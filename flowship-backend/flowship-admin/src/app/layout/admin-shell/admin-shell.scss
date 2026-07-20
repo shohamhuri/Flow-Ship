@@ -1,0 +1,157 @@
+:host {
+    display: block;
+    direction: rtl;
+    font-family: Arial, sans-serif;
+}
+
+.shell {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    min-height: 100vh;
+    background: #f4f7fb;
+}
+
+.sidebar {
+    background: #0f2747;
+    color: #fff;
+    padding: 24px 18px;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+    h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+    }
+
+    p {
+        margin: 4px 0 0;
+        color: #c8d5e6;
+        font-size: 14px;
+    }
+}
+
+.brand-badge {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: #f4d35e;
+    color: #0f2747;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.menu {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-decoration: none;
+    color: #ffffff;
+    padding: 14px 14px;
+    border-radius: 16px;
+    transition: 0.2s ease;
+    background: transparent;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.07);
+    }
+
+    &.active {
+        background: #f4d35e;
+        color: #0f2747;
+
+        .menu-subtitle {
+            color: #334155;
+        }
+    }
+}
+
+.menu-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 20px;
+}
+
+.menu-item.active .menu-icon {
+    background: rgba(15, 39, 71, 0.12);
+}
+
+.menu-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.menu-label {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.menu-subtitle {
+    font-size: 12px;
+    color: #c8d5e6;
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.topbar {
+    background: white;
+    padding: 22px 28px;
+    border-bottom: 1px solid #e7edf4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h2 {
+        margin: 0 0 6px;
+        color: #0f2747;
+        font-size: 24px;
+    }
+
+    p {
+        margin: 0;
+        color: #64748b;
+    }
+}
+
+.topbar-badge {
+    background: #fff8db;
+    color: #7a5c00;
+    border: 1px solid #f4d35e;
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.page-content {
+    padding: 28px;
+}

@@ -1,0 +1,20 @@
+<div class="home-page">
+    <div class="hero">
+        <div>
+            <h1>ברוכה הבאה ל־FlowShip Admin</h1>
+            <p>
+                כאן תוכלי לנהל את מנועי הלוגיסטיקה, ספקי השילוח, הקריטריונים,
+                הלוגים ותהליכי המשלוחים בצורה מסודרת.
+            </p>
+        </div>
+    </div>
+
+    <div class="cards-grid">
+        <a *ngFor="let card of cards" [routerLink]="card.route" class="portal-card">
+            <div class="card-badge">{{ card.badge }}</div>
+            <h3>{{ card.title }}</h3>
+            <p>{{ card.description }}</p>
+            <span class="card-link">כניסה למסך ←</span>
+        </a>
+    </div>
+</div>

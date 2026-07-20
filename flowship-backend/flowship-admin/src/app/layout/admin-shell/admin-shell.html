@@ -1,0 +1,39 @@
+<div class="shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-badge">F</div>
+            <div>
+                <h1>FlowShip</h1>
+                <p>Admin Portal</p>
+            </div>
+        </div>
+
+        <nav class="menu">
+            <a *ngFor="let item of menuItems" [routerLink]="item.route" routerLinkActive="active" class="menu-item">
+                <div class="menu-icon">{{ item.icon }}</div>
+
+                <div class="menu-text">
+                    <div class="menu-label">{{ item.label }}</div>
+                    <div class="menu-subtitle">{{ item.subtitle }}</div>
+                </div>
+            </a>
+        </nav>
+    </aside>
+
+    <main class="content">
+        <header class="topbar">
+            <div>
+                <h2>מערכת ניהול FlowShip</h2>
+                <p>ניהול ספקים, קריטריונים, לוגים ותהליכי שילוח</p>
+            </div>
+
+            <div class="topbar-badge">
+                SaaS Multi-Tenant
+            </div>
+        </header>
+
+        <section class="page-content">
+            <router-outlet></router-outlet>
+        </section>
+    </main>
+</div>

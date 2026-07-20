@@ -1,0 +1,166 @@
+<div class="criteria-page">
+    <section class="hero-card">
+        <div>
+            <div class="eyebrow">Decision Engine</div>
+            <h1>ניהול קריטריונים</h1>
+            <p>
+                סדרי את הקוביות לפי החשיבות העסקית. הקובייה העליונה משפיעה הכי הרבה
+                על בחירת חברת השילוח, והקוביות שמתחתיה משפיעות פחות.
+            </p>
+        </div>
+
+        <button type="button" class="primary-btn" (click)="openCreatePanel()">
+            + צור קובייה
+        </button>
+    </section>
+
+    <section class="explain-card">
+        <div class="explain-item">
+            <strong>איך זה עובד?</strong>
+            <span>גוררים קוביות למעלה או למטה לפי חשיבות.</span>
+        </div>
+
+        <div class="explain-item">
+            <strong>חברת שילוח</strong>
+            <span>כרגע אפשר לבחור ALL, ובהמשך גם חברה ספציפית.</span>
+        </div>
+
+        <div class="explain-item">
+            <strong>קריטריון</strong>
+            <span>המערכת מאפשרת רק קריטריונים שהיא יודעת לחשב.</span>
+        </div>
+    </section>
+
+    <div *ngIf="loading && !cards.length" class="state-card">
+        טוען קוביות...
+    </div>
+    <div *ngIf="saving" class="saving-pill">
+        שומר סדר...
+    </div>
+
+    <div *ngIf="errorMsg" class="error-card">
+        {{ errorMsg }}
+    </div>
+
+    <div *ngIf="successMsg" class="success-card">
+        {{ successMsg }}
+    </div>
+
+    <section *ngIf="showCreatePanel" class="create-panel">
+        <div class="panel-header">
+            <div>
+                <h2>יצירת קוביית תעדוף</h2>
+                <p>בחרי חברת שילוח וקריטריון. הקובייה תתווסף לסוף הרשימה.</p>
+            </div>
+
+            <button type="button" class="ghost-btn" (click)="closeCreatePanel()">
+                סגור
+            </button>
+        </div>
+
+        <div class="form-grid">
+            <label>
+                חברת שילוח
+                <select [(ngModel)]="newCard.providerId">
+                    <option [ngValue]="null">ALL - כל החברות</option>
+
+                    <option *ngFor="let provider of providers" [ngValue]="provider.id">
+                        {{ provider.name }}
+                    </option>
+                </select>
+            </label>
+
+            <label>
+                קריטריון
+                <select [(ngModel)]="newCard.criterionKey">
+                    <option value="" disabled>בחרי קריטריון</option>
+
+                    <option *ngFor="let criterion of criteria" [value]="criterion.key">
+                        {{ criterion.label }}
+                    </option>
+                </select>
+                <div *ngIf="isDuplicateNewCard()" class="duplicate-warning">
+                    קובייה כזאת כבר קיימת. אי אפשר ליצור אותה שוב.
+                </div>
+            </label>
+        </div>
+
+        <div class="panel-actions">
+            <button type="button" class="primary-btn" (click)="createCard()" [disabled]="isDuplicateNewCard()">
+                צור קובייה
+            </button>
+
+            <button type="button" class="secondary-btn" (click)="closeCreatePanel()">
+                ביטול
+            </button>
+        </div>
+    </section>
+
+    <section class="cards-section" *ngIf="cards.length">
+        <div class="section-header">
+            <div>
+                <h2>סדר עדיפויות פעיל</h2>
+                <p>
+                    {{ activeCardsCount }} קוביות פעילות. גרירה למעלה מעלה את החשיבות.
+                </p>
+            </div>
+        </div>
+
+        <div cdkDropList class="cards-list" (cdkDropListDropped)="drop($event)">
+            <article *ngFor="let card of cards; let i = index; trackBy: trackByCardId" cdkDrag class="priority-card"
+                [class.inactive]="!card.isActive">
+                <div class="drag-handle" cdkDragHandle title="גרירה">
+                    ⋮⋮
+                </div>
+
+                <div class="rank-box">
+                    <span>עדיפות</span>
+                    <strong>#{{ i + 1 }}</strong>
+                </div>
+
+                <div class="card-main">
+                    <div class="card-top">
+                        <span class="provider-pill">
+                            {{ card.providerName }}
+                        </span>
+
+                        <span class="criterion-pill">
+                            {{ card.criterionLabel }}
+                        </span>
+
+                        <span class="active-pill" [class.off]="!card.isActive">
+                            {{ card.isActive ? 'פעיל' : 'כבוי' }}
+                        </span>
+                    </div>
+
+                    <h3>{{ card.title }}</h3>
+
+                    <p>
+                        {{ card.criterionDescription || 'קריטריון תעדוף במנוע ההחלטות' }}
+                    </p>
+                </div>
+
+                <div class="weight-preview">
+                    <span>השפעה משוערת</span>
+                    <strong *ngIf="card.isActive">
+                        {{ getRankWeight(i) * 100 | number:'1.0-0' }}%
+                    </strong>
+
+                    <strong *ngIf="!card.isActive">
+                        —
+                    </strong>
+                </div>
+
+                <div class="card-actions">
+                    <button type="button" class="small-btn" (click)="toggleCard(card)">
+                        {{ card.isActive ? 'כבה' : 'הפעל' }}
+                    </button>
+
+                    <button type="button" class="danger-btn" (click)="deleteCard(card)">
+                        מחק
+                    </button>
+                </div>
+            </article>
+        </div>
+    </section>
+</div>

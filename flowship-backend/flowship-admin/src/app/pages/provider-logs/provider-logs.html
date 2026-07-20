@@ -1,0 +1,570 @@
+<section class="logs-page" dir="rtl">
+    <header class="page-header">
+        <div>
+            <div class="eyebrow">מערכת ניטור</div>
+
+            <h1>לוגים של ספקי שילוח</h1>
+
+            <p>
+                מעקב אחר קריאות לספקים, זמני תגובה,
+                שגיאות והנתונים שנשלחו והתקבלו.
+            </p>
+        </div>
+
+        <div class="header-actions">
+            @if (tenantName) {
+            <span class="tenant-badge">
+                {{ tenantName }}
+            </span>
+            }
+
+            <button type="button" class="refresh-button" [disabled]="loading" (click)="refresh()">
+                <span class="refresh-icon" [class.spinning]="loading">
+                    ↻
+                </span>
+
+                רענון
+            </button>
+        </div>
+    </header>
+
+    <div class="summary-grid">
+        <article class="summary-card">
+            <div class="summary-icon">☰</div>
+
+            <div>
+                <span>סה״כ תוצאות</span>
+                <strong>{{ total }}</strong>
+            </div>
+        </article>
+
+        <article class="summary-card success">
+            <div class="summary-icon">✓</div>
+
+            <div>
+                <span>הצלחות בעמוד</span>
+                <strong>{{ successCount }}</strong>
+            </div>
+        </article>
+
+        <article class="summary-card failed">
+            <div class="summary-icon">!</div>
+
+            <div>
+                <span>כישלונות בעמוד</span>
+                <strong>{{ failedCount }}</strong>
+            </div>
+        </article>
+
+        <article class="summary-card">
+            <div class="summary-icon">◷</div>
+
+            <div>
+                <span>זמן תגובה ממוצע</span>
+                <strong>
+                    {{ averageResponseTime }} ms
+                </strong>
+            </div>
+        </article>
+    </div>
+
+    <form class="filters-card" [formGroup]="filterForm" (ngSubmit)="applyFilters()">
+        <div class="search-field">
+            <label for="logs-search">
+                חיפוש
+            </label>
+
+            <div class="search-input-wrapper">
+                <span>⌕</span>
+
+                <input id="logs-search" type="search" formControlName="search"
+                    placeholder="ספק, פעולה, מזהה לוג או הודעת שגיאה" />
+            </div>
+        </div>
+
+        <div class="filter-field">
+            <label for="provider-filter">
+                ספק
+            </label>
+
+            <select id="provider-filter" formControlName="providerCode">
+                <option value="">
+                    כל הספקים
+                </option>
+
+                @for (
+                provider of providers;
+                track provider.code
+                ) {
+                <option [value]="provider.code">
+                    {{ provider.name }}
+                </option>
+                }
+            </select>
+        </div>
+
+        <div class="filter-field">
+            <label for="status-filter">
+                סטטוס
+            </label>
+
+            <select id="status-filter" formControlName="status">
+                <option value="">
+                    כל הסטטוסים
+                </option>
+
+                <option value="success">
+                    הצלחה
+                </option>
+
+                <option value="failed">
+                    נכשל
+                </option>
+            </select>
+        </div>
+
+        <div class="filter-field">
+            <label for="action-filter">
+                פעולה
+            </label>
+
+            <select id="action-filter" formControlName="action">
+                <option value="">
+                    כל הפעולות
+                </option>
+
+                @for (
+                action of actions;
+                track action.value
+                ) {
+                <option [value]="action.value">
+                    {{ action.label }}
+                </option>
+                }
+            </select>
+        </div>
+
+        <div class="filter-field">
+            <label for="from-date">
+                מתאריך
+            </label>
+
+            <input id="from-date" type="date" formControlName="fromDate" />
+        </div>
+
+        <div class="filter-field">
+            <label for="to-date">
+                עד תאריך
+            </label>
+
+            <input id="to-date" type="date" formControlName="toDate" />
+        </div>
+
+        <div class="filter-field compact">
+            <label for="page-size">
+                תוצאות
+            </label>
+
+            <select id="page-size" formControlName="limit">
+                @for (size of pageSizes; track size) {
+                <option [ngValue]="size">
+                    {{ size }}
+                </option>
+                }
+            </select>
+        </div>
+
+        <div class="filter-actions">
+            <button type="submit" class="primary-button" [disabled]="loading">
+                הצג תוצאות
+            </button>
+
+            <button type="button" class="secondary-button" [disabled]="loading" (click)="resetFilters()">
+                איפוס
+            </button>
+        </div>
+    </form>
+
+    <div class="logs-card">
+        <div class="table-header">
+            <div>
+                <h2>קריאות לספקים</h2>
+
+                <span>
+                    מציג {{ logs.length }} מתוך
+                    {{ total }} תוצאות
+                </span>
+            </div>
+        </div>
+
+        @if (loading) {
+        <div class="state-box">
+            <div class="loader"></div>
+            <strong>טוען לוגים...</strong>
+            <span>הנתונים מתעדכנים מהשרת</span>
+        </div>
+        } @else if (errorMessage) {
+        <div class="state-box error-state">
+            <div class="state-icon">!</div>
+            <strong>טעינת הלוגים נכשלה</strong>
+            <span>{{ errorMessage }}</span>
+
+            <button type="button" class="primary-button" (click)="loadLogs()">
+                ניסיון נוסף
+            </button>
+        </div>
+        } @else if (!logs.length) {
+        <div class="state-box">
+            <div class="state-icon">⌕</div>
+            <strong>לא נמצאו לוגים</strong>
+            <span>
+                נסי לשנות או לאפס את הסינונים.
+            </span>
+        </div>
+        } @else {
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>תאריך ושעה</th>
+                        <th>ספק</th>
+                        <th>פעולה</th>
+                        <th>מסלול</th>
+                        <th>תוצאות</th>
+                        <th>סטטוס</th>
+                        <th>זמן תגובה</th>
+                        <th>שגיאה</th>
+                        <th></th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (
+                    log of logs;
+                    track trackByLogId(
+                    $index,
+                    log
+                    )
+                    ) {
+                    <tr>
+                        <td class="date-cell">
+                            <strong>
+                                {{
+                                log.createdAt
+                                | date:
+                                'dd/MM/yyyy'
+                                }}
+                            </strong>
+
+                            <span>
+                                {{
+                                log.createdAt
+                                | date:
+                                'HH:mm:ss'
+                                }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <div class="provider-cell">
+                                <div class="provider-avatar">
+                                    {{
+                                    log.providerName
+                                    ?.charAt(0)
+                                    }}
+                                </div>
+
+                                <div>
+                                    <strong>
+                                        {{
+                                        log.providerName
+                                        || 'ספק לא ידוע'
+                                        }}
+                                    </strong>
+
+                                    <span>
+                                        {{
+                                        log.providerCode
+                                        || 'ללא קוד'
+                                        }}
+                                    </span>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <span class="action-badge">
+                                {{
+                                getActionLabel(
+                                log.action
+                                )
+                                }}
+                            </span>
+                        </td>
+
+                        <td class="route-cell">
+                            {{ getRequestRoute(log) }}
+                        </td>
+
+                        <td>
+                            {{ getQuotesCount(log) }}
+                            הצעות
+                        </td>
+
+                        <td>
+                            <span class="status-badge" [class.success]="
+                                            log.status ===
+                                            'success'
+                                        " [class.failed]="
+                                            log.status ===
+                                            'failed'
+                                        ">
+                                <span class="status-dot"></span>
+
+                                {{
+                                getStatusLabel(
+                                log.status
+                                )
+                                }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <span class="response-time" [class.slow]="
+                                            (log.responseTimeMs
+                                                ?? 0) >
+                                            1000
+                                        ">
+                                {{
+                                log.responseTimeMs
+                                ?? 0
+                                }}
+                                ms
+                            </span>
+                        </td>
+
+                        <td class="error-cell" [title]="
+                                        log.errorMessage || ''
+                                    ">
+                            {{
+                            log.errorMessage
+                            || '—'
+                            }}
+                        </td>
+
+                        <td>
+                            <button type="button" class="details-button" (click)="openLog(log)">
+                                פרטים
+                            </button>
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="pagination">
+            <button type="button" [disabled]="currentPage <= 1" (click)="previousPage()">
+                הקודם
+            </button>
+
+            <span>
+                עמוד {{ currentPage }}
+                מתוך {{ totalPages }}
+            </span>
+
+            <button type="button" [disabled]="!hasNextPage" (click)="nextPage()">
+                הבא
+            </button>
+        </footer>
+        }
+    </div>
+</section>
+
+@if (selectedLog) {
+<div class="log-drawer-backdrop" (click)="closeLog()">
+    <aside class="log-drawer" dir="rtl" (click)="$event.stopPropagation()">
+        <header class="log-drawer__header">
+            <div>
+                <span class="log-drawer__eyebrow">
+                    פרטי לוג
+                </span>
+
+                <h2>
+                    {{ getProviderDisplayName(selectedLog) }}
+                </h2>
+
+                <p>
+                    {{ selectedLog.id }}
+                </p>
+            </div>
+
+            <button type="button" class="log-drawer__close" (click)="closeLog()" aria-label="סגירה">
+                ×
+            </button>
+        </header>
+
+        <div class="log-drawer__content">
+            <div class="modal-summary">
+                <div>
+                    <span>סטטוס</span>
+
+                    <strong [class.status-success]="selectedLog.status === 'success'"
+                        [class.status-failed]="selectedLog.status === 'failed'">
+                        {{ getStatusLabel(selectedLog.status) }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>פעולה</span>
+
+                    <strong>
+                        {{ getActionLabel(selectedLog.action) }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>זמן תגובה</span>
+
+                    <strong>
+                        {{ selectedLog.responseTimeMs ?? 0 }}
+                        מילישניות
+                    </strong>
+                </div>
+
+                <div>
+                    <span>תאריך ושעה</span>
+
+                    <strong>
+                        {{
+                        selectedLog.createdAt
+                        | date: 'dd/MM/yyyy HH:mm:ss'
+                        }}
+                    </strong>
+                </div>
+            </div>
+
+            <section class="log-section">
+                <h3>פרטי הבקשה</h3>
+
+                <div class="log-details-grid">
+                    <div class="log-detail">
+                        <span>ספק</span>
+                        <strong>
+                            {{ getProviderDisplayName(selectedLog) }}
+                        </strong>
+                    </div>
+
+                    <div class="log-detail">
+                        <span>עיר מוצא</span>
+                        <strong>
+                            {{ getOriginCity(selectedLog) }}
+                        </strong>
+                    </div>
+
+                    <div class="log-detail">
+                        <span>עיר יעד</span>
+                        <strong>
+                            {{ getDestinationCity(selectedLog) }}
+                        </strong>
+                    </div>
+
+                    <div class="log-detail">
+                        <span>משקל משלוח</span>
+                        <strong>
+                            {{ getWeightKg(selectedLog) }}
+                        </strong>
+                    </div>
+
+                    <div class="log-detail">
+                        <span>קוד ספק</span>
+                        <strong>
+                            {{ selectedLog.providerCode || 'לא צוין' }}
+                        </strong>
+                    </div>
+
+                    <div class="log-detail">
+                        <span>מזהה Adapter</span>
+                        <strong>
+                            {{ getAdapterKey(selectedLog) }}
+                        </strong>
+                    </div>
+                </div>
+            </section>
+
+            @if (selectedLog.status === 'failed') {
+            <section class="log-error-box">
+                <h3>מה קרה?</h3>
+
+                <p>
+                    {{ getReadableError(selectedLog) }}
+                </p>
+            </section>
+            }
+
+            <section class="log-section">
+                <h3>תוצאת הבקשה</h3>
+
+                <p class="log-response-summary">
+                    {{ getResponseSummary(selectedLog) }}
+                </p>
+
+                @if (getLogResponse(selectedLog)?.quotes?.length) {
+                <div class="quote-list">
+                    @for (
+                    quote of getLogResponse(selectedLog)?.quotes;
+                    track $index
+                    ) {
+                    <article class="quote-card">
+                        <div class="quote-card__main">
+                            <strong>
+                                {{
+                                quote.serviceName
+                                || 'שירות משלוח'
+                                }}
+                            </strong>
+
+                            <span>
+                                {{
+                                quote.carrierName
+                                || getProviderDisplayName(selectedLog)
+                                }}
+                            </span>
+                        </div>
+
+                        <div class="quote-card__price">
+                            {{ quote.price }}
+                            {{ quote.currency || 'ILS' }}
+                        </div>
+
+                        <div class="quote-card__days">
+                            {{
+                            getEstimatedDaysLabel(
+                            quote.estimatedDays
+                            )
+                            }}
+                        </div>
+                    </article>
+                    }
+                </div>
+                }
+            </section>
+
+            <details class="technical-details">
+                <summary>מידע טכני</summary>
+
+                <div class="technical-block">
+                    <h4>בקשה גולמית</h4>
+                    <pre>{{ selectedLog.request | json }}</pre>
+                </div>
+
+                <div class="technical-block">
+                    <h4>תגובה גולמית</h4>
+                    <pre>{{ selectedLog.response | json }}</pre>
+                </div>
+            </details>
+        </div>
+    </aside>
+</div>
+
+}

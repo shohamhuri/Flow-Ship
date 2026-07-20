@@ -1,0 +1,73 @@
+<div class="page">
+    <header class="page-header">
+        <div>
+            <h1>ניהול חברות שילוח</h1>
+            <p *ngIf="tenantName">
+                Tenant: <strong>{{ tenantName }}</strong>
+                <span>({{ schemaName }})</span>
+            </p>
+        </div>
+
+        <button type="button" (click)="loadProviders()">
+            רענון
+        </button>
+    </header>
+
+    <div *ngIf="loading" class="state">
+        טוען נתונים...
+    </div>
+
+    <div *ngIf="errorMsg" class="error">
+        {{ errorMsg }}
+    </div>
+
+    <table *ngIf="!loading && providers.length" class="providers-table">
+        <thead>
+            <tr>
+                <th>שם ספק</th>
+                <th>Code</th>
+                <th>Adapter</th>
+                <th>Mock</th>
+                <th>פעיל</th>
+                <th>עדיפות ספק</th>
+                <th>עודכן לאחרונה</th>
+                <th>פעולות</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr *ngFor="let provider of providers">
+                <td>{{ provider.name }}</td>
+                <td>{{ provider.code }}</td>
+                <td>{{ provider.adapterKey }}</td>
+                <td>
+                    <span class="badge" [class.yes]="provider.isMock">
+                        {{ provider.isMock ? 'כן' : 'לא' }}
+                    </span>
+                </td>
+                <td>
+                    <span class="status" [class.active]="provider.isActive">
+                        {{ provider.isActive ? 'פעיל' : 'כבוי' }}
+                    </span>
+                </td>
+                <td>
+                    <input type="number" min="0" max="1" step="0.1" [(ngModel)]="provider.priorityScore" />
+                </td>
+                <td>{{ provider.updatedAt | date:'dd/MM/yyyy HH:mm' }}</td>
+                <td class="actions">
+                    <button type="button" (click)="toggleProvider(provider)">
+                        {{ provider.isActive ? 'כבה' : 'הפעל' }}
+                    </button>
+
+                    <button type="button" (click)="savePriority(provider)">
+                        שמור Priority
+                    </button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div *ngIf="!loading && !providers.length" class="state">
+        לא נמצאו ספקי שילוח
+    </div>
+</div>
