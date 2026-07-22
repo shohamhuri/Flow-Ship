@@ -4,22 +4,27 @@ import { AppModule } from './app.module';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
-  const allowedOrigins = (
-    process.env.FRONTEND_URL || 'http://localhost:4200'
-  )
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
   app.enableCors({
-    origin: allowedOrigins,
+    origin: [
+      'http://localhost:4200',
+      process.env.FRONTEND_URL,
+    ].filter((origin): origin is string => Boolean(origin)),
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-api-key',
+    ],
   });
 
   const port = Number(process.env.PORT) || 3000;
 
   await app.listen(port, '0.0.0.0');
+
+  console.log(`FlowShip API is running on port ${port}`);
 }
 
-void bootstrap();
+bootstrap().catch((error: unknown) => {
+  console.error('Failed to start FlowShip API:', error);
+  process.exit(1);
+});
