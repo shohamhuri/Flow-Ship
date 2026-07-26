@@ -8,6 +8,7 @@ import { CarriersModule } from './modules/carriers/carriers.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { DecisionModule } from './modules/decision/decision.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { CheckoutModule } from './modules/checkout/checkout.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -19,6 +20,7 @@ import { AdminModule } from './modules/admin/admin.module';
     QuotesModule,
     DecisionModule,
     AdminModule,
+    CheckoutModule,
   ],
   controllers: [AppController],
   providers: [AppService],
