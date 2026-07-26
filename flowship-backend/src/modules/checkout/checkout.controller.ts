@@ -1,16 +1,37 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Headers,
+    Post,
+} from '@nestjs/common';
+
+import {
+    CurrentTenant,
+    TenantsService,
+} from '../tenants/tenants.service';
+
 import { CheckoutService } from './checkout.service';
+import type { CheckoutProcessingResult } from './checkout.service';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
-import type { Checkout } from './interfaces/checkout.interface';
 
 @Controller('checkout')
 export class CheckoutController {
-    constructor(private readonly checkoutService: CheckoutService) { }
+    constructor(
+        private readonly checkoutService: CheckoutService,
+        private readonly tenantsService: TenantsService,
+    ) { }
 
     @Post()
-    createCheckout(
+    async createCheckout(
         @Body() createCheckoutDto: CreateCheckoutDto,
-    ): Checkout {
-        return this.checkoutService.createCheckout(createCheckoutDto);
+        @Headers('x-api-key') apiKey: string | undefined,
+    ): Promise<CheckoutProcessingResult> {
+        const tenant: CurrentTenant =
+            await this.tenantsService.findByApiKey(apiKey);
+
+        return this.checkoutService.createCheckout(
+            createCheckoutDto,
+            tenant,
+        );
     }
 }

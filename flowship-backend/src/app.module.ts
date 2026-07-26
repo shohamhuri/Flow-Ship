@@ -9,6 +9,8 @@ import { QuotesModule } from './modules/quotes/quotes.module';
 import { DecisionModule } from './modules/decision/decision.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
+import { SourcingModule } from './modules/sourcing/sourcing.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -21,6 +23,8 @@ import { CheckoutModule } from './modules/checkout/checkout.module';
     DecisionModule,
     AdminModule,
     CheckoutModule,
+    SourcingModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
