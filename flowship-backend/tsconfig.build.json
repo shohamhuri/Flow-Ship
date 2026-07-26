@@ -1,10 +1,13 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false
+  },
   "exclude": [
     "node_modules",
     "test",
     "dist",
-    "**/*spec.ts",
+    "**/*.spec.ts",
     "flowship-admin",
     "flowship-admin/**/*"
   ]
