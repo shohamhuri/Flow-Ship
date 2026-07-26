@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 export type ProviderLogStatus = 'success' | 'failed';
-
+import { environment } from '../../environments/environment';
 export interface ProviderCallLog {
   id: string;
   providerId: string | null;
@@ -116,7 +116,7 @@ type UpdateProviderResponse = {
   providedIn: 'root',
 })
 export class AdminApiService {
-  private readonly baseUrl = 'http://localhost:3000';
+  private readonly baseUrl = environment.apiUrl;
   private readonly apiKey = 'flow_ship_test_key_123';
 
   constructor(private readonly http: HttpClient) { }
