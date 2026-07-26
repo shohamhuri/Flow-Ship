@@ -21,6 +21,8 @@ async function bootstrap(): Promise<void> {
       'Authorization',
       'x-api-key',
     ],
+    credentials: false,
+
   });
 
   const port = Number(process.env.PORT) || 3000;
