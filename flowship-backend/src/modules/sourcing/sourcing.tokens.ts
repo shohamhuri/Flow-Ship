@@ -1,0 +1,2 @@
+export const INVENTORY_PROVIDER =
+    'INVENTORY_PROVIDER';
