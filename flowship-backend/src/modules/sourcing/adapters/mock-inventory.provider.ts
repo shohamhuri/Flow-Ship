@@ -46,6 +46,7 @@ export class MockInventoryProvider implements InventoryProvider {
                 city: 'Tel Aviv',
             },
         },
+
     ];
 
     private readonly inventory: SourceInventory[] = [
@@ -63,6 +64,16 @@ export class MockInventoryProvider implements InventoryProvider {
             sourceId: 'BRANCH-BEER-SHEVA',
             sku: 'SHIRT-BLACK-M',
             availableQuantity: 1,
+        },
+        {
+            sourceId: 'BRANCH-BEER-SHEVA',
+            sku: 'ICE-CREAM-VANILLA',
+            availableQuantity: 10,
+        },
+        {
+            sourceId: 'WAREHOUSE-SOUTH',
+            sku: 'ICE-CREAM-VANILLA',
+            availableQuantity: 20,
         },
         {
             sourceId: 'BRANCH-TEL-AVIV',
