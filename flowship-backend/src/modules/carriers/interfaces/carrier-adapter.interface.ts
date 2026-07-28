@@ -15,6 +15,9 @@ export interface CarrierQuoteOption {
     currency: 'ILS';
     estimatedDays: number;
     providerPriority?: number;
+    providerId?: string;
+    providerCode?: string;
+    adapterKey?: string;
 }
 
 export interface CarrierAdapter {

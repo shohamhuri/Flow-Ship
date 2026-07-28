@@ -123,8 +123,13 @@ export class DecisionCriteriaComponent implements OnInit {
       },
       error: (err) => {
         console.error('reorder error:', err);
+        console.error('validation message:', err?.error?.message);
 
-        this.errorMsg = 'שגיאה בשמירת הסדר';
+        this.errorMsg = Array.isArray(err?.error?.message)
+          ? err.error.message.join(', ')
+          : 'שגיאה בשמירת הסדר';
+
+        this.saving = false;
         this.loadPage();
       },
       complete: () => {

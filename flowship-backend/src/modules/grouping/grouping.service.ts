@@ -2,50 +2,133 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
 import { Checkout } from '../checkout/interfaces/checkout.interface';
+import { ItemSourceAssignment } from '../planning/interfaces/shipment-plan.interface';
 import { ItemSourcingResult } from '../sourcing/interfaces/source-ranking.interface';
+import { RankedSupplySource } from '../sourcing/interfaces/source-ranking.interface';
 
+import { GroupingRulesService } from './grouping-rules.service';
 import { GroupingResult } from './interfaces/grouping-result.interface';
 import {
     ShipmentGroup,
     ShipmentGroupItem,
 } from './interfaces/shipment-group.interface';
-import { GroupingRulesService } from './grouping-rules.service';
+
+interface ItemSourceSelection {
+    itemIndex: number;
+    selectedSource: RankedSupplySource | null;
+}
 
 @Injectable()
 export class GroupingService {
+    constructor(
+        private readonly groupingRulesService: GroupingRulesService,
+    ) { }
+
+    /**
+     * הזרימה הישנה:
+     * משתמשת במקור הראשי שנבחר על ידי ה-Sourcing.
+     *
+     * נשאיר אותה כרגע כדי לא לשבור את CheckoutService.
+     */
     groupCheckout(
         checkout: Checkout,
         sourcingResults: ItemSourcingResult[],
     ): GroupingResult {
+        const sourceSelections: ItemSourceSelection[] =
+            checkout.items.map((item, itemIndex) => {
+                /*
+                 * כרגע ItemSourcingResult אינו כולל itemIndex,
+                 * ולכן לצורך תאימות לזרימה הקיימת אנחנו מחפשים לפי SKU.
+                 *
+                 * מנגנון התוכניות החדש לא ישתמש בחיפוש הזה.
+                 */
+                const sourcingResult = sourcingResults.find(
+                    (result) => result.sku === item.sku,
+                );
 
+                return {
+                    itemIndex,
+                    selectedSource:
+                        sourcingResult?.selectedSource ?? null,
+                };
+            });
+
+        return this.buildGroupingResult(
+            checkout,
+            sourceSelections,
+        );
+    }
+
+    /**
+     * הזרימה החדשה:
+     * יוצרת Shipment Groups עבור תוכנית משלוחים מסוימת.
+     *
+     * בכל תוכנית יכול להיבחר מקור שונה לכל פריט.
+     */
+    groupShipmentPlan(
+        checkout: Checkout,
+        assignments: ItemSourceAssignment[],
+    ): GroupingResult {
+        const sourceSelections: ItemSourceSelection[] =
+            assignments.map((assignment) => ({
+                itemIndex: assignment.itemIndex,
+                selectedSource: assignment.selectedSource,
+            }));
+
+        return this.buildGroupingResult(
+            checkout,
+            sourceSelections,
+        );
+    }
+
+    /**
+     * לוגיקת הקיבוץ המשותפת לשתי הזרימות.
+     */
+    private buildGroupingResult(
+        checkout: Checkout,
+        sourceSelections: ItemSourceSelection[],
+    ): GroupingResult {
         const groupsByKey = new Map<string, ShipmentGroup>();
 
-        const ungroupedItems: GroupingResult['ungroupedItems'] = [];
+        const ungroupedItems: GroupingResult['ungroupedItems'] =
+            [];
 
-        for (const item of checkout.items) {
-            const sourcingResult = sourcingResults.find(
-                (result) => result.sku === item.sku,
+        for (
+            let itemIndex = 0;
+            itemIndex < checkout.items.length;
+            itemIndex++
+        ) {
+            const item = checkout.items[itemIndex];
+
+            const sourceSelection = sourceSelections.find(
+                (selection) =>
+                    selection.itemIndex === itemIndex,
             );
 
-            if (!sourcingResult) {
+            if (!sourceSelection) {
                 ungroupedItems.push({
                     sku: item.sku,
                     name: item.name,
                     quantity: item.quantity,
-                    reasons: ['SOURCING_RESULT_NOT_FOUND'],
+                    reasons: [
+                        'SOURCE_ASSIGNMENT_NOT_FOUND',
+                    ],
                 });
 
                 continue;
             }
 
-            const selectedSource = sourcingResult.selectedSource;
+            const selectedSource =
+                sourceSelection.selectedSource;
 
             if (!selectedSource) {
                 ungroupedItems.push({
                     sku: item.sku,
                     name: item.name,
                     quantity: item.quantity,
-                    reasons: ['NO_SUPPLY_SOURCE_SELECTED'],
+                    reasons: [
+                        'NO_SUPPLY_SOURCE_SELECTED',
+                    ],
                 });
 
                 continue;
@@ -64,8 +147,6 @@ export class GroupingService {
                 handlingGroup,
             ].join('::');
 
-            const existingGroup = groupsByKey.get(groupingKey);
-
             const shipmentItem: ShipmentGroupItem = {
                 sku: item.sku,
                 name: item.name,
@@ -76,22 +157,32 @@ export class GroupingService {
                 category: item.category,
             };
 
+            const existingGroup =
+                groupsByKey.get(groupingKey);
+
             if (existingGroup) {
                 if (
                     item.category &&
-                    !existingGroup.categories.includes(item.category)
+                    !existingGroup.categories.includes(
+                        item.category,
+                    )
                 ) {
-                    existingGroup.categories.push(item.category);
+                    existingGroup.categories.push(
+                        item.category,
+                    );
                 }
+
                 existingGroup.items.push(shipmentItem);
 
                 existingGroup.totalItems += item.quantity;
 
                 existingGroup.totalWeight +=
-                    item.quantity * (item.unitWeight ?? 0);
+                    item.quantity *
+                    (item.unitWeight ?? 0);
 
                 existingGroup.totalPrice +=
-                    item.quantity * (item.unitPrice ?? 0);
+                    item.quantity *
+                    (item.unitPrice ?? 0);
 
                 continue;
             }
@@ -102,19 +193,24 @@ export class GroupingService {
                 source,
 
                 supplierId: item.supplierId,
+
                 categories: item.category
                     ? [item.category]
                     : [],
+
                 handlingGroup,
+
                 items: [shipmentItem],
 
                 totalItems: item.quantity,
 
                 totalWeight:
-                    item.quantity * (item.unitWeight ?? 0),
+                    item.quantity *
+                    (item.unitWeight ?? 0),
 
                 totalPrice:
-                    item.quantity * (item.unitPrice ?? 0),
+                    item.quantity *
+                    (item.unitPrice ?? 0),
 
                 groupingReasons: [
                     'SAME_SUPPLY_SOURCE',
@@ -124,31 +220,41 @@ export class GroupingService {
             });
         }
 
-        const shipmentGroups = Array.from(groupsByKey.values()).map(
-            (group) => ({
-                ...group,
-                totalWeight: Number(group.totalWeight.toFixed(3)),
-                totalPrice: Number(group.totalPrice.toFixed(2)),
-            }),
-        );
-        const splitReasons = this.buildSplitReasons(shipmentGroups);
+        const shipmentGroups = Array.from(
+            groupsByKey.values(),
+        ).map((group) => ({
+            ...group,
+            totalWeight: Number(
+                group.totalWeight.toFixed(3),
+            ),
+            totalPrice: Number(
+                group.totalPrice.toFixed(2),
+            ),
+        }));
+
+        const splitReasons =
+            this.buildSplitReasons(shipmentGroups);
 
         return {
             orderId: checkout.orderId,
             shipmentGroups,
             ungroupedItems,
+
             totalGroups: shipmentGroups.length,
+
             totalGroupedItems: shipmentGroups.reduce(
-                (total, group) => total + group.totalItems,
+                (total, group) =>
+                    total + group.totalItems,
                 0,
             ),
-            hasUngroupedItems: ungroupedItems.length > 0,
+
+            hasUngroupedItems:
+                ungroupedItems.length > 0,
+
             splitReasons,
         };
     }
-    constructor(
-        private readonly groupingRulesService: GroupingRulesService,
-    ) { }
+
     private buildSplitReasons(
         shipmentGroups: ShipmentGroup[],
     ): string[] {
@@ -159,21 +265,29 @@ export class GroupingService {
         const reasons = new Set<string>();
 
         const sourceIds = new Set(
-            shipmentGroups.map((group) => group.source.id),
+            shipmentGroups.map(
+                (group) => group.source.id,
+            ),
         );
 
         const supplierIds = new Set(
             shipmentGroups.map(
-                (group) => group.supplierId ?? 'NO_SUPPLIER',
+                (group) =>
+                    group.supplierId ??
+                    'NO_SUPPLIER',
             ),
         );
 
         const handlingGroups = new Set(
-            shipmentGroups.map((group) => group.handlingGroup),
+            shipmentGroups.map(
+                (group) => group.handlingGroup,
+            ),
         );
 
         if (sourceIds.size > 1) {
-            reasons.add('DIFFERENT_SUPPLY_SOURCES');
+            reasons.add(
+                'DIFFERENT_SUPPLY_SOURCES',
+            );
         }
 
         if (supplierIds.size > 1) {
@@ -181,7 +295,9 @@ export class GroupingService {
         }
 
         if (handlingGroups.size > 1) {
-            reasons.add('INCOMPATIBLE_HANDLING_GROUPS');
+            reasons.add(
+                'INCOMPATIBLE_HANDLING_GROUPS',
+            );
         }
 
         return Array.from(reasons);

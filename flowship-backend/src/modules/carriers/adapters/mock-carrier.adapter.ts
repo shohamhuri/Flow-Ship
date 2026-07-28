@@ -18,18 +18,19 @@ export class MockCarrierAdapter implements CarrierAdapter {
         return [
             {
                 carrierName: 'Mock Express',
-                serviceName: 'Standard Delivery',
-                price: basePrice,
+                serviceName: 'Budget Delivery',
+                price: 15,
                 currency: 'ILS',
-                estimatedDays: 3,
+                estimatedDays: 7,
             },
-            {
-                carrierName: 'Mock Express',
-                serviceName: 'Fast Delivery',
-                price: basePrice + 20,
-                currency: 'ILS',
-                estimatedDays: 1,
-            },
+
+            // {
+            //     carrierName: 'Mock Express',
+            //         serviceName: 'Fast Delivery',
+            //             price: basePrice + 20,
+            //                 currency: 'ILS',
+            //                     estimatedDays: 1,
+            //     },
         ];
     }
 }

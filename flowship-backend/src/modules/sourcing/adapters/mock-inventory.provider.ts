@@ -67,6 +67,16 @@ export class MockInventoryProvider implements InventoryProvider {
         },
         {
             sourceId: 'BRANCH-BEER-SHEVA',
+            sku: 'SHIRT-WHITE-L',
+            availableQuantity: 10,
+        },
+        {
+            sourceId: 'WAREHOUSE-SOUTH',
+            sku: 'SHIRT-WHITE-L',
+            availableQuantity: 20,
+        },
+        {
+            sourceId: 'BRANCH-BEER-SHEVA',
             sku: 'ICE-CREAM-VANILLA',
             availableQuantity: 10,
         },

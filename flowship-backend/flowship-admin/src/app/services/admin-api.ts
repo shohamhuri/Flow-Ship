@@ -195,16 +195,24 @@ export class AdminApiService {
     });
   }
 
-  reorderDecisionPriorityCards(cards: { id: string; priorityRank: number }[]) {
+  reorderDecisionPriorityCards(
+    cards: { id: string; priorityRank: number }[],
+  ) {
     return this.http.patch<{
       ok: boolean;
-      tenant: { id: string; name: string; schemaName: string };
+      tenant: {
+        id: string;
+        name: string;
+        schemaName: string;
+      };
       cards: DecisionPriorityCard[];
     }>(
       `${this.baseUrl}/admin/decision-priority-cards/reorder`,
       { cards },
       {
-        headers: { 'x-api-key': this.apiKey },
+        headers: {
+          'x-api-key': this.apiKey,
+        },
       },
     );
   }
