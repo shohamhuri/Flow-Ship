@@ -33,7 +33,7 @@ import {
 import {
     GroupingRulesService,
 } from '../grouping/grouping-rules.service';
-
+import { ShipmentCreationService } from '../shipments/shipment-creation.service';
 export interface CheckoutProcessingResult {
     checkout: Checkout;
 
@@ -98,6 +98,8 @@ export class CheckoutService {
             DecisionService,
         private readonly groupingRulesService:
             GroupingRulesService,
+        private readonly shipmentCreationService: ShipmentCreationService,
+
     ) { }
 
     async createCheckout(
@@ -207,15 +209,42 @@ export class CheckoutService {
                         allDeliveryOptions,
                         priorityCards,
                     );
-            if (selectedDeliveryOption) {
-                await this.decisionService.saveShipmentDecision(
-                    tenant,
-                    checkout.orderId,
-                    selectedDeliveryOption,
-                    priorityCards,
-                    allDeliveryOptions.length,
+            if (!selectedDeliveryOption) {
+                throw new Error(
+                    'No delivery option could be selected',
                 );
             }
+
+            const winningPlan =
+                validPlans.find(
+                    (plan) =>
+                        plan.id ===
+                        selectedDeliveryOption.planId,
+                );
+
+            if (!winningPlan) {
+                throw new Error(
+                    `Winning shipment plan not found: ${selectedDeliveryOption.planId}`,
+                );
+            }
+
+            if (!winningPlan.grouping) {
+                throw new Error(
+                    `Winning shipment plan has no grouping result: ${winningPlan.id}`,
+                );
+            }
+
+            const grouping = winningPlan.grouping;
+
+            await this.decisionService.saveShipmentDecision(
+                tenant,
+                checkoutId,
+                checkout.orderId,
+                selectedDeliveryOption,
+                priorityCards,
+                allDeliveryOptions.length,
+            );
+
             console.dir(
                 {
                     deliveryOptions:
@@ -481,21 +510,11 @@ export class CheckoutService {
                 },
             );
 
-            /*
-             * תאימות זמנית לזרימה הקיימת:
-             *
-             * עדיין יוצרים ושומרים את הקיבוץ המבוסס על
-             * selectedSource הראשי של ה-Sourcing.
-             *
-             * בהמשך נסיר את החלק הזה, ולאחר דירוג התוכניות
-             * נשמור רק את התוכנית שנבחרה.
-             */
-            const grouping =
-                this.groupingService.groupCheckout(
-                    checkout,
-                    sourcing,
-                );
 
+
+            /*
+   * שמירת הקבוצות שנבחרו כחלק מהתוכנית הזוכה.
+   */
             await this.shipmentGroupsRepository
                 .saveGroupingResult(
                     tenant,
@@ -503,6 +522,23 @@ export class CheckoutService {
                     grouping,
                     checkoutItemIdsBySku,
                 );
+
+            /*
+             * רק לאחר שהקבוצות נשמרו במסד,
+             * יוצרים Shipment אחד לכל Shipment Group.
+             */
+            const createdShipments =
+                await this.shipmentCreationService.createShipments(
+                    tenant,
+                    checkoutId,
+                    checkout,
+                    winningPlan,
+                    selectedDeliveryOption,
+                );
+
+            console.log(
+                `Created ${createdShipments.length} shipments for checkout ${checkoutId}`,
+            );
 
             await this.checkoutProcessingRepository
                 .markGroupingCompleted(

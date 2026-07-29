@@ -1,7 +1,12 @@
 export type SupplySourceType = 'branch' | 'warehouse'; // סניף / מחסן 
 
 export interface SupplySourceLocation {
+    country: string;
     city: string;
+    street: string;
+    houseNumber: string;
+    postalCode?: string;
+
     latitude?: number;
     longitude?: number;
 }

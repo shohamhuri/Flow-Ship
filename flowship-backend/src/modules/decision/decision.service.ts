@@ -535,6 +535,7 @@ export class DecisionService {
     }
     async saveShipmentDecision(
         tenant: { schemaName: string },
+        checkoutId: string,
         orderId: string,
         winner: ScoredShipmentPlanDeliveryOption,
         priorityCards: WeightedDecisionPriorityCard[],
@@ -543,18 +544,18 @@ export class DecisionService {
         const schemaName = tenant.schemaName;
 
         const sql = `
-        insert into ${schemaName}.shipment_decisions (
-            order_id,
-            selected_plan_id,
-            selected_delivery_option_id,
-            score,
-            evaluated_options_count,
-            winner_snapshot,
-            priority_cards_snapshot
-        )
-        values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)
-        on conflict (order_id)
-        do update set
+       insert into ${schemaName}.shipment_decisions (
+    checkout_id,
+    order_id,
+    selected_plan_id,
+    selected_delivery_option_id,
+    score,
+    evaluated_options_count,
+    winner_snapshot,
+    priority_cards_snapshot
+)
+values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)
+on conflict (checkout_id)        do update set
             selected_plan_id = excluded.selected_plan_id,
             selected_delivery_option_id = excluded.selected_delivery_option_id,
             score = excluded.score,
@@ -564,14 +565,18 @@ export class DecisionService {
             updated_at = now()
     `;
 
-        await this.db.query(sql, [
-            orderId,
-            winner.planId,
-            winner.id,
-            winner.score,
-            evaluatedOptionsCount,
-            JSON.stringify(winner),
-            JSON.stringify(priorityCards),
-        ]);
+        await this.db.query(sql,
+            [
+                checkoutId,
+                orderId,
+                winner.planId,
+                winner.id,
+                winner.score,
+                evaluatedOptionsCount,
+                JSON.stringify(winner),
+                JSON.stringify(priorityCards),
+            ]
+
+        );
     }
 }

@@ -15,7 +15,7 @@ import { ShipmentPlanQuoteService } from '../planning/shipment-plan-quote.servic
 import { CarriersModule } from '../carriers/carriers.module';
 import { ShipmentPlanDeliveryOptionsService } from '../planning/shipment-plan-delivery-options.service';
 import { DecisionModule } from '../decision/decision.module';
-
+import { ShipmentsModule } from '../shipments/shipments.module';
 @Module({
   imports: [
     SourcingModule,
@@ -25,6 +25,7 @@ import { DecisionModule } from '../decision/decision.module';
     DatabaseModule,
     CarriersModule,
     DecisionModule,
+    ShipmentsModule,
   ],
 
   controllers: [

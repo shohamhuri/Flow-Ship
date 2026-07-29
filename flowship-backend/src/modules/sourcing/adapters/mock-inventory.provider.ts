@@ -13,7 +13,10 @@ export class MockInventoryProvider implements InventoryProvider {
             isActive: true,
             priority: 0.9,
             location: {
+                country: 'Israel',
                 city: 'Netivot',
+                street: 'Industrial Area',
+                houseNumber: '1',
             },
         },
         {
@@ -23,7 +26,10 @@ export class MockInventoryProvider implements InventoryProvider {
             isActive: true,
             priority: 0.8,
             location: {
+                country: 'Israel',
                 city: 'Rishon LeZion',
+                street: 'Moshe Dayan',
+                houseNumber: '10',
             },
         },
         {
@@ -33,7 +39,10 @@ export class MockInventoryProvider implements InventoryProvider {
             isActive: true,
             priority: 0.7,
             location: {
+                country: 'Israel',
                 city: 'Beer Sheva',
+                street: 'HaAtzmaut',
+                houseNumber: '25',
             },
         },
         {
@@ -43,7 +52,10 @@ export class MockInventoryProvider implements InventoryProvider {
             isActive: false,
             priority: 0.95,
             location: {
+                country: 'Israel',
                 city: 'Tel Aviv',
+                street: 'Ibn Gabirol',
+                houseNumber: '50',
             },
         },
 
