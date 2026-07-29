@@ -4,7 +4,9 @@ import { Checkout } from '../checkout/interfaces/checkout.interface';
 import { GroupingService } from '../grouping/grouping.service';
 
 import { ShipmentPlanCandidate } from './interfaces/shipment-plan.interface';
-
+import {
+    GroupingStrategySetting,
+} from '../grouping/interfaces/grouping-strategy-setting.interface';
 @Injectable()
 export class ShipmentPlanBuilderService {
     constructor(
@@ -14,12 +16,14 @@ export class ShipmentPlanBuilderService {
     buildPlans(
         checkout: Checkout,
         plans: ShipmentPlanCandidate[],
+        strategies: GroupingStrategySetting[] = [],
     ): ShipmentPlanCandidate[] {
         return plans.map((plan) => {
             const grouping =
                 this.groupingService.groupShipmentPlan(
                     checkout,
                     plan.assignments,
+                    strategies,
                 );
 
             /*

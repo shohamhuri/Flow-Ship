@@ -30,6 +30,9 @@ import {
     ScoredShipmentPlanDeliveryOption,
     WeightedDecisionPriorityCard,
 } from '../decision/decision.service';
+import {
+    GroupingRulesService,
+} from '../grouping/grouping-rules.service';
 
 export interface CheckoutProcessingResult {
     checkout: Checkout;
@@ -93,6 +96,8 @@ export class CheckoutService {
             ShipmentPlanDeliveryOptionsService,
         private readonly decisionService:
             DecisionService,
+        private readonly groupingRulesService:
+            GroupingRulesService,
     ) { }
 
     async createCheckout(
@@ -131,7 +136,18 @@ export class CheckoutService {
                     checkout,
                     tenant,
                 );
+            const activeGroupingStrategies =
+                await this.groupingRulesService
+                    .getActiveStrategies(tenant);
 
+            console.dir(
+                {
+                    activeGroupingStrategies,
+                },
+                {
+                    depth: null,
+                },
+            );
             await this.checkoutProcessingRepository
                 .markSourcingCompleted(
                     tenant,
@@ -157,8 +173,8 @@ export class CheckoutService {
                 this.shipmentPlanBuilderService.buildPlans(
                     checkout,
                     generation.plans,
+                    activeGroupingStrategies,
                 );
-
             const validPlans = allPlans.filter(
                 (plan) => plan.status === 'grouped',
             );
