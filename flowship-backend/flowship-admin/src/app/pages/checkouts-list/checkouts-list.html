@@ -1,0 +1,152 @@
+<div class="checkouts-page">
+    <section class="hero-card">
+        <div>
+            <div class="eyebrow">Checkout Monitor</div>
+
+            <h1>תהליכי Checkout</h1>
+
+            <p>
+                צפייה בכל ההזמנות שעברו במערכת,
+                בסטטוס העיבוד ובנתוני המשלוח המרכזיים.
+            </p>
+        </div>
+
+        <button type="button" class="refresh-button" (click)="loadCheckouts()" [disabled]="isLoading">
+            רענון נתונים
+        </button>
+    </section>
+
+    <section class="summary-grid">
+        <div class="summary-card">
+            <span>סה״כ תהליכים</span>
+            <strong>{{ checkouts.length }}</strong>
+        </div>
+
+        <div class="summary-card">
+            <span>הושלמו</span>
+            <strong>{{ groupedCount }}</strong>
+        </div>
+
+        <div class="summary-card">
+            <span>נכשלו</span>
+            <strong>{{ failedCount }}</strong>
+        </div>
+    </section>
+
+    <section class="table-card">
+        <div class="table-header">
+            <div>
+                <h2>היסטוריית Checkout</h2>
+                <p>לחיצה על שורה תפתח את פרטי התהליך.</p>
+            </div>
+        </div>
+
+        <div *ngIf="isLoading" class="state-message">
+            טוען תהליכי Checkout...
+        </div>
+
+        <div *ngIf="!isLoading && errorMessage" class="state-message error">
+            <p>{{ errorMessage }}</p>
+
+            <button type="button" (click)="loadCheckouts()">
+                נסי שוב
+            </button>
+        </div>
+
+        <div *ngIf="
+        !isLoading &&
+        !errorMessage &&
+        checkouts.length === 0
+      " class="state-message">
+            עדיין לא נמצאו תהליכי Checkout.
+        </div>
+
+        <div *ngIf="
+        !isLoading &&
+        !errorMessage &&
+        checkouts.length > 0
+      " class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>מספר הזמנה</th>
+                        <th>יעד</th>
+                        <th>פריטים</th>
+                        <th>סכום</th>
+                        <th>מקור</th>
+                        <th>סטטוס</th>
+                        <th>תאריך יצירה</th>
+                        <th></th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr *ngFor="let checkout of checkouts" (click)="openCheckout(checkout.id)">
+                        <td>
+                            <div class="order-cell">
+                                <strong>{{ checkout.orderId }}</strong>
+                                <span>{{ checkout.id }}</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            {{
+                            getDestinationLabel(
+                            checkout.destination
+                            )
+                            }}
+                        </td>
+
+                        <td>{{ checkout.totalItems }}</td>
+
+                        <td>
+                            {{
+                            checkout.totalPrice
+                            | currency:
+                            'ILS':
+                            'symbol':
+                            '1.2-2' }}
+                        </td>
+
+                        <td>{{ checkout.platform }}</td>
+
+                        <td>
+                            <span class="status-badge" [class.status-success]="
+                  checkout.status === 'grouped'
+                " [class.status-warning]="
+                  checkout.status ===
+                  'partially_grouped'
+                " [class.status-processing]="
+                  checkout.status ===
+                  'processing'
+                " [class.status-error]="
+                  checkout.status === 'failed'
+                ">
+                                {{
+                                getStatusLabel(checkout.status)
+                                }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{
+                            checkout.createdAt
+                            | date:
+                            'dd/MM/yyyy HH:mm'
+                            }}
+                        </td>
+
+                        <td>
+                            <button type="button" class="details-button" (click)="
+    $event.stopPropagation();
+    openCheckout(checkout.id)
+  ">
+                                צפייה
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>

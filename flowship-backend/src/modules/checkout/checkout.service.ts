@@ -17,8 +17,11 @@ import { SourcingService } from '../sourcing/sourcing.service';
 import { CurrentTenant } from '../tenants/tenants.service';
 
 import { CheckoutProcessingRepository } from './checkout-processing.repository';
-import { CheckoutRepository } from './checkout.repository';
-import { CreateCheckoutDto } from './dto/create-checkout.dto';
+import {
+    CheckoutDetails,
+    CheckoutListRow,
+    CheckoutRepository,
+} from './checkout.repository'; import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { Checkout } from './interfaces/checkout.interface';
 import { ShipmentPlanQuoteService } from '../planning/shipment-plan-quote.service';
 import { QuotedShipmentPlan } from '../planning/interfaces/shipment-plan-quote.interface';
@@ -34,6 +37,7 @@ import {
     GroupingRulesService,
 } from '../grouping/grouping-rules.service';
 import { ShipmentCreationService } from '../shipments/shipment-creation.service';
+
 export interface CheckoutProcessingResult {
     checkout: Checkout;
 
@@ -101,6 +105,20 @@ export class CheckoutService {
         private readonly shipmentCreationService: ShipmentCreationService,
 
     ) { }
+    async getCheckouts(
+        tenant: CurrentTenant,
+    ): Promise<CheckoutListRow[]> {
+        return this.checkoutRepository.getCheckouts(tenant);
+    }
+    async getCheckoutById(
+        tenant: CurrentTenant,
+        checkoutId: string,
+    ): Promise<CheckoutDetails | null> {
+        return this.checkoutRepository.getCheckoutById(
+            tenant,
+            checkoutId,
+        );
+    }
 
     async createCheckout(
         createCheckoutDto: CreateCheckoutDto,

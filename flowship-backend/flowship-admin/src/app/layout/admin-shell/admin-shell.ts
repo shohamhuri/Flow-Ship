@@ -49,6 +49,12 @@ export class AdminShellComponent {
       icon: '⧉',
     },
     {
+      label: 'תהליכי Checkout',
+      subtitle: 'הזמנות, תוכניות ותוצאות',
+      route: '/admin/checkouts',
+      icon: '🧭',
+    },
+    {
       label: 'היסטוריית משלוחים',
       subtitle: 'משלוחים, סטטוסים וסינונים',
       route: '/admin/shipments-history',

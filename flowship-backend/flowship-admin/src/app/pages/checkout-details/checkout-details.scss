@@ -1,0 +1,269 @@
+:host {
+    display: block;
+    direction: rtl;
+}
+
+.checkout-details-page {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.back-button {
+    align-self: flex-start;
+    border: 1px solid #d8e2ee;
+    background: white;
+    color: #0f2747;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.hero-card {
+    background:
+        linear-gradient(135deg,
+            #0f2747 0%,
+            #173b68 100%);
+    color: white;
+    border-radius: 24px;
+    padding: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+
+    h1 {
+        margin: 6px 0 8px;
+    }
+
+    p {
+        margin: 0;
+        color: #d5e1ef;
+    }
+}
+
+.eyebrow {
+    color: #f4d35e;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.summary-card,
+.content-card,
+.group-card,
+.shipment-card {
+    background: white;
+    border: 1px solid #e2eaf3;
+    border-radius: 20px;
+}
+
+.summary-card {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    span {
+        color: #64748b;
+    }
+
+    strong {
+        color: #0f2747;
+        font-size: 24px;
+    }
+}
+
+.content-card {
+    overflow: hidden;
+}
+
+.section-header {
+    padding: 22px 24px;
+    border-bottom: 1px solid #e7edf4;
+
+    h2 {
+        margin: 0 0 5px;
+        color: #0f2747;
+    }
+
+    p {
+        margin: 0;
+        color: #64748b;
+    }
+}
+
+.details-grid,
+.group-meta,
+.shipment-meta {
+    display: grid;
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    padding: 22px 24px;
+
+    div {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    span {
+        color: #64748b;
+        font-size: 13px;
+    }
+
+    strong {
+        color: #0f2747;
+    }
+}
+
+.groups-grid,
+.shipments-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    padding: 22px;
+}
+
+.group-card,
+.shipment-card {
+    overflow: hidden;
+}
+
+.group-header,
+.shipment-header {
+    padding: 18px 20px;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #edf1f6;
+
+    span,
+    p {
+        color: #64748b;
+        font-size: 13px;
+    }
+
+    h3 {
+        margin: 5px 0;
+        color: #0f2747;
+    }
+
+    p {
+        margin: 0;
+    }
+}
+
+.reasons,
+.group-items,
+.stops {
+    padding: 0 20px 20px;
+}
+
+.reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    span {
+        background: #eef4fb;
+        color: #34506f;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 11px;
+    }
+}
+
+.group-items,
+.stops {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.group-items>div,
+.stop {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.status-badge,
+.small-badge {
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 800;
+    background: #edf2f7;
+    color: #475569;
+}
+
+.status-success {
+    background: #e4f8ed;
+    color: #137447;
+}
+
+.status-error {
+    background: #ffe6e6;
+    color: #b42318;
+}
+
+.status-processing {
+    background: #e7f0ff;
+    color: #245fb5;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+}
+
+th,
+td {
+    padding: 15px 18px;
+    text-align: right;
+    border-bottom: 1px solid #edf1f6;
+}
+
+th {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.state-message {
+    padding: 60px;
+    text-align: center;
+    color: #64748b;
+}
+
+.error {
+    color: #b42318;
+}
+
+@media (max-width: 1000px) {
+
+    .summary-grid,
+    .groups-grid,
+    .shipments-grid,
+    .details-grid,
+    .group-meta,
+    .shipment-meta {
+        grid-template-columns: 1fr;
+    }
+}

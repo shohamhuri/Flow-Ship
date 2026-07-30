@@ -111,7 +111,110 @@ type UpdateProviderResponse = {
   };
   provider: AdminProvider;
 };
+export interface CheckoutListItem {
+  id: string;
+  orderId: string;
+  storeId: string | null;
+  platform: string;
+  status: string;
+  totalItems: number;
+  totalPrice: number;
 
+  destination: {
+    country?: string;
+    city?: string;
+    street?: string;
+    houseNumber?: string;
+    postalCode?: string;
+  } | null;
+
+  createdAt: string;
+  updatedAt: string | null;
+}
+export interface CheckoutDetailsItem {
+  id: string;
+  sku: string;
+  name: string;
+  quantity: number;
+  unitWeight: string | number | null;
+  unitPrice: string | number | null;
+  supplierId: string | null;
+  category: string | null;
+}
+
+export interface CheckoutShipmentGroupItem {
+  checkoutItemId: string;
+  sku: string;
+  quantity: number;
+  unitWeight: string | number | null;
+  unitPrice: string | number | null;
+  category: string | null;
+}
+
+export interface CheckoutShipmentGroup {
+  id: string;
+  sourceId: string;
+  sourceName: string;
+  sourceType: string;
+  supplierId: string | null;
+  handlingGroup: string | null;
+  totalItems: number;
+  totalWeight: string | number;
+  totalPrice: string | number;
+  groupingReasons: string[];
+  status: string;
+  items: CheckoutShipmentGroupItem[];
+}
+
+export interface CheckoutShipmentStop {
+  id: string;
+  stopOrder: number;
+  stopType: string;
+  address: Record<string, unknown>;
+}
+
+export interface CheckoutShipment {
+  id: string;
+  shipmentGroupId: string;
+  orderId: string;
+  selectedPlanId: string;
+  selectedDeliveryOptionKey: string;
+  providerId: string | null;
+  providerCode: string | null;
+  adapterKey: string | null;
+  carrierName: string;
+  serviceName: string;
+  price: string | number;
+  currency: string;
+  estimatedDeliveryDays: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string | null;
+  stops: CheckoutShipmentStop[];
+}
+
+export interface CheckoutDetails {
+  id: string;
+  orderId: string;
+  storeId: string | null;
+  platform: string;
+  status: string;
+  customer: Record<string, unknown>;
+  destination: {
+    city?: string;
+    street?: string;
+    country?: string;
+    postalCode?: string;
+    houseNumber?: string;
+  } | null;
+  totalItems: number;
+  totalPrice: number;
+  createdAt: string;
+  updatedAt: string | null;
+  items: CheckoutDetailsItem[];
+  shipmentGroups: CheckoutShipmentGroup[];
+  shipments: CheckoutShipment[];
+}
 @Injectable({
   providedIn: 'root',
 })
@@ -290,6 +393,26 @@ export class AdminApiService {
       `${this.baseUrl}/admin/provider-call-logs`,
       {
         params,
+        headers: {
+          'x-api-key': this.apiKey,
+        },
+      },
+    );
+  }
+  getCheckouts() {
+    return this.http.get<CheckoutListItem[]>(
+      `${this.baseUrl}/checkout`,
+      {
+        headers: {
+          'x-api-key': this.apiKey,
+        },
+      },
+    );
+  }
+  getCheckoutById(checkoutId: string) {
+    return this.http.get<CheckoutDetails>(
+      `${this.baseUrl}/checkout/${checkoutId}`,
+      {
         headers: {
           'x-api-key': this.apiKey,
         },

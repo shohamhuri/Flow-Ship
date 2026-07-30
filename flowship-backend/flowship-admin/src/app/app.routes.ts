@@ -7,6 +7,10 @@ import { ProviderLogs } from './pages/provider-logs/provider-logs';
 import { ShipmentGrouping } from './pages/shipment-grouping/shipment-grouping';
 import { ShipmentsHistory } from './pages/shipments-history/shipments-history';
 import { GroupPurchases } from './pages/group-purchases/group-purchases';
+import { CheckoutsList } from './pages/checkouts-list/checkouts-list';
+import {
+    CheckoutDetailsComponent,
+} from './pages/checkout-details/checkout-details';
 export const routes: Routes = [
     {
         path: '',
@@ -21,6 +25,11 @@ export const routes: Routes = [
             { path: 'admin/shipment-grouping', component: ShipmentGrouping },
             { path: 'admin/shipments-history', component: ShipmentsHistory },
             { path: 'admin/group-purchases', component: GroupPurchases },
+            { path: 'admin/checkouts', component: CheckoutsList, },
+            {
+                path: 'admin/checkouts/:checkoutId',
+                component: CheckoutDetailsComponent,
+            },
         ],
     },
 ];
