@@ -35,7 +35,6 @@ export class CheckoutService {
 
   getCheckouts(): Observable<CheckoutListItem[]> {
     const headers = new HttpHeaders({
-      'x-api-key': this.apiKey,
     });
 
     return this.http.get<CheckoutListItem[]>(

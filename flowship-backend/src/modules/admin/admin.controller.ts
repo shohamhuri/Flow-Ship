@@ -3,15 +3,27 @@ import {
     Controller,
     Delete,
     Get,
-    Headers,
     NotFoundException,
     Param,
     Patch,
     Query,
     Post,
-    UnauthorizedException,
+    UseGuards
+
 } from '@nestjs/common';
-import { TenantsService } from '../tenants/tenants.service';
+
+
+import {
+    CurrentFlowShipAuth,
+} from '../auth/current-auth.decorator';
+
+import type {
+    FlowShipAuthContext,
+} from '../auth/auth.types';
+
+import {
+    SupabaseAuthGuard,
+} from '../auth/supabase-auth.guard';
 import { AdminService } from './admin.service';
 import { UpdateProviderDto } from './dto/update-provider.dto';
 import { UpdateDecisionSettingsDto } from './dto/update-decision-settings.dto';
@@ -20,27 +32,21 @@ import { CreateDecisionPriorityCardDto } from './dto/create-decision-priority-ca
 import { UpdateDecisionPriorityCardDto } from './dto/update-decision-priority-card.dto';
 import { ReorderDecisionPriorityCardsDto } from './dto/reorder-decision-priority-cards.dto';
 @Controller('admin')
+@UseGuards(SupabaseAuthGuard)
 export class AdminController {
     constructor(
         private readonly adminService: AdminService,
-        private readonly tenantsService: TenantsService,
     ) { }
 
     @Get('providers')
     async getProviders(
-        @Headers('x-api-key') apiKey: string | undefined,
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
     ) {
-        if (!apiKey) {
-            throw new UnauthorizedException('Missing x-api-key header');
-        }
+        const tenant = auth.tenant;
 
-        const tenant = await this.tenantsService.findByApiKey(apiKey);
-
-        if (!tenant) {
-            throw new UnauthorizedException('Invalid API key');
-        }
-
-        const providers = await this.adminService.getProviders(tenant);
+        const providers =
+            await this.adminService.getProviders(tenant);
 
         return {
             ok: true,
@@ -54,22 +60,19 @@ export class AdminController {
     }
     @Get('decision-settings')
     async getDecisionSettings(
-        @Headers('x-api-key') apiKey: string | undefined,
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
     ) {
-        if (!apiKey) {
-            throw new UnauthorizedException('Missing x-api-key header');
-        }
+        const tenant = auth.tenant;
 
-        const tenant = await this.tenantsService.findByApiKey(apiKey);
-
-        if (!tenant) {
-            throw new UnauthorizedException('Invalid API key');
-        }
-
-        const settings = await this.adminService.getDecisionSettings(tenant);
+        const settings =
+            await this.adminService
+                .getDecisionSettings(tenant);
 
         if (!settings) {
-            throw new NotFoundException('Decision settings not found');
+            throw new NotFoundException(
+                'Decision settings not found',
+            );
         }
 
         return {
@@ -85,26 +88,25 @@ export class AdminController {
 
     @Patch('decision-settings')
     async updateDecisionSettings(
-        @Headers('x-api-key') apiKey: string | undefined,
-        @Body() dto: UpdateDecisionSettingsDto,
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+
+        @Body()
+        dto: UpdateDecisionSettingsDto,
     ) {
-        if (!apiKey) {
-            throw new UnauthorizedException('Missing x-api-key header');
-        }
+        const tenant = auth.tenant;
 
-        const tenant = await this.tenantsService.findByApiKey(apiKey);
-
-        if (!tenant) {
-            throw new UnauthorizedException('Invalid API key');
-        }
-
-        const settings = await this.adminService.updateDecisionSettings(
-            tenant,
-            dto,
-        );
+        const settings =
+            await this.adminService
+                .updateDecisionSettings(
+                    tenant,
+                    dto,
+                );
 
         if (!settings) {
-            throw new NotFoundException('Decision settings not found');
+            throw new NotFoundException(
+                'Decision settings not found',
+            );
         }
 
         return {
@@ -119,28 +121,53 @@ export class AdminController {
     }
     @Get('provider-call-logs')
     async getProviderCallLogs(
-        @Headers('x-api-key') apiKey: string,
-        @Query('status') status?: string,
-        @Query('providerCode') providerCode?: string,
-        @Query('action') action?: string,
-        @Query('search') search?: string,
-        @Query('fromDate') fromDate?: string,
-        @Query('toDate') toDate?: string,
-        @Query('limit') limit?: string,
-        @Query('offset') offset?: string,
-    ) {
-        const tenant = await this.resolveTenant(apiKey);
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
 
-        const result = await this.adminService.getProviderCallLogs(tenant, {
-            status,
-            providerCode,
-            action,
-            search,
-            fromDate,
-            toDate,
-            limit: limit ? Number(limit) : undefined,
-            offset: offset ? Number(offset) : undefined,
-        });
+        @Query('status')
+        status?: string,
+
+        @Query('providerCode')
+        providerCode?: string,
+
+        @Query('action')
+        action?: string,
+
+        @Query('search')
+        search?: string,
+
+        @Query('fromDate')
+        fromDate?: string,
+
+        @Query('toDate')
+        toDate?: string,
+
+        @Query('limit')
+        limit?: string,
+
+        @Query('offset')
+        offset?: string,
+    ) {
+        const tenant = auth.tenant;
+
+        const result =
+            await this.adminService.getProviderCallLogs(
+                tenant,
+                {
+                    status,
+                    providerCode,
+                    action,
+                    search,
+                    fromDate,
+                    toDate,
+                    limit: limit
+                        ? Number(limit)
+                        : undefined,
+                    offset: offset
+                        ? Number(offset)
+                        : undefined,
+                },
+            );
 
         return {
             ok: true,
@@ -151,7 +178,8 @@ export class AdminController {
             },
             filters: {
                 status: status ?? null,
-                providerCode: providerCode ?? null,
+                providerCode:
+                    providerCode ?? null,
                 action: action ?? null,
                 search: search ?? null,
                 fromDate: fromDate ?? null,
@@ -166,28 +194,28 @@ export class AdminController {
     }
     @Patch('providers/:id')
     async updateProvider(
-        @Headers('x-api-key') apiKey: string | undefined,
-        @Param('id') providerId: string,
-        @Body() dto: UpdateProviderDto,
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+
+        @Param('id')
+        providerId: string,
+
+        @Body()
+        dto: UpdateProviderDto,
     ) {
-        if (!apiKey) {
-            throw new UnauthorizedException('Missing x-api-key header');
-        }
+        const tenant = auth.tenant;
 
-        const tenant = await this.tenantsService.findByApiKey(apiKey);
-
-        if (!tenant) {
-            throw new UnauthorizedException('Invalid API key');
-        }
-
-        const provider = await this.adminService.updateProvider(
-            tenant,
-            providerId,
-            dto,
-        );
+        const provider =
+            await this.adminService.updateProvider(
+                tenant,
+                providerId,
+                dto,
+            );
 
         if (!provider) {
-            throw new NotFoundException('Provider not found');
+            throw new NotFoundException(
+                'Provider not found',
+            );
         }
 
         return {
@@ -201,10 +229,15 @@ export class AdminController {
         };
     }
     @Get('decision-criteria')
-    async getDecisionCriteria(@Headers('x-api-key') apiKey: string) {
-        const tenant = await this.resolveTenant(apiKey);
+    async getDecisionCriteria(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+    ) {
+        const tenant = auth.tenant;
 
-        const criteria = await this.adminService.getDecisionCriteria(tenant);
+        const criteria =
+            await this.adminService
+                .getDecisionCriteria(tenant);
 
         return {
             ok: true,
@@ -216,35 +249,32 @@ export class AdminController {
             criteria,
         };
     }
-    private async resolveTenant(apiKey: string) {
-        if (!apiKey) {
-            throw new UnauthorizedException('Missing x-api-key header');
-        }
 
-        const tenant = await this.tenantsService.findByApiKey(apiKey);
-
-        if (!tenant) {
-            throw new UnauthorizedException('Invalid API key');
-        }
-
-        return tenant;
-    }
     @Patch('decision-criteria/:id')
     async updateDecisionCriterion(
-        @Headers('x-api-key') apiKey: string,
-        @Param('id') id: string,
-        @Body() dto: UpdateDecisionCriterionDto,
-    ) {
-        const tenant = await this.resolveTenant(apiKey);
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
 
-        const criterion = await this.adminService.updateDecisionCriterion(
-            tenant,
-            id,
-            dto,
-        );
+        @Param('id')
+        id: string,
+
+        @Body()
+        dto: UpdateDecisionCriterionDto,
+    ) {
+        const tenant = auth.tenant;
+
+        const criterion =
+            await this.adminService
+                .updateDecisionCriterion(
+                    tenant,
+                    id,
+                    dto,
+                );
 
         if (!criterion) {
-            throw new NotFoundException('Decision criterion not found');
+            throw new NotFoundException(
+                'Decision criterion not found',
+            );
         }
 
         return {
@@ -258,10 +288,15 @@ export class AdminController {
         };
     }
     @Get('decision-priority-cards')
-    async getDecisionPriorityCards(@Headers('x-api-key') apiKey: string) {
-        const tenant = await this.resolveTenant(apiKey);
+    async getDecisionPriorityCards(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+    ) {
+        const tenant = auth.tenant;
 
-        const cards = await this.adminService.getDecisionPriorityCards(tenant);
+        const cards =
+            await this.adminService
+                .getDecisionPriorityCards(tenant);
 
         return {
             ok: true,
@@ -275,15 +310,20 @@ export class AdminController {
     }
     @Post('decision-priority-cards')
     async createDecisionPriorityCard(
-        @Headers('x-api-key') apiKey: string,
-        @Body() dto: CreateDecisionPriorityCardDto,
-    ) {
-        const tenant = await this.resolveTenant(apiKey);
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
 
-        const card = await this.adminService.createDecisionPriorityCard(
-            tenant,
-            dto,
-        );
+        @Body()
+        dto: CreateDecisionPriorityCardDto,
+    ) {
+        const tenant = auth.tenant;
+
+        const card =
+            await this.adminService
+                .createDecisionPriorityCard(
+                    tenant,
+                    dto,
+                );
 
         return {
             ok: true,
@@ -297,15 +337,20 @@ export class AdminController {
     }
     @Patch('decision-priority-cards/reorder')
     async reorderDecisionPriorityCards(
-        @Headers('x-api-key') apiKey: string,
-        @Body() dto: ReorderDecisionPriorityCardsDto,
-    ) {
-        const tenant = await this.resolveTenant(apiKey);
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
 
-        const cards = await this.adminService.reorderDecisionPriorityCards(
-            tenant,
-            dto,
-        );
+        @Body()
+        dto: ReorderDecisionPriorityCardsDto,
+    ) {
+        const tenant = auth.tenant;
+
+        const cards =
+            await this.adminService
+                .reorderDecisionPriorityCards(
+                    tenant,
+                    dto,
+                );
 
         return {
             ok: true,
@@ -319,20 +364,29 @@ export class AdminController {
     }
     @Patch('decision-priority-cards/:id')
     async updateDecisionPriorityCard(
-        @Headers('x-api-key') apiKey: string,
-        @Param('id') id: string,
-        @Body() dto: UpdateDecisionPriorityCardDto,
-    ) {
-        const tenant = await this.resolveTenant(apiKey);
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
 
-        const card = await this.adminService.updateDecisionPriorityCard(
-            tenant,
-            id,
-            dto,
-        );
+        @Param('id')
+        id: string,
+
+        @Body()
+        dto: UpdateDecisionPriorityCardDto,
+    ) {
+        const tenant = auth.tenant;
+
+        const card =
+            await this.adminService
+                .updateDecisionPriorityCard(
+                    tenant,
+                    id,
+                    dto,
+                );
 
         if (!card) {
-            throw new NotFoundException('Decision priority card not found');
+            throw new NotFoundException(
+                'Decision priority card not found',
+            );
         }
 
         return {
@@ -347,18 +401,25 @@ export class AdminController {
     }
     @Delete('decision-priority-cards/:id')
     async deleteDecisionPriorityCard(
-        @Headers('x-api-key') apiKey: string,
-        @Param('id') id: string,
-    ) {
-        const tenant = await this.resolveTenant(apiKey);
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
 
-        const deleted = await this.adminService.deleteDecisionPriorityCard(
-            tenant,
-            id,
-        );
+        @Param('id')
+        id: string,
+    ) {
+        const tenant = auth.tenant;
+
+        const deleted =
+            await this.adminService
+                .deleteDecisionPriorityCard(
+                    tenant,
+                    id,
+                );
 
         if (!deleted) {
-            throw new NotFoundException('Decision priority card not found');
+            throw new NotFoundException(
+                'Decision priority card not found',
+            );
         }
 
         return {

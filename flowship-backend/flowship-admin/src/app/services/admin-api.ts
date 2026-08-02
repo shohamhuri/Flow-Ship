@@ -215,12 +215,26 @@ export interface CheckoutDetails {
   shipmentGroups: CheckoutShipmentGroup[];
   shipments: CheckoutShipment[];
 }
+export interface AuthMeResponse {
+  user: {
+    id: string;
+    email: string | null;
+    displayName: string | null;
+    role: string;
+  };
+
+  tenant: {
+    id: string;
+    name: string;
+    schemaName: string;
+    status?: string;
+  };
+}
 @Injectable({
   providedIn: 'root',
 })
 export class AdminApiService {
   private readonly baseUrl = environment.apiUrl;
-  private readonly apiKey = 'flow_ship_test_key_123';
 
   constructor(private readonly http: HttpClient) { }
 
@@ -228,9 +242,7 @@ export class AdminApiService {
     return this.http.get<ProvidersResponse>(
       `${this.baseUrl}/admin/providers`,
       {
-        headers: {
-          'x-api-key': this.apiKey,
-        },
+       
       },
     );
   }
@@ -247,7 +259,6 @@ export class AdminApiService {
       body,
       {
         headers: {
-          'x-api-key': this.apiKey,
         },
       },
     );
@@ -258,7 +269,6 @@ export class AdminApiService {
       tenant: { id: string; name: string; schemaName: string };
       cards: DecisionPriorityCard[];
     }>(`${this.baseUrl}/admin/decision-priority-cards`, {
-      headers: { 'x-api-key': this.apiKey },
     });
   }
 
@@ -274,7 +284,6 @@ export class AdminApiService {
       tenant: { id: string; name: string; schemaName: string };
       card: DecisionPriorityCard;
     }>(`${this.baseUrl}/admin/decision-priority-cards`, body, {
-      headers: { 'x-api-key': this.apiKey },
     });
   }
 
@@ -294,7 +303,6 @@ export class AdminApiService {
       tenant: { id: string; name: string; schemaName: string };
       card: DecisionPriorityCard;
     }>(`${this.baseUrl}/admin/decision-priority-cards/${cardId}`, body, {
-      headers: { 'x-api-key': this.apiKey },
     });
   }
 
@@ -312,11 +320,7 @@ export class AdminApiService {
     }>(
       `${this.baseUrl}/admin/decision-priority-cards/reorder`,
       { cards },
-      {
-        headers: {
-          'x-api-key': this.apiKey,
-        },
-      },
+     
     );
   }
 
@@ -325,7 +329,6 @@ export class AdminApiService {
       ok: boolean;
       deletedId: string;
     }>(`${this.baseUrl}/admin/decision-priority-cards/${cardId}`, {
-      headers: { 'x-api-key': this.apiKey },
     });
   }
 
@@ -335,7 +338,6 @@ export class AdminApiService {
       tenant: { id: string; name: string; schemaName: string };
       criteria: DecisionCriterion[];
     }>(`${this.baseUrl}/admin/decision-criteria`, {
-      headers: { 'x-api-key': this.apiKey },
     });
   }
   getProviderCallLogs(
@@ -394,7 +396,6 @@ export class AdminApiService {
       {
         params,
         headers: {
-          'x-api-key': this.apiKey,
         },
       },
     );
@@ -404,7 +405,6 @@ export class AdminApiService {
       `${this.baseUrl}/checkout`,
       {
         headers: {
-          'x-api-key': this.apiKey,
         },
       },
     );
@@ -414,9 +414,13 @@ export class AdminApiService {
       `${this.baseUrl}/checkout/${checkoutId}`,
       {
         headers: {
-          'x-api-key': this.apiKey,
         },
       },
+    );
+  }
+  getMe() {
+    return this.http.get<AuthMeResponse>(
+      `${this.baseUrl}/auth/me`,
     );
   }
 }

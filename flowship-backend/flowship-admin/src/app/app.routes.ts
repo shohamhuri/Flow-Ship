@@ -1,4 +1,6 @@
 import { Routes } from '@angular/router';
+
+import { Login } from './pages/login/login';
 import { AdminProvidersComponent } from './pages/admin-providers/admin-providers';
 import { AdminShellComponent } from './layout/admin-shell/admin-shell';
 import { AdminHomeComponent } from './pages/admin-home/admin-home';
@@ -8,28 +10,72 @@ import { ShipmentGrouping } from './pages/shipment-grouping/shipment-grouping';
 import { ShipmentsHistory } from './pages/shipments-history/shipments-history';
 import { GroupPurchases } from './pages/group-purchases/group-purchases';
 import { CheckoutsList } from './pages/checkouts-list/checkouts-list';
-import {
-    CheckoutDetailsComponent,
-} from './pages/checkout-details/checkout-details';
+import { CheckoutDetailsComponent } from './pages/checkout-details/checkout-details';
+import { authGuard } from './guards/auth-guard';
+
 export const routes: Routes = [
     {
         path: '',
-        component: AdminShellComponent,
-        children: [
-            { path: '', redirectTo: 'admin/home', pathMatch: 'full' },
+        redirectTo: 'login',
+        pathMatch: 'full',
+    },
 
-            { path: 'admin/home', component: AdminHomeComponent },
-            { path: 'admin/providers', component: AdminProvidersComponent },
-            { path: 'admin/decision-criteria', component: DecisionCriteriaComponent },
-            { path: 'admin/provider-logs', component: ProviderLogs },
-            { path: 'admin/shipment-grouping', component: ShipmentGrouping },
-            { path: 'admin/shipments-history', component: ShipmentsHistory },
-            { path: 'admin/group-purchases', component: GroupPurchases },
-            { path: 'admin/checkouts', component: CheckoutsList, },
+    {
+        path: 'login',
+        component: Login,
+    },
+
+    {
+        path: 'admin',
+        component: AdminShellComponent,
+        canActivate: [authGuard],
+        children: [
             {
-                path: 'admin/checkouts/:checkoutId',
+                path: '',
+                redirectTo: 'home',
+                pathMatch: 'full',
+            },
+            {
+                path: 'home',
+                component: AdminHomeComponent,
+            },
+            {
+                path: 'providers',
+                component: AdminProvidersComponent,
+            },
+            {
+                path: 'decision-criteria',
+                component: DecisionCriteriaComponent,
+            },
+            {
+                path: 'provider-logs',
+                component: ProviderLogs,
+            },
+            {
+                path: 'shipment-grouping',
+                component: ShipmentGrouping,
+            },
+            {
+                path: 'shipments-history',
+                component: ShipmentsHistory,
+            },
+            {
+                path: 'group-purchases',
+                component: GroupPurchases,
+            },
+            {
+                path: 'checkouts',
+                component: CheckoutsList,
+            },
+            {
+                path: 'checkouts/:checkoutId',
                 component: CheckoutDetailsComponent,
             },
         ],
+    },
+
+    {
+        path: '**',
+        redirectTo: 'login',
     },
 ];

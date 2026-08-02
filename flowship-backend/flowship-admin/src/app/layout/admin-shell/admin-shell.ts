@@ -1,7 +1,18 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import {
+  ChangeDetectorRef,
+  Component,
+  OnInit,
+} from '@angular/core';
+import {
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
 
+import { AuthService } from '../../services/auth';
+import { AdminApiService } from '../../services/admin-api';
 type MenuItem = {
   label: string;
   subtitle: string;
@@ -12,11 +23,23 @@ type MenuItem = {
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [
+    CommonModule,
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+  ],
   templateUrl: './admin-shell.html',
   styleUrl: './admin-shell.scss',
 })
-export class AdminShellComponent {
+export class AdminShellComponent implements OnInit {
+  userEmail = '';
+  userDisplayName = 'משתמש FlowShip';
+  tenantName = 'FLOW_SHIP_TEST';
+
+  isUserMenuOpen = false;
+  isLoggingOut = false;
+
   menuItems: MenuItem[] = [
     {
       label: 'דף בית',
@@ -67,4 +90,79 @@ export class AdminShellComponent {
       icon: '👥',
     },
   ];
+
+  constructor(
+    private readonly authService: AuthService,
+    private readonly router: Router,
+    private readonly cdr: ChangeDetectorRef,
+    private readonly adminApiService: AdminApiService,
+  ) { }
+
+  ngOnInit(): void {
+    this.adminApiService.getMe().subscribe({
+      next: (response) => {
+        this.userEmail =
+          response.user.email ?? '';
+
+        this.userDisplayName =
+          response.user.displayName ??
+          response.user.email?.split('@')[0] ??
+          'משתמש FlowShip';
+
+        this.tenantName =
+          response.tenant.name;
+
+        this.cdr.detectChanges();
+      },
+
+      error: (error) => {
+        console.error(
+          'Failed to load authenticated user',
+          error,
+        );
+
+        void this.router.navigate(['/login']);
+      },
+    });
+  }
+
+  toggleUserMenu(): void {
+    this.isUserMenuOpen =
+      !this.isUserMenuOpen;
+  }
+
+  closeUserMenu(): void {
+    this.isUserMenuOpen = false;
+  }
+
+  async logout(): Promise<void> {
+    if (this.isLoggingOut) {
+      return;
+    }
+
+    this.isLoggingOut = true;
+
+    try {
+      await this.authService.logout();
+
+      await this.router.navigate([
+        '/login',
+      ]);
+    } finally {
+      this.isLoggingOut = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  get userInitial(): string {
+    const value =
+      this.userDisplayName ||
+      this.userEmail ||
+      'F';
+
+    return value
+      .trim()
+      .charAt(0)
+      .toUpperCase();
+  }
 }

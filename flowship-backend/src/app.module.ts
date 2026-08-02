@@ -11,6 +11,9 @@ import { AdminModule } from './modules/admin/admin.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
 import { SourcingModule } from './modules/sourcing/sourcing.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import {
+  AuthModule,
+} from './modules/auth/auth.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -25,6 +28,7 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
     CheckoutModule,
     SourcingModule,
     AuditLogsModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
