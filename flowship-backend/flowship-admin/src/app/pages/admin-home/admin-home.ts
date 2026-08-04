@@ -39,7 +39,7 @@ export class AdminHomeComponent {
     {
       title: 'ניהול קיבוץ משלוחים',
       description: 'ניהול Grouping Engine ופיצול / קיבוץ של משלוחים.',
-      route: '/admin/shipment-grouping',
+      route: '/admin/grouping-management',
       badge: 'Grouping',
     },
     {

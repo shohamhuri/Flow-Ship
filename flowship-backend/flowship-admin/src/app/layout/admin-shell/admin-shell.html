@@ -2,29 +2,116 @@
     <aside class="sidebar">
         <div class="brand">
             <div class="brand-badge">F</div>
+
             <div>
                 <h1>FlowShip</h1>
                 <p>Admin Portal</p>
             </div>
         </div>
 
-        <nav class="menu">
+        <div class="user-area">
+            <button type="button" class="user-card" (click)="toggleUserMenu()">
+                <div class="user-avatar">
+                    {{ userInitial }}
+                </div>
+
+                <div class="user-details">
+                    <strong>
+                        {{ userDisplayName }}
+                    </strong>
+
+                    <span>
+                        {{ tenantName }}
+                    </span>
+                </div>
+
+                <span class="user-arrow" [class.open]="isUserMenuOpen">
+                    ▾
+                </span>
+            </button>
+
+            <div *ngIf="isUserMenuOpen" class="user-menu">
+                <div class="user-menu-header">
+                    <strong>
+                        {{ userDisplayName }}
+                    </strong>
+
+                    <span>
+                        {{ userEmail }}
+                    </span>
+                </div>
+
+                <div class="user-menu-section">
+
+
+                    <div class="tenant-row">
+                        <div class="tenant-icon">
+                            F
+                        </div>
+
+                        <div>
+                            <strong>
+                                {{ tenantName }}
+                            </strong>
+
+                            <span>
+                                סביבת העבודה הנוכחית
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <button type="button" class="user-menu-action logout-action" (click)="logout()"
+                    [disabled]="isLoggingOut">
+                    {{
+                    isLoggingOut
+                    ? 'מתנתקת...'
+                    : 'יציאה מהמערכת'
+                    }}
+                </button>
+            </div>
+        </div>
+
+        <nav class="menu" (click)="closeUserMenu()">
             <a *ngFor="let item of menuItems" [routerLink]="item.route" routerLinkActive="active" class="menu-item">
-                <div class="menu-icon">{{ item.icon }}</div>
+                <div class="menu-icon">
+                    {{ item.icon }}
+                </div>
 
                 <div class="menu-text">
-                    <div class="menu-label">{{ item.label }}</div>
-                    <div class="menu-subtitle">{{ item.subtitle }}</div>
+                    <div class="menu-label">
+                        {{ item.label }}
+                    </div>
+
+                    <div class="menu-subtitle">
+                        {{ item.subtitle }}
+                    </div>
                 </div>
             </a>
         </nav>
+
+        <!-- <div class="sidebar-footer">
+            <button type="button" class="logout-button" (click)="logout()" [disabled]="isLoggingOut">
+                <div class="menu-icon">
+                    ↪
+                </div>
+
+
+            </button>
+        </div> -->
     </aside>
 
     <main class="content">
         <header class="topbar">
             <div>
                 <h2>מערכת ניהול FlowShip</h2>
-                <p>ניהול ספקים, קריטריונים, לוגים ותהליכי שילוח</p>
+
+                <p>
+                    ניהול ספקים, קריטריונים,
+                    לוגים ותהליכי שילוח
+                </p>
             </div>
 
             <div class="topbar-badge">

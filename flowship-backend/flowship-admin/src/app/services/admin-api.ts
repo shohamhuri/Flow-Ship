@@ -60,8 +60,8 @@ export type DecisionPriorityCard = {
   providerCode: string;
 
   criterionKey: string;
-  criterionLabel: string;
-  criterionDescription: string;
+  criterionLabel: string | null;
+  criterionDescription: string | null;
 
   title: string;
   priorityRank: number;
@@ -76,11 +76,87 @@ export type DecisionCriterion = {
   id: string;
   key: string;
   label: string;
-  description: string;
+  description: string | null;
   weight: number;
   isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+export type DecisionSettings = {
+  id: string;
+  priceWeight: number;
+  speedWeight: number;
+  providerPriorityWeight: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type AdminTenantInfo = {
+  id: string;
+  name: string;
+  schemaName: string;
+};
+export type DecisionSettingsResponse = {
+  ok: boolean;
+  tenant: AdminTenantInfo;
+  settings: DecisionSettings;
 };
 
+export type DecisionCriteriaResponse = {
+  ok: boolean;
+  tenant: AdminTenantInfo;
+  criteria: DecisionCriterion[];
+};
+
+export type DecisionCriterionResponse = {
+  ok: boolean;
+  tenant: AdminTenantInfo;
+  criterion: DecisionCriterion;
+};
+
+export type DecisionPriorityCardsResponse = {
+  ok: boolean;
+  tenant: AdminTenantInfo;
+  cards: DecisionPriorityCard[];
+};
+
+export type DecisionPriorityCardResponse = {
+  ok: boolean;
+  tenant: AdminTenantInfo;
+  card: DecisionPriorityCard;
+};
+export type UpdateDecisionSettingsPayload = {
+  priceWeight?: number;
+  speedWeight?: number;
+  providerPriorityWeight?: number;
+};
+
+export type UpdateDecisionCriterionPayload = {
+  weight?: number;
+  isActive?: boolean;
+};
+
+export type CreateDecisionPriorityCardPayload = {
+  providerId?: string | null;
+  criterionKey: string;
+  title?: string | null;
+  isActive?: boolean;
+  config?: Record<string, unknown>;
+};
+
+export type UpdateDecisionPriorityCardPayload = {
+  providerId?: string | null;
+  criterionKey?: string;
+  title?: string | null;
+  priorityRank?: number;
+  isActive?: boolean;
+  config?: Record<string, unknown>;
+};
+
+export type ReorderDecisionPriorityCardItem = {
+  id: string;
+  priorityRank: number;
+};
 export type AdminProviderOption = {
   id: string;
   code: string;
@@ -111,13 +187,182 @@ type UpdateProviderResponse = {
   };
   provider: AdminProvider;
 };
+export interface CheckoutListItem {
+  id: string;
+  orderId: string;
+  storeId: string | null;
+  platform: string;
+  status: string;
+  totalItems: number;
+  totalPrice: number;
 
+  destination: {
+    country?: string;
+    city?: string;
+    street?: string;
+    houseNumber?: string;
+    postalCode?: string;
+  } | null;
+
+  createdAt: string;
+  updatedAt: string | null;
+}
+export interface CheckoutDetailsItem {
+  id: string;
+  sku: string;
+  name: string;
+  quantity: number;
+  unitWeight: string | number | null;
+  unitPrice: string | number | null;
+  supplierId: string | null;
+  category: string | null;
+}
+
+export interface CheckoutShipmentGroupItem {
+  checkoutItemId: string;
+  sku: string;
+  quantity: number;
+  unitWeight: string | number | null;
+  unitPrice: string | number | null;
+  category: string | null;
+}
+
+export interface CheckoutShipmentGroup {
+  id: string;
+  sourceId: string;
+  sourceName: string;
+  sourceType: string;
+  supplierId: string | null;
+  handlingGroup: string | null;
+  totalItems: number;
+  totalWeight: string | number;
+  totalPrice: string | number;
+  groupingReasons: string[];
+  status: string;
+  items: CheckoutShipmentGroupItem[];
+}
+
+export interface CheckoutShipmentStop {
+  id: string;
+  stopOrder: number;
+  stopType: string;
+  address: Record<string, unknown>;
+}
+
+export interface CheckoutShipment {
+  id: string;
+  shipmentGroupId: string;
+  orderId: string;
+  selectedPlanId: string;
+  selectedDeliveryOptionKey: string;
+  providerId: string | null;
+  providerCode: string | null;
+  adapterKey: string | null;
+  carrierName: string;
+  serviceName: string;
+  price: string | number;
+  currency: string;
+  estimatedDeliveryDays: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string | null;
+  stops: CheckoutShipmentStop[];
+}
+
+export interface CheckoutDetails {
+  id: string;
+  orderId: string;
+  storeId: string | null;
+  platform: string;
+  status: string;
+  customer: Record<string, unknown>;
+  destination: {
+    city?: string;
+    street?: string;
+    country?: string;
+    postalCode?: string;
+    houseNumber?: string;
+  } | null;
+  totalItems: number;
+  totalPrice: number;
+  createdAt: string;
+  updatedAt: string | null;
+  items: CheckoutDetailsItem[];
+  shipmentGroups: CheckoutShipmentGroup[];
+  shipments: CheckoutShipment[];
+}
+export interface AuthMeResponse {
+  user: {
+    id: string;
+    email: string | null;
+    displayName: string | null;
+    role: string;
+  };
+
+  tenant: {
+    id: string;
+    name: string;
+    schemaName: string;
+    status?: string;
+  };
+}
+export type GroupingStrategyKey =
+  | 'group_by_source'
+  | 'split_by_max_weight'
+  | 'split_by_max_items';
+
+export interface GroupingStrategyConfig {
+  maxWeightKg?: number;
+  maxItems?: number;
+}
+
+export interface GroupingStrategy {
+  id: string;
+  strategyKey: GroupingStrategyKey;
+  displayName: string;
+  isEnabled: boolean;
+  executionOrder: number;
+  conflictPriority: number;
+  config: GroupingStrategyConfig;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GroupingStrategiesResponse {
+  ok: boolean;
+
+  tenant: {
+    id: string;
+    name: string;
+    schemaName: string;
+  };
+
+  strategies: GroupingStrategy[];
+}
+
+export interface GroupingStrategyResponse {
+  ok: boolean;
+  strategy: GroupingStrategy;
+}
+
+export interface UpdateGroupingStrategyPayload {
+  displayName?: string;
+  isEnabled?: boolean;
+  executionOrder?: number;
+  conflictPriority?: number;
+  config?: GroupingStrategyConfig;
+}
+
+export interface ReorderGroupingStrategyItem {
+  id: string;
+  executionOrder: number;
+  conflictPriority: number;
+}
 @Injectable({
   providedIn: 'root',
 })
 export class AdminApiService {
   private readonly baseUrl = environment.apiUrl;
-  private readonly apiKey = 'flow_ship_test_key_123';
 
   constructor(private readonly http: HttpClient) { }
 
@@ -125,9 +370,7 @@ export class AdminApiService {
     return this.http.get<ProvidersResponse>(
       `${this.baseUrl}/admin/providers`,
       {
-        headers: {
-          'x-api-key': this.apiKey,
-        },
+
       },
     );
   }
@@ -144,88 +387,69 @@ export class AdminApiService {
       body,
       {
         headers: {
-          'x-api-key': this.apiKey,
         },
       },
     );
   }
   getDecisionPriorityCards() {
-    return this.http.get<{
-      ok: boolean;
-      tenant: { id: string; name: string; schemaName: string };
-      cards: DecisionPriorityCard[];
-    }>(`${this.baseUrl}/admin/decision-priority-cards`, {
-      headers: { 'x-api-key': this.apiKey },
-    });
+    return this.http.get<DecisionPriorityCardsResponse>(
+      `${this.baseUrl}/admin/decision-priority-cards`,
+    );
   }
 
-  createDecisionPriorityCard(body: {
-    providerId?: string | null;
-    criterionKey: string;
-    title?: string;
-    isActive?: boolean;
-    config?: Record<string, unknown>;
-  }) {
-    return this.http.post<{
-      ok: boolean;
-      tenant: { id: string; name: string; schemaName: string };
-      card: DecisionPriorityCard;
-    }>(`${this.baseUrl}/admin/decision-priority-cards`, body, {
-      headers: { 'x-api-key': this.apiKey },
-    });
+  createDecisionPriorityCard(
+    body: CreateDecisionPriorityCardPayload,
+  ) {
+    return this.http.post<DecisionPriorityCardResponse>(
+      `${this.baseUrl}/admin/decision-priority-cards`,
+      body,
+    );
   }
 
   updateDecisionPriorityCard(
     cardId: string,
-    body: {
-      providerId?: string | null;
-      criterionKey?: string;
-      title?: string;
-      priorityRank?: number;
-      isActive?: boolean;
-      config?: Record<string, unknown>;
-    },
+    body: UpdateDecisionPriorityCardPayload,
   ) {
-    return this.http.patch<{
-      ok: boolean;
-      tenant: { id: string; name: string; schemaName: string };
-      card: DecisionPriorityCard;
-    }>(`${this.baseUrl}/admin/decision-priority-cards/${cardId}`, body, {
-      headers: { 'x-api-key': this.apiKey },
-    });
+    return this.http.patch<DecisionPriorityCardResponse>(
+      `${this.baseUrl}/admin/decision-priority-cards/${cardId}`,
+      body,
+    );
   }
 
-  reorderDecisionPriorityCards(cards: { id: string; priorityRank: number }[]) {
-    return this.http.patch<{
-      ok: boolean;
-      tenant: { id: string; name: string; schemaName: string };
-      cards: DecisionPriorityCard[];
-    }>(
+  reorderDecisionPriorityCards(
+    cards: ReorderDecisionPriorityCardItem[],
+  ) {
+    return this.http.patch<DecisionPriorityCardsResponse>(
       `${this.baseUrl}/admin/decision-priority-cards/reorder`,
-      { cards },
       {
-        headers: { 'x-api-key': this.apiKey },
+        cards,
       },
     );
   }
 
-  deleteDecisionPriorityCard(cardId: string) {
+  deleteDecisionPriorityCard(
+    cardId: string,
+  ) {
     return this.http.delete<{
       ok: boolean;
       deletedId: string;
-    }>(`${this.baseUrl}/admin/decision-priority-cards/${cardId}`, {
-      headers: { 'x-api-key': this.apiKey },
-    });
+    }>(
+      `${this.baseUrl}/admin/decision-priority-cards/${cardId}`,
+    );
   }
-
   getDecisionCriteria() {
-    return this.http.get<{
-      ok: boolean;
-      tenant: { id: string; name: string; schemaName: string };
-      criteria: DecisionCriterion[];
-    }>(`${this.baseUrl}/admin/decision-criteria`, {
-      headers: { 'x-api-key': this.apiKey },
-    });
+    return this.http.get<DecisionCriteriaResponse>(
+      `${this.baseUrl}/admin/decision-criteria`,
+    );
+  }
+  updateDecisionCriterion(
+    criterionId: string,
+    body: UpdateDecisionCriterionPayload,
+  ) {
+    return this.http.patch<DecisionCriterionResponse>(
+      `${this.baseUrl}/admin/decision-criteria/${criterionId}`,
+      body,
+    );
   }
   getProviderCallLogs(
     filters: ProviderLogsFilters = {},
@@ -283,8 +507,69 @@ export class AdminApiService {
       {
         params,
         headers: {
-          'x-api-key': this.apiKey,
         },
+      },
+    );
+  }
+  getCheckouts() {
+    return this.http.get<CheckoutListItem[]>(
+      `${this.baseUrl}/checkout`,
+      {
+        headers: {
+        },
+      },
+    );
+  }
+  getCheckoutById(checkoutId: string) {
+    return this.http.get<CheckoutDetails>(
+      `${this.baseUrl}/checkout/${checkoutId}`,
+      {
+        headers: {
+        },
+      },
+    );
+  }
+  getMe() {
+    return this.http.get<AuthMeResponse>(
+      `${this.baseUrl}/auth/me`,
+    );
+  }
+  getDecisionSettings() {
+    return this.http.get<DecisionSettingsResponse>(
+      `${this.baseUrl}/admin/decision-settings`,
+    );
+  }
+  updateDecisionSettings(
+    body: UpdateDecisionSettingsPayload,
+  ) {
+    return this.http.patch<DecisionSettingsResponse>(
+      `${this.baseUrl}/admin/decision-settings`,
+      body,
+    );
+  }
+  getGroupingStrategies() {
+    return this.http.get<GroupingStrategiesResponse>(
+      `${this.baseUrl}/admin/grouping-strategies`,
+    );
+  }
+
+  updateGroupingStrategy(
+    strategyId: string,
+    body: UpdateGroupingStrategyPayload,
+  ) {
+    return this.http.patch<GroupingStrategyResponse>(
+      `${this.baseUrl}/admin/grouping-strategies/${strategyId}`,
+      body,
+    );
+  }
+
+  reorderGroupingStrategies(
+    items: ReorderGroupingStrategyItem[],
+  ) {
+    return this.http.patch<GroupingStrategiesResponse>(
+      `${this.baseUrl}/admin/grouping-strategies/reorder`,
+      {
+        items,
       },
     );
   }

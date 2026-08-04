@@ -155,3 +155,245 @@
 .page-content {
     padding: 28px;
 }
+
+.logout-button {
+    margin-top: auto;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border: 0;
+    background: transparent;
+    color: white;
+    padding: 14px;
+    border-radius: 16px;
+    cursor: pointer;
+    text-align: right;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.07);
+    }
+}
+
+.user-area {
+    position: relative;
+    margin-bottom: 18px;
+}
+
+.user-card {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background:
+        rgba(255, 255, 255, 0.05);
+    color: white;
+    border-radius: 16px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    text-align: right;
+    cursor: pointer;
+    font-family: inherit;
+
+    &:hover {
+        background:
+            rgba(255, 255, 255, 0.08);
+    }
+}
+
+.user-avatar {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border-radius: 12px;
+    background: #f4d35e;
+    color: #0f2747;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.user-details {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    strong {
+        overflow: hidden;
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    span {
+        color: #c8d5e6;
+        font-size: 11px;
+    }
+}
+
+.user-arrow {
+    color: #c8d5e6;
+    font-size: 14px;
+    transition: transform 0.2s ease;
+
+    &.open {
+        transform: rotate(180deg);
+    }
+}
+
+.user-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    left: 0;
+    z-index: 30;
+    overflow: hidden;
+    background: white;
+    color: #0f2747;
+    border: 1px solid #dbe4ee;
+    border-radius: 16px;
+    box-shadow:
+        0 18px 45px rgba(15, 39, 71, 0.22);
+}
+
+.user-menu-header {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    border-bottom: 1px solid #edf1f6;
+
+    strong {
+        font-size: 13px;
+    }
+
+    span {
+        overflow: hidden;
+        color: #64748b;
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.user-menu-section {
+    padding: 13px 14px;
+    border-bottom: 1px solid #edf1f6;
+}
+
+.section-label {
+    display: block;
+    margin-bottom: 9px;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.tenant-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    >div:last-child {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    strong {
+        font-size: 12px;
+    }
+
+    span {
+        color: #64748b;
+        font-size: 10px;
+    }
+}
+
+.tenant-icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border-radius: 10px;
+    background: #fff4bf;
+    color: #7a5c00;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+}
+
+.user-menu-action {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid #edf1f6;
+    background: white;
+    color: #334155;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: right;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+
+    span {
+        color: #94a3b8;
+        font-size: 10px;
+    }
+
+    &:hover:not(:disabled) {
+        background: #f8fafc;
+    }
+
+    &:disabled {
+        cursor: default;
+        opacity: 0.65;
+    }
+
+    &:last-child {
+        border-bottom: 0;
+    }
+}
+
+.logout-action {
+    color: #b42318;
+}
+
+.sidebar-footer {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logout-button {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: white;
+    padding: 12px 14px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-align: right;
+    font-family: inherit;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+        background:
+            rgba(255, 255, 255, 0.07);
+    }
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+}

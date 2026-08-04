@@ -1,0 +1,331 @@
+<div class="checkout-details-page">
+    <button type="button" class="back-button" (click)="goBack()">
+        ← חזרה לרשימה
+    </button>
+
+    <div *ngIf="isLoading" class="state-message">
+        טוען פרטי Checkout...
+    </div>
+
+    <div *ngIf="!isLoading && errorMessage" class="state-message error">
+        {{ errorMessage }}
+    </div>
+
+    <ng-container *ngIf="!isLoading && !errorMessage && checkout">
+        <section class="hero-card">
+            <div>
+                <div class="eyebrow">
+                    Checkout Details
+                </div>
+
+                <h1>{{ checkout.orderId }}</h1>
+
+                <p>
+                    מזהה תהליך:
+                    {{ checkout.id }}
+                </p>
+            </div>
+
+            <span class="status-badge" [class.status-success]="
+          checkout.status === 'grouped'
+        " [class.status-error]="
+          checkout.status === 'failed'
+        " [class.status-processing]="
+          checkout.status === 'processing'
+        ">
+                {{ getStatusLabel(checkout.status) }}
+            </span>
+        </section>
+
+        <section class="summary-grid">
+            <article class="summary-card">
+                <span>סה״כ פריטים</span>
+                <strong>{{ checkout.totalItems }}</strong>
+            </article>
+
+            <article class="summary-card">
+                <span>שווי הזמנה</span>
+                <strong>
+                    {{
+                    checkout.totalPrice
+                    | currency:'ILS':'symbol':'1.2-2'
+                    }}
+                </strong>
+            </article>
+
+            <article class="summary-card">
+                <span>קבוצות משלוח</span>
+                <strong>
+                    {{ checkout.shipmentGroups.length }}
+                </strong>
+            </article>
+
+            <article class="summary-card">
+                <span>משלוחים שנוצרו</span>
+                <strong>
+                    {{ checkout.shipments.length }}
+                </strong>
+            </article>
+        </section>
+
+        <section class="content-card">
+            <div class="section-header">
+                <div>
+                    <h2>פרטי הזמנה</h2>
+                    <p>מידע כללי וכתובת יעד.</p>
+                </div>
+            </div>
+
+            <div class="details-grid">
+                <div>
+                    <span>מקור</span>
+                    <strong>{{ checkout.platform }}</strong>
+                </div>
+
+                <div>
+                    <span>Store ID</span>
+                    <strong>
+                        {{ checkout.storeId || 'לא הוגדר' }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>נוצר בתאריך</span>
+                    <strong>
+                        {{
+                        checkout.createdAt
+                        | date:'dd/MM/yyyy HH:mm'
+                        }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>יעד</span>
+                    <strong>
+                        {{ checkout.destination?.city }},
+                        {{ checkout.destination?.street }}
+                        {{ checkout.destination?.houseNumber }}
+                    </strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-card">
+            <div class="section-header">
+                <div>
+                    <h2>פריטי ההזמנה</h2>
+                    <p>
+                        כל הפריטים שהתקבלו ב־Checkout.
+                    </p>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>שם</th>
+                            <th>כמות</th>
+                            <th>מחיר יחידה</th>
+                            <th>משקל יחידה</th>
+                            <th>ספק</th>
+                            <th>קטגוריה</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <tr *ngFor="let item of checkout.items">
+                            <td>{{ item.sku }}</td>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>
+                                {{
+                                +item.unitPrice!
+                                | currency:
+                                'ILS':
+                                'symbol':
+                                '1.2-2'
+                                }}
+                            </td>
+                            <td>
+                                {{ item.unitWeight }} ק״ג
+                            </td>
+                            <td>
+                                {{ item.supplierId || '—' }}
+                            </td>
+                            <td>
+                                {{ item.category || '—' }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="content-card">
+            <div class="section-header">
+                <div>
+                    <h2>קבוצות משלוח</h2>
+                    <p>
+                        תוצאת מנגנון הקיבוץ של ההזמנה.
+                    </p>
+                </div>
+            </div>
+
+            <div class="groups-grid">
+                <article *ngFor="
+            let group of checkout.shipmentGroups;
+            let index = index
+          " class="group-card">
+                    <div class="group-header">
+                        <div>
+                            <span>קבוצה {{ index + 1 }}</span>
+                            <h3>{{ group.sourceName }}</h3>
+                        </div>
+
+                        <span class="group-status" [ngClass]="getShipmentGroupStatusClass(group)">
+                            {{ getShipmentGroupStatusLabel(group) }}
+                        </span>
+                    </div>
+
+                    <div class="group-meta">
+                        <div>
+                            <span>סוג מקור</span>
+                            <strong>{{ group.sourceType }}</strong>
+                        </div>
+
+                        <div>
+                            <span>קבוצת טיפול</span>
+                            <strong>
+                                {{ group.handlingGroup || '—' }}
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>כמות פריטים</span>
+                            <strong>{{ group.totalItems }}</strong>
+                        </div>
+
+                        <div>
+                            <span>משקל</span>
+                            <strong>
+                                {{ group.totalWeight }} ק״ג
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>שווי</span>
+                            <strong>
+                                {{
+                                +group.totalPrice
+                                | currency:
+                                'ILS':
+                                'symbol':
+                                '1.2-2'
+                                }}
+                            </strong>
+                        </div>
+                    </div>
+
+                    <div class="reasons">
+                        <span *ngFor="
+                let reason of group.groupingReasons
+              ">
+                            {{ reason }}
+                        </span>
+                    </div>
+
+                    <div class="group-items">
+                        <div *ngFor="let item of group.items">
+                            <strong>{{ item.sku }}</strong>
+                            <span>
+                                כמות: {{ item.quantity }}
+                            </span>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="content-card">
+            <div class="section-header">
+                <div>
+                    <h2>משלוחים שנוצרו</h2>
+                    <p>
+                        המשלוחים שנוצרו מתוך התוכנית הזוכה.
+                    </p>
+                </div>
+            </div>
+
+            <div class="shipments-grid">
+                <article *ngFor="
+            let shipment of checkout.shipments;
+            let index = index
+          " class="shipment-card">
+                    <div class="shipment-header">
+                        <div>
+                            <span>משלוח {{ index + 1 }}</span>
+                            <h3>{{ shipment.carrierName }}</h3>
+                            <p>{{ shipment.serviceName }}</p>
+                        </div>
+
+                        <span class="small-badge">
+                            {{ getStatusLabel(shipment.status) }}
+                        </span>
+                    </div>
+
+                    <div class="shipment-meta">
+                        <div>
+                            <span>מחיר משלוח</span>
+                            <strong>
+                                {{
+                                +shipment.price
+                                | currency:
+                                shipment.currency:
+                                'symbol':
+                                '1.2-2'
+                                }}
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>ימי אספקה</span>
+                            <strong>
+                                {{
+                                shipment.estimatedDeliveryDays
+                                }}
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>חברת שילוח</span>
+                            <strong>
+                                {{ shipment.providerCode }}
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>תוכנית נבחרת</span>
+                            <strong>
+                                {{ shipment.selectedPlanId }}
+                            </strong>
+                        </div>
+                    </div>
+
+                    <div class="stops">
+                        <div *ngFor="let stop of shipment.stops" class="stop">
+                            <span>
+                                {{ getStopLabel(stop) }}
+                            </span>
+
+                            <strong>
+                                {{ getAddressLabel(stop.address) }}
+                            </strong>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+    </ng-container>
+</div>

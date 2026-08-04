@@ -1,0 +1,302 @@
+<div class="checkouts-page">
+    <section class="hero-card">
+        <div>
+            <div class="eyebrow">
+                Checkout Monitor
+            </div>
+
+            <h1>תהליכי Checkout</h1>
+
+            <p>
+                צפייה בכל ההזמנות שעברו במערכת,
+                בסטטוס העיבוד ובנתוני המשלוח המרכזיים.
+            </p>
+        </div>
+
+        <button type="button" class="refresh-button" (click)="loadCheckouts()" [disabled]="isLoading">
+            רענון נתונים
+        </button>
+    </section>
+
+    <section class="summary-grid">
+        <div class="summary-card">
+            <span>סה״כ תהליכים</span>
+            <strong>{{ checkouts.length }}</strong>
+        </div>
+
+        <div class="summary-card">
+            <span>הושלמו</span>
+            <strong>{{ groupedCount }}</strong>
+        </div>
+
+        <div class="summary-card">
+            <span>נכשלו</span>
+            <strong>{{ failedCount }}</strong>
+        </div>
+    </section>
+
+
+    <section class="filters-card">
+        <div class="filters-heading">
+            <div>
+                <h2>סינון ומיון</h2>
+                <p>
+                    חיפוש לפי הזמנה, סטטוס, מקור ההזמנה וטווח תאריכים.
+                </p>
+            </div>
+
+            <button type="button" class="reset-button" (click)="resetFilters()">
+                איפוס סינונים
+            </button>
+        </div>
+
+        <div class="filters-grid">
+            <label class="filter-field search-field">
+                <span>חיפוש</span>
+
+                <input type="search" [(ngModel)]="searchTerm" placeholder="מספר הזמנה או מזהה Checkout" />
+            </label>
+
+            <label class="filter-field">
+                <span>סטטוס</span>
+
+                <select [(ngModel)]="selectedStatus">
+                    <option value="">כל הסטטוסים</option>
+                    <option value="grouped">הושלם</option>
+                    <option value="partially_grouped">
+                        הושלם חלקית
+                    </option>
+                    <option value="processing">בתהליך</option>
+                    <option value="failed">נכשל</option>
+                </select>
+            </label>
+
+            <label class="filter-field">
+                <span>מקור ההזמנה</span>
+
+                <select [(ngModel)]="selectedPlatform">
+                    <option value="">כל המקורות</option>
+
+                    <option *ngFor="let platform of platforms" [value]="platform">
+                        {{ getPlatformLabel(platform) }}
+                    </option>
+                </select>
+            </label>
+
+            <div class="date-range-group">
+                <label class="filter-field">
+                    <span>מתאריך</span>
+
+                    <input type="date" [(ngModel)]="fromDate" />
+                </label>
+
+                <label class="filter-field">
+                    <span>עד תאריך</span>
+
+                    <input type="date" [(ngModel)]="toDate" />
+                </label>
+            </div>
+
+            <label class="filter-field">
+                <span>מיון לפי</span>
+
+                <select [(ngModel)]="sortField">
+                    <option value="createdAt">
+                        תאריך יצירה
+                    </option>
+
+                    <option value="totalPrice">
+                        סכום ההזמנה
+                    </option>
+                </select>
+            </label>
+
+            <label class="filter-field">
+                <span>סדר</span>
+
+                <select [(ngModel)]="sortDirection">
+                    <option value="desc">
+                        מהחדש / הגבוה
+                    </option>
+
+                    <option value="asc">
+                        מהישן / הנמוך
+                    </option>
+                </select>
+            </label>
+        </div>
+    </section>
+    <section class="table-card">
+        <div class="table-header">
+            <div>
+                <h2>היסטוריית Checkout</h2>
+
+                <p>
+                    לחיצה על שורה תפתח את פרטי התהליך.
+                </p>
+            </div>
+
+            <div *ngIf="!isLoading && !errorMessage" class="results-count">
+                מציג
+                <strong>
+                    {{ filteredCheckouts.length }}
+                </strong>
+                מתוך
+                <strong>{{ checkouts.length }}</strong>
+                תהליכים
+            </div>
+        </div>
+
+        <div *ngIf="isLoading" class="state-message">
+            טוען תהליכי Checkout...
+        </div>
+
+        <div *ngIf="!isLoading && errorMessage" class="state-message error">
+            <p>{{ errorMessage }}</p>
+
+            <button type="button" (click)="loadCheckouts()">
+                נסי שוב
+            </button>
+        </div>
+
+        <div *ngIf="
+        !isLoading &&
+        !errorMessage &&
+        checkouts.length === 0
+      " class="state-message">
+            עדיין לא נמצאו תהליכי Checkout.
+        </div>
+
+        <div *ngIf="
+        !isLoading &&
+        !errorMessage &&
+        checkouts.length > 0 &&
+        filteredCheckouts.length === 0
+      " class="state-message">
+            לא נמצאו תהליכים שתואמים לסינון.
+        </div>
+
+        <div *ngIf="
+        !isLoading &&
+        !errorMessage &&
+        filteredCheckouts.length > 0
+      " class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>מספר הזמנה</th>
+                        <th>יעד</th>
+                        <th>פריטים</th>
+
+                        <th>
+                            <button type="button" class="sort-button" (click)="setSort('totalPrice')">
+                                סכום
+                                <span>
+                                    {{
+                                    getSortIcon(
+                                    'totalPrice'
+                                    )
+                                    }}
+                                </span>
+                            </button>
+                        </th>
+
+                        <th>מקור</th>
+                        <th>סטטוס</th>
+
+                        <th>
+                            <button type="button" class="sort-button" (click)="setSort('createdAt')">
+                                תאריך יצירה
+                                <span>
+                                    {{
+                                    getSortIcon(
+                                    'createdAt'
+                                    )
+                                    }}
+                                </span>
+                            </button>
+                        </th>
+
+                        <th></th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr *ngFor="
+              let checkout of filteredCheckouts;
+              trackBy: trackCheckout
+            " (click)="openCheckout(checkout.id)">
+                        <td>
+                            <div class="order-cell">
+                                <strong>
+                                    {{ checkout.orderId }}
+                                </strong>
+
+                                <span>{{ checkout.id }}</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            {{
+                            getDestinationLabel(
+                            checkout.destination
+                            )
+                            }}
+                        </td>
+
+                        <td>{{ checkout.totalItems }}</td>
+
+                        <td>
+                            {{
+                            checkout.totalPrice
+                            | currency:
+                            'ILS':
+                            'symbol':
+                            '1.2-2'
+                            }}
+                        </td>
+
+                        <td>{{ checkout.platform }}</td>
+
+                        <td>
+                            <span class="status-badge" [class.status-success]="
+                  checkout.status === 'grouped'
+                " [class.status-warning]="
+                  checkout.status ===
+                  'partially_grouped'
+                " [class.status-processing]="
+                  checkout.status ===
+                  'processing'
+                " [class.status-error]="
+                  checkout.status === 'failed'
+                ">
+                                {{
+                                getStatusLabel(
+                                checkout.status
+                                )
+                                }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{
+                            checkout.createdAt
+                            | date:
+                            'dd/MM/yyyy HH:mm'
+                            }}
+                        </td>
+
+                        <td>
+                            <button type="button" class="details-button" (click)="
+                  $event.stopPropagation();
+                  openCheckout(checkout.id)
+                ">
+                                צפייה
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>

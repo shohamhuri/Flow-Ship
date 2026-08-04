@@ -13,7 +13,10 @@ export class MockInventoryProvider implements InventoryProvider {
             isActive: true,
             priority: 0.9,
             location: {
+                country: 'Israel',
                 city: 'Netivot',
+                street: 'Industrial Area',
+                houseNumber: '1',
             },
         },
         {
@@ -23,7 +26,10 @@ export class MockInventoryProvider implements InventoryProvider {
             isActive: true,
             priority: 0.8,
             location: {
+                country: 'Israel',
                 city: 'Rishon LeZion',
+                street: 'Moshe Dayan',
+                houseNumber: '10',
             },
         },
         {
@@ -33,7 +39,10 @@ export class MockInventoryProvider implements InventoryProvider {
             isActive: true,
             priority: 0.7,
             location: {
+                country: 'Israel',
                 city: 'Beer Sheva',
+                street: 'HaAtzmaut',
+                houseNumber: '25',
             },
         },
         {
@@ -43,9 +52,13 @@ export class MockInventoryProvider implements InventoryProvider {
             isActive: false,
             priority: 0.95,
             location: {
+                country: 'Israel',
                 city: 'Tel Aviv',
+                street: 'Ibn Gabirol',
+                houseNumber: '50',
             },
         },
+
     ];
 
     private readonly inventory: SourceInventory[] = [
@@ -63,6 +76,26 @@ export class MockInventoryProvider implements InventoryProvider {
             sourceId: 'BRANCH-BEER-SHEVA',
             sku: 'SHIRT-BLACK-M',
             availableQuantity: 1,
+        },
+        {
+            sourceId: 'BRANCH-BEER-SHEVA',
+            sku: 'SHIRT-WHITE-L',
+            availableQuantity: 10,
+        },
+        {
+            sourceId: 'WAREHOUSE-SOUTH',
+            sku: 'SHIRT-WHITE-L',
+            availableQuantity: 20,
+        },
+        {
+            sourceId: 'BRANCH-BEER-SHEVA',
+            sku: 'ICE-CREAM-VANILLA',
+            availableQuantity: 10,
+        },
+        {
+            sourceId: 'WAREHOUSE-SOUTH',
+            sku: 'ICE-CREAM-VANILLA',
+            availableQuantity: 20,
         },
         {
             sourceId: 'BRANCH-TEL-AVIV',
