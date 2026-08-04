@@ -184,8 +184,8 @@
                             <h3>{{ group.sourceName }}</h3>
                         </div>
 
-                        <span class="small-badge">
-                            {{ getStatusLabel(group.status) }}
+                        <span class="group-status" [ngClass]="getShipmentGroupStatusClass(group)">
+                            {{ getShipmentGroupStatusLabel(group) }}
                         </span>
                     </div>
 

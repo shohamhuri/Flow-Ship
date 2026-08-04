@@ -248,3 +248,144 @@ tbody tr {
         grid-template-columns: 1fr;
     }
 }
+
+.filters-card {
+    background: #ffffff;
+    border: 1px solid #dce5ef;
+    border-radius: 28px;
+    padding: 32px 48px;
+    box-shadow: 0 18px 45px rgba(20, 49, 84, 0.08);
+    overflow: hidden;
+}
+
+.filters-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 28px;
+
+    h2 {
+        margin: 0 0 6px;
+        color: #082d59;
+        font-size: 28px;
+    }
+
+    p {
+        margin: 0;
+        color: #718099;
+        font-size: 17px;
+    }
+}
+
+.filters-grid {
+    display: grid;
+    grid-template-columns:
+        minmax(280px, 2fr) minmax(170px, 1fr) minmax(180px, 1fr);
+    gap: 20px;
+    align-items: end;
+}
+
+.filter-field {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+
+    >span {
+        color: #53657f;
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    input,
+    select {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        height: 52px;
+        padding: 0 16px;
+        border: 1px solid #d4deea;
+        border-radius: 14px;
+        background: #ffffff;
+        color: #173557;
+        font: inherit;
+        outline: none;
+        transition:
+            border-color 0.2s ease,
+            box-shadow 0.2s ease;
+    }
+
+    input:focus,
+    select:focus {
+        border-color: #e5b92f;
+        box-shadow: 0 0 0 3px rgba(229, 185, 47, 0.16);
+    }
+}
+
+.search-field {
+    grid-column: span 1;
+}
+
+.date-range-group {
+    grid-column: span 2;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+    gap: 20px;
+}
+
+.reset-button {
+    height: 48px;
+    padding: 0 24px;
+    border: 1px solid #d4deea;
+    border-radius: 14px;
+    background: #ffffff;
+    color: #102f57;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.reset-button:hover {
+    background: #f4f7fb;
+}
+
+@media (max-width: 1050px) {
+    .filters-card {
+        padding: 28px;
+    }
+
+    .filters-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .search-field,
+    .date-range-group {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 650px) {
+    .filters-card {
+        padding: 22px 18px;
+    }
+
+    .filters-heading {
+        flex-direction: column;
+    }
+
+    .reset-button {
+        width: 100%;
+    }
+
+    .filters-grid,
+    .date-range-group {
+        grid-template-columns: 1fr;
+    }
+
+    .search-field,
+    .date-range-group {
+        grid-column: auto;
+    }
+}

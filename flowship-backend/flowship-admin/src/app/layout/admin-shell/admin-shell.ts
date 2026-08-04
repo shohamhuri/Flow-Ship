@@ -68,7 +68,7 @@ export class AdminShellComponent implements OnInit {
     {
       label: 'ניהול קיבוץ משלוחים',
       subtitle: 'Grouping Engine',
-      route: '/admin/shipment-grouping',
+      route: '/admin/grouping-management',
       icon: '⧉',
     },
     {

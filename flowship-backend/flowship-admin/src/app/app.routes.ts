@@ -6,7 +6,7 @@ import { AdminShellComponent } from './layout/admin-shell/admin-shell';
 import { AdminHomeComponent } from './pages/admin-home/admin-home';
 import { DecisionCriteriaComponent } from './pages/decision-criteria/decision-criteria';
 import { ProviderLogs } from './pages/provider-logs/provider-logs';
-import { ShipmentGrouping } from './pages/shipment-grouping/shipment-grouping';
+import { GroupingManagement } from './pages/grouping-management/grouping-management';
 import { ShipmentsHistory } from './pages/shipments-history/shipments-history';
 import { GroupPurchases } from './pages/group-purchases/group-purchases';
 import { CheckoutsList } from './pages/checkouts-list/checkouts-list';
@@ -52,8 +52,8 @@ export const routes: Routes = [
                 component: ProviderLogs,
             },
             {
-                path: 'shipment-grouping',
-                component: ShipmentGrouping,
+                path: 'grouping-management',
+                component: GroupingManagement,
             },
             {
                 path: 'shipments-history',

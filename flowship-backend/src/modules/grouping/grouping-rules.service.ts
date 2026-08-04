@@ -116,4 +116,52 @@ export class GroupingRulesService {
             }
         }
     }
+    async getAllStrategies(
+        tenant: CurrentTenant,
+    ): Promise<GroupingStrategySetting[]> {
+        return this
+            .groupingStrategySettingsRepository
+            .findAllStrategies(tenant);
+    }
+    async updateStrategy(
+        tenant: CurrentTenant,
+        strategyId: string,
+        changes: {
+            displayName?: string;
+            isEnabled?: boolean;
+            executionOrder?: number;
+            conflictPriority?: number;
+            config?: Record<string, unknown>;
+        },
+    ): Promise<GroupingStrategySetting | null> {
+        const strategy =
+            await this
+                .groupingStrategySettingsRepository
+                .updateStrategy(
+                    tenant,
+                    strategyId,
+                    changes,
+                );
+
+        if (strategy) {
+            this.validateStrategyConfig(strategy);
+        }
+
+        return strategy;
+    }
+    async reorderStrategies(
+        tenant: CurrentTenant,
+        items: Array<{
+            id: string;
+            executionOrder: number;
+            conflictPriority: number;
+        }>,
+    ): Promise<GroupingStrategySetting[]> {
+        return this
+            .groupingStrategySettingsRepository
+            .reorderStrategies(
+                tenant,
+                items,
+            );
+    }
 }

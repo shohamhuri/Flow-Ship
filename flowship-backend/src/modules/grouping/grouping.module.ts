@@ -6,6 +6,7 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import {
     GroupingStrategySettingsRepository,
 } from './grouping-strategy-settings.repository';
+import { GroupingAdminController } from './grouping-admin.controller';
 
 
 @Module({
@@ -17,6 +18,9 @@ import {
         GroupingRulesService,
         ShipmentGroupsRepository,
         GroupingStrategySettingsRepository,
+    ],
+    controllers: [
+        GroupingAdminController,
     ],
     exports: [
         GroupingService,

@@ -1,0 +1,323 @@
+<div class="grouping-page">
+    <section class="hero-card">
+        <div>
+            <div class="eyebrow">
+                Grouping Engine
+            </div>
+
+            <h1>ניהול קיבוץ משלוחים</h1>
+
+            <p>
+                הגדרת החוקים שעל פיהם המערכת מקבצת
+                פריטים ומפצלת הזמנות לקבוצות משלוח.
+            </p>
+        </div>
+
+        <button type="button" class="refresh-button" (click)="loadStrategies()" [disabled]="isLoading">
+            רענון נתונים
+        </button>
+    </section>
+
+    <div *ngIf="successMessage" class="alert success">
+        {{ successMessage }}
+    </div>
+
+    <div *ngIf="errorMessage" class="alert error">
+        {{ errorMessage }}
+    </div>
+
+    <div *ngIf="isLoading" class="state-card">
+        טוען את הגדרות קיבוץ המשלוחים...
+    </div>
+
+    <ng-container *ngIf="!isLoading">
+        <section class="summary-grid">
+            <article class="summary-card">
+                <span>אסטרטגיות</span>
+                <strong>{{ strategies.length }}</strong>
+                <small>
+                    {{ activeStrategiesCount }} פעילות
+                </small>
+            </article>
+
+            <article class="summary-card">
+                <span>משקל מרבי</span>
+                <strong>
+                    {{
+                    maxWeightStrategy
+                    ?.config
+                    ?.maxWeightKg ?? '—'
+                    }}
+                </strong>
+                <small>ק״ג לקבוצה</small>
+            </article>
+
+            <article class="summary-card">
+                <span>כמות מרבית</span>
+                <strong>
+                    {{
+                    maxItemsStrategy
+                    ?.config
+                    ?.maxItems ?? '—'
+                    }}
+                </strong>
+                <small>פריטים לקבוצה</small>
+            </article>
+
+            <article class="summary-card">
+                <span>פיצול לפי מקור</span>
+                <strong>
+                    {{
+                    sourceStrategy?.isEnabled
+                    ? 'פעיל'
+                    : 'כבוי'
+                    }}
+                </strong>
+                <small>
+                    מחסן או סניף
+                </small>
+            </article>
+        </section>
+
+        <section class="content-card">
+            <div class="section-heading">
+                <div>
+                    <div class="section-eyebrow">
+                        GROUPING RULES
+                    </div>
+
+                    <h2>חוקי הפיצול הפעילים</h2>
+
+                    <p>
+                        כל חוק משפיע על האופן שבו פריטי
+                        ההזמנה מחולקים לקבוצות משלוח.
+                    </p>
+                </div>
+            </div>
+
+            <div class="strategy-list">
+
+                <article *ngFor="
+            let strategy of strategies;
+            let index = index;
+            let first = first;
+            let last = last;
+            trackBy: trackStrategy
+        " class="strategy-card" [class.disabled-card]="!strategy.isEnabled"
+                    [class.drag-over]="dragOverStrategyId === strategy.id" draggable="true"
+                    (dragstart)="onDragStart($event, strategy.id)" (dragover)="onDragOver($event, strategy.id)"
+                    (dragleave)="onDragLeave(strategy.id)" (drop)="onDrop($event, strategy.id)" (dragend)="onDragEnd()">
+
+                    <!-- ידית גרירה -->
+                    <div class="drag-handle" title="גרירה לשינוי סדר העדיפויות">
+
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+
+                    <!-- מספר סדר -->
+                    <div class="strategy-order">
+                        {{ index + 1 }}
+                    </div>
+
+                    <!-- תוכן החוק -->
+                    <div class="strategy-main">
+
+                        <div class="strategy-header">
+
+                            <div class="strategy-heading">
+                                <h3>
+                                    {{
+                                    getStrategyTitle(
+                                    strategy.strategyKey
+                                    )
+                                    }}
+                                </h3>
+
+                                <span class="technical-key">
+                                    {{ strategy.strategyKey }}
+                                </span>
+                            </div>
+
+                            <div class="strategy-badges">
+
+                                <span class="status-badge" [class.active]="strategy.isEnabled">
+
+                                    {{
+                                    strategy.isEnabled
+                                    ? 'פעיל'
+                                    : 'כבוי'
+                                    }}
+                                </span>
+
+                                <div class="influence-badge">
+                                    <span>השפעה משוערת</span>
+
+                                    <strong>
+                                        {{ getEstimatedInfluence(index) }}%
+                                    </strong>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <p class="strategy-description">
+                            {{
+                            getStrategyDescription(
+                            strategy.strategyKey
+                            )
+                            }}
+                        </p>
+
+                        <div class="effect-box">
+                            {{ getStrategyEffect(strategy) }}
+                        </div>
+                        <div class="influence-progress">
+                            <div class="influence-progress-header">
+                                <span>השפעה משוערת</span>
+
+                                <strong>
+                                    {{ getEstimatedInfluence(index) }}%
+                                </strong>
+                            </div>
+
+                            <div class="influence-track">
+                                <div class="influence-fill" [style.width.%]="
+        getEstimatedInfluence(index)
+      "></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- פעולות -->
+                    <div class="strategy-actions">
+
+                        <!-- <div class="order-actions">
+
+                            <button type="button" class="order-button" [disabled]="first || isReordering" (click)="
+                        moveStrategy(
+                            strategy.id,
+                            'up'
+                        )
+                    " title="העלאה בסדר העדיפויות">
+                                ↑
+                            </button>
+
+                            <button type="button" class="order-button" [disabled]="last || isReordering" (click)="
+                        moveStrategy(
+                            strategy.id,
+                            'down'
+                        )
+                    " title="הורדה בסדר העדיפויות">
+                                ↓
+                            </button>
+
+                        </div> -->
+
+                        <label class="toggle-control" [title]="
+                    strategy.isEnabled
+                        ? 'כיבוי החוק'
+                        : 'הפעלת החוק'
+                ">
+
+                            <input type="checkbox" [checked]="strategy.isEnabled"
+                                (change)="toggleStrategy(strategy, $event)" />
+                            <span class="toggle-track">
+                                <span class="toggle-thumb"></span>
+                            </span>
+
+                        </label>
+
+                        <button *ngIf="
+                    editingStrategyId !== strategy.id
+                " type="button" class="edit-button" (click)="startEditing(strategy)">
+
+                            עריכה
+                        </button>
+
+                    </div>
+
+                    <!-- אזור עריכה -->
+                    <div *ngIf="
+                editingStrategyId === strategy.id
+            " class="strategy-editor">
+
+
+
+                        <label *ngIf="
+                    strategy.strategyKey ===
+                    'split_by_max_weight'
+                " class="form-field">
+
+                            <span>משקל מרבי לקבוצה</span>
+
+                            <div class="input-with-unit">
+
+                                <input type="number" min="0.1" step="0.1" [ngModel]="
+                            strategy.config.maxWeightKg
+                        " (ngModelChange)="
+                            setMaxWeight(
+                                strategy,
+                                $event
+                            )
+                        " name="maxWeight-{{ strategy.id }}" />
+
+                                <span>ק״ג</span>
+
+                            </div>
+
+                        </label>
+
+                        <label *ngIf="
+                    strategy.strategyKey ===
+                    'split_by_max_items'
+                " class="form-field">
+
+                            <span>מספר פריטים מרבי</span>
+
+                            <div class="input-with-unit">
+
+                                <input type="number" min="1" step="1" [ngModel]="
+                            strategy.config.maxItems
+                        " (ngModelChange)="
+                            setMaxItems(
+                                strategy,
+                                $event
+                            )
+                        " name="maxItems-{{ strategy.id }}" />
+
+                                <span>פריטים</span>
+
+                            </div>
+
+                        </label>
+
+                        <div class="editor-actions">
+
+                            <button type="button" class="cancel-button" [disabled]="isSaving" (click)="cancelEditing()">
+
+                                ביטול
+                            </button>
+
+                            <button type="button" class="save-button" [disabled]="isSaving"
+                                (click)="saveStrategy(strategy)">
+
+                                {{
+                                isSaving
+                                ? 'שומר...'
+                                : 'שמירת שינויים'
+                                }}
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </article>
+
+            </div>
+        </section>
+    </ng-container>
+</div>

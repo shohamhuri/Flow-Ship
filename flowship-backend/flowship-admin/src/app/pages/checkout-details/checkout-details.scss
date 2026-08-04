@@ -267,3 +267,40 @@ th {
         grid-template-columns: 1fr;
     }
 }
+
+.group-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0 18px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.group-status-planned {
+    background: #edf2f7;
+    color: #64748b;
+}
+
+.group-status-processing {
+    background: #e8f1ff;
+    color: #2563a8;
+}
+
+.group-status-waiting {
+    background: #fff4cf;
+    color: #8a6500;
+}
+
+.group-status-created {
+    background: #dcf7e8;
+    color: #087443;
+}
+
+.group-status-failed {
+    background: #ffe1e1;
+    color: #b42318;
+}

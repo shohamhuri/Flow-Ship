@@ -88,7 +88,64 @@ export class CheckoutDetailsComponent implements OnInit {
         },
       });
   }
+  hasShipmentForGroup(groupId: string): boolean {
+    return (
+      this.checkout?.shipments?.some(
+        (shipment) =>
+          shipment.shipmentGroupId === groupId,
+      ) ?? false
+    );
+  }
 
+  getShipmentGroupStatusLabel(group: {
+    id: string;
+    status: string;
+  }): string {
+    if (group.status === 'failed') {
+      return 'נכשל';
+    }
+
+    if (this.hasShipmentForGroup(group.id)) {
+      return 'נוצר משלוח';
+    }
+
+    switch (group.status) {
+      case 'ready':
+        return 'ממתין ליצירת משלוח';
+
+      case 'processing':
+        return 'בעיבוד';
+
+      case 'planned':
+        return 'מתוכנן';
+
+      default:
+        return group.status;
+    }
+  }
+
+  getShipmentGroupStatusClass(group: {
+    id: string;
+    status: string;
+  }): string {
+    if (group.status === 'failed') {
+      return 'group-status-failed';
+    }
+
+    if (this.hasShipmentForGroup(group.id)) {
+      return 'group-status-created';
+    }
+
+    if (group.status === 'ready') {
+      return 'group-status-waiting';
+    }
+
+    if (group.status === 'processing') {
+      return 'group-status-processing';
+    }
+
+    return 'group-status-planned';
+  }
   goBack(): void {
     void this.router.navigate([
       '/admin/checkouts',
