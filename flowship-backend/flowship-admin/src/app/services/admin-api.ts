@@ -358,6 +358,102 @@ export interface ReorderGroupingStrategyItem {
   executionOrder: number;
   conflictPriority: number;
 }
+export interface ShipmentHistoryShipment {
+  id: string;
+
+  externalShipmentId: string | null;
+  shipmentGroupId: string | null;
+
+  status: string;
+
+  carrierName: string | null;
+  serviceName: string | null;
+
+  price: number | null;
+  currency: string;
+
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+
+  pickup: Record<string, unknown> | null;
+  dropoff: Record<string, unknown> | null;
+
+  failureReason: string | null;
+
+  deliveredAt: string | null;
+  failedAt: string | null;
+  createdAt: string;
+}
+
+export interface ShipmentHistoryItem {
+  checkoutId: string;
+  orderId: string;
+  platform: string;
+
+  resultStatus:
+  | 'delivered'
+  | 'failed';
+
+  checkoutStatus: string;
+
+  failureStage: string | null;
+  failureReason: string | null;
+
+  destination: {
+    city?: string;
+    street?: string;
+    houseNumber?: string;
+    postalCode?: string;
+    country?: string;
+  };
+
+  totalShipments: number;
+  deliveredShipments: number;
+  failedShipments: number;
+
+  totalShippingPrice: number;
+  currency: string;
+
+  createdAt: string;
+  completedAt: string | null;
+
+  shipments: ShipmentHistoryShipment[];
+}
+
+export interface ShipmentHistoryResponse {
+  ok: boolean;
+
+  tenant: {
+    id: string;
+    name: string;
+    schemaName: string;
+  };
+
+  count: number;
+  items: ShipmentHistoryItem[];
+}
+export type ShipmentHistoryResultStatus =
+  | 'delivered'
+  | 'failed';
+
+export type ShipmentHistorySortBy =
+  | 'completedAt'
+  | 'totalShippingPrice'
+  | 'totalShipments';
+
+export type ShipmentHistorySortDirection =
+  | 'asc'
+  | 'desc';
+
+export interface ShipmentHistoryFilters {
+  resultStatus?: ShipmentHistoryResultStatus;
+  carrierName?: string;
+  search?: string;
+  fromDate?: string;
+  toDate?: string;
+  sortBy?: ShipmentHistorySortBy;
+  sortDirection?: ShipmentHistorySortDirection;
+}
 @Injectable({
   providedIn: 'root',
 })
@@ -570,6 +666,63 @@ export class AdminApiService {
       `${this.baseUrl}/admin/grouping-strategies/reorder`,
       {
         items,
+      },
+    );
+  }
+  getShipmentHistory(
+    filters: ShipmentHistoryFilters = {},
+  ) {
+    let params = new HttpParams();
+
+    if (filters.resultStatus) {
+      params = params.set(
+        'resultStatus',
+        filters.resultStatus,
+      );
+    }
+
+    if (filters.carrierName?.trim()) {
+      params = params.set(
+        'carrierName',
+        filters.carrierName.trim(),
+      );
+    }
+
+    if (filters.search?.trim()) {
+      params = params.set(
+        'search',
+        filters.search.trim(),
+      );
+    }
+
+    if (filters.fromDate) {
+      params = params.set(
+        'fromDate',
+        filters.fromDate,
+      );
+    }
+
+    if (filters.toDate) {
+      params = params.set(
+        'toDate',
+        filters.toDate,
+      );
+    }
+
+    params = params.set(
+      'sortBy',
+      filters.sortBy ?? 'completedAt',
+    );
+
+    params = params.set(
+      'sortDirection',
+      filters.sortDirection ?? 'desc',
+    );
+
+    return this.http.get<ShipmentHistoryResponse>(
+      `${this.baseUrl}/admin/shipment-history`,
+      {
+        params,
       },
     );
   }

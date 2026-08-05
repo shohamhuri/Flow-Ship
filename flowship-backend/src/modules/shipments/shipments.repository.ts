@@ -45,6 +45,13 @@ export interface CreateShipmentData {
 
     status: string;
 }
+export interface ShipmentStatusSummary {
+    checkoutId: string;
+    totalShipments: number;
+    deliveredShipments: number;
+    failedShipments: number;
+    activeShipments: number;
+}
 @Injectable()
 export class ShipmentsRepository {
     constructor(
@@ -170,5 +177,248 @@ export class ShipmentsRepository {
         }
 
         return schemaName;
+    }
+    async markDelivered(
+        tenant: CurrentTenant,
+        shipmentId: string,
+        deliveredAt: Date = new Date(),
+    ): Promise<void> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        await this.db.query(
+            `
+    update "${schemaName}".shipments
+    set
+      status = 'delivered',
+      delivered_at = $1,
+      failed_at = null,
+      failure_reason = null,
+      updated_at = now()
+    where id = $2
+    `,
+            [
+                deliveredAt,
+                shipmentId,
+            ],
+        );
+    }
+
+    async markFailed(
+        tenant: CurrentTenant,
+        shipmentId: string,
+        failureReason: string,
+        failedAt: Date = new Date(),
+    ): Promise<void> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        await this.db.query(
+            `
+    update "${schemaName}".shipments
+    set
+      status = 'failed',
+      failed_at = $1,
+      failure_reason = $2,
+      delivered_at = null,
+      updated_at = now()
+    where id = $3
+    `,
+            [
+                failedAt,
+                failureReason,
+                shipmentId,
+            ],
+        );
+    }
+
+    async markDropoffCompleted(
+        tenant: CurrentTenant,
+        shipmentId: string,
+        completedAt: Date = new Date(),
+    ): Promise<void> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        await this.db.query(
+            `
+    update "${schemaName}".shipment_stops
+    set
+      status = 'completed',
+      arrived_at = coalesce(arrived_at, $1),
+      completed_at = $1
+    where shipment_id = $2
+      and stop_type = 'dropoff'
+    `,
+            [
+                completedAt,
+                shipmentId,
+            ],
+        );
+    }
+
+    async markPickupCompleted(
+        tenant: CurrentTenant,
+        shipmentId: string,
+        completedAt: Date = new Date(),
+    ): Promise<void> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        await this.db.query(
+            `
+    update "${schemaName}".shipment_stops
+    set
+      status = 'completed',
+      arrived_at = coalesce(arrived_at, $1),
+      completed_at = $1
+    where shipment_id = $2
+      and stop_type = 'pickup'
+    `,
+            [
+                completedAt,
+                shipmentId,
+            ],
+        );
+    }
+
+    async updateStatus(
+        tenant: CurrentTenant,
+        shipmentId: string,
+        status: string,
+    ): Promise<void> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        await this.db.query(
+            `
+    update "${schemaName}".shipments
+    set
+      status = $1,
+      updated_at = now()
+    where id = $2
+    `,
+            [
+                status,
+                shipmentId,
+            ],
+        );
+    }
+    async findCheckoutIdByShipmentId(
+        tenant: CurrentTenant,
+        shipmentId: string,
+    ): Promise<string | null> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        const rows = await this.db.query<{
+            checkout_id: string | null;
+        }>(
+            `
+    select checkout_id
+    from "${schemaName}".shipments
+    where id = $1
+    limit 1
+    `,
+            [shipmentId],
+        );
+
+        return rows[0]?.checkout_id ?? null;
+    }
+    async getShipmentStatusSummary(
+        tenant: CurrentTenant,
+        checkoutId: string,
+    ): Promise<ShipmentStatusSummary | null> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        const rows = await this.db.query<{
+            checkout_id: string;
+            total_shipments: string | number;
+            delivered_shipments: string | number;
+            failed_shipments: string | number;
+            active_shipments: string | number;
+        }>(
+            `
+    select
+      checkout_id,
+
+      count(*) as total_shipments,
+
+      count(*) filter (
+        where status = 'delivered'
+      ) as delivered_shipments,
+
+      count(*) filter (
+        where status = 'failed'
+      ) as failed_shipments,
+
+      count(*) filter (
+        where status not in (
+          'delivered',
+          'failed'
+        )
+      ) as active_shipments
+
+    from "${schemaName}".shipments
+
+    where checkout_id = $1
+
+    group by checkout_id
+    `,
+            [checkoutId],
+        );
+
+        const row = rows[0];
+
+        if (!row) {
+            return null;
+        }
+
+        return {
+            checkoutId: row.checkout_id,
+            totalShipments:
+                Number(row.total_shipments),
+
+            deliveredShipments:
+                Number(row.delivered_shipments),
+
+            failedShipments:
+                Number(row.failed_shipments),
+
+            activeShipments:
+                Number(row.active_shipments),
+        };
+    }
+    async updateCheckoutStatus(
+        tenant: CurrentTenant,
+        checkoutId: string,
+        status: string,
+    ): Promise<void> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        const rows = await this.db.query<{
+            id: string;
+        }>(
+            `
+    update "${schemaName}".checkouts
+    set
+      status = $1,
+      updated_at = now()
+    where id = $2
+    returning id
+    `,
+            [
+                status,
+                checkoutId,
+            ],
+        );
+
+        if (!rows[0]) {
+            throw new Error(
+                `Checkout not found: ${checkoutId}`,
+            );
+        }
     }
 }

@@ -1,42 +1,590 @@
-<div class="placeholder-page">
-    <div class="placeholder-card">
-        <div class="badge">Shipments</div>
-
-        <h1>היסטוריית משלוחים</h1>
-
-        <p>
-            כאן תוצג היסטוריית משלוחים מלאה, כולל סטטוס, ספק שילוח,
-            תאריכים, חיפושים וסינונים לפי לקוח או מזהה משלוח.
-        </p>
-
-        <div class="mock-table">
-            <div class="table-header">
-                <span>מספר משלוח</span>
-                <span>ספק</span>
-                <span>סטטוס</span>
-                <span>תאריך</span>
+<div class="history-page">
+    <section class="hero-card">
+        <div>
+            <div class="eyebrow">
+                Shipment History
             </div>
 
-            <div class="table-row">
-                <span>FS-10024</span>
-                <span>Mock Express</span>
-                <span class="status done">נמסר</span>
-                <span>19/07/2026</span>
+            <h1>היסטוריית משלוחים</h1>
+
+            <p>
+                צפייה בהזמנות שהסתיימו במסירה מלאה
+                או נכשלו במהלך העיבוד או המשלוח.
+            </p>
+        </div>
+
+        <button type="button" class="refresh-button" (click)="loadHistory()" [disabled]="isLoading">
+            רענון נתונים
+        </button>
+    </section>
+
+    <section class="filters-card">
+        <div class="filters-header">
+            <div>
+                <h2>חיפוש וסינון</h2>
+
+                <p>
+                    ניתן לחפש לפי הזמנה, משלוח,
+                    מספר מעקב או חברת שילוח.
+                </p>
             </div>
 
-            <div class="table-row">
-                <span>FS-10025</span>
-                <span>Mock Yango</span>
-                <span class="status pending">בדרך</span>
-                <span>19/07/2026</span>
-            </div>
+            <button type="button" class="reset-button" (click)="resetFilters()" [disabled]="isLoading">
+                איפוס סינונים
+            </button>
+        </div>
 
-            <div class="table-row">
-                <span>FS-10026</span>
-                <span>Mock DHL</span>
-                <span class="status failed">שגיאה</span>
-                <span>19/07/2026</span>
+        <div class="filters-grid">
+            <label class="filter-field search-field">
+                <span>חיפוש חופשי</span>
+
+                <input type="search" [(ngModel)]="search" placeholder="מספר הזמנה, מזהה משלוח או מספר מעקב"
+                    (keyup.enter)="onSearchEnter()" />
+            </label>
+
+            <label class="filter-field">
+                <span>תוצאה סופית</span>
+
+                <select [(ngModel)]="resultStatus">
+                    <option value="">
+                        הכול
+                    </option>
+
+                    <option value="delivered">
+                        נמסר
+                    </option>
+
+                    <option value="failed">
+                        נכשל
+                    </option>
+                </select>
+            </label>
+
+            <label class="filter-field">
+                <span>חברת שילוח</span>
+
+                <input type="text" [(ngModel)]="carrierName" placeholder="למשל Mock Yango" />
+            </label>
+
+            <label class="filter-field">
+                <span>מתאריך</span>
+
+                <input type="date" [(ngModel)]="fromDate" />
+            </label>
+
+            <label class="filter-field">
+                <span>עד תאריך</span>
+
+                <input type="date" [(ngModel)]="toDate" />
+            </label>
+
+            <label class="filter-field">
+                <span>מיון לפי</span>
+
+                <select [(ngModel)]="sortBy">
+                    <option value="completedAt">
+                        תאריך סיום
+                    </option>
+
+                    <option value="totalShippingPrice">
+                        מחיר כולל
+                    </option>
+
+                    <option value="totalShipments">
+                        מספר משלוחים
+                    </option>
+                </select>
+            </label>
+
+            <label class="filter-field">
+                <span>כיוון מיון</span>
+
+                <select [(ngModel)]="sortDirection">
+                    <option value="desc">
+                        מהגבוה לנמוך / מהחדש לישן
+                    </option>
+
+                    <option value="asc">
+                        מהנמוך לגבוה / מהישן לחדש
+                    </option>
+                </select>
+            </label>
+
+            <div class="filter-actions">
+                <button type="button" class="apply-button" (click)="applyFilters()" [disabled]="isLoading">
+                    הצגת תוצאות
+                </button>
             </div>
         </div>
+    </section>
+
+    <div *ngIf="isLoading" class="state-card">
+        טוען את היסטוריית המשלוחים...
     </div>
+
+    <div *ngIf="!isLoading && errorMessage" class="state-card error-state">
+        <p>{{ errorMessage }}</p>
+
+        <button type="button" (click)="loadHistory()">
+            נסי שוב
+        </button>
+    </div>
+
+    <ng-container *ngIf="!isLoading && !errorMessage">
+        <section class="summary-grid">
+            <article class="summary-card">
+                <span>סה״כ הזמנות סופיות</span>
+
+                <strong>
+                    {{ items.length }}
+                </strong>
+
+                <small>
+                    בהתאם לסינונים הנוכחיים
+                </small>
+            </article>
+
+            <article class="summary-card success-card">
+                <span>נמסרו</span>
+
+                <strong>
+                    {{ deliveredCount }}
+                </strong>
+
+                <small>
+                    כל המשלוחים הגיעו
+                </small>
+            </article>
+
+            <article class="summary-card failure-card">
+                <span>נכשלו</span>
+
+                <strong>
+                    {{ failedCount }}
+                </strong>
+
+                <small>
+                    בעיבוד או במסירה
+                </small>
+            </article>
+
+            <article class="summary-card">
+                <span>עלות שילוח כוללת</span>
+
+                <strong>
+                    {{
+                    totalShippingPrice
+                    | currency:
+                    'ILS':
+                    'symbol':
+                    '1.2-2'
+                    }}
+                </strong>
+
+                <small>
+                    להזמנות המוצגות
+                </small>
+            </article>
+        </section>
+
+        <section class="table-card">
+            <div class="table-card-header">
+                <div>
+                    <div class="section-eyebrow">
+                        FINAL ORDERS
+                    </div>
+
+                    <h2>הזמנות שהסתיימו</h2>
+
+                    <p>
+                        לחיצה על שורה תציג את כל
+                        המשלוחים המקושרים להזמנה.
+                    </p>
+                </div>
+
+                <span class="results-count">
+                    {{ items.length }} תוצאות
+                </span>
+            </div>
+
+            <div *ngIf="items.length === 0" class="empty-state">
+                לא נמצאו הזמנות התואמות לסינונים.
+            </div>
+
+            <div *ngIf="items.length > 0" class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>מספר הזמנה</th>
+                            <th>תוצאה</th>
+                            <th>חברת שילוח</th>
+                            <th>יעד</th>
+                            <th>משלוחים</th>
+                            <th>עלות</th>
+                            <th>תאריך סיום</th>
+                            <th>סיבת כשל</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <ng-container *ngFor="
+                let item of items;
+                trackBy: trackItem
+              ">
+                            <tr class="history-row" (click)="
+                  toggleDetails(
+                    item.checkoutId
+                  )
+                ">
+                                <td>
+                                    <div class="order-cell">
+                                        <strong>
+                                            {{ item.orderId }}
+                                        </strong>
+
+                                        <span>
+                                            {{ item.platform }}
+                                        </span>
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="result-badge" [class.delivered]="
+                      item.resultStatus ===
+                      'delivered'
+                    " [class.failed]="
+                      item.resultStatus ===
+                      'failed'
+                    ">
+                                        {{
+                                        item.resultStatus ===
+                                        'delivered'
+                                        ? 'נמסר'
+                                        : 'נכשל'
+                                        }}
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <div class="carrier-cell">
+                                        {{
+                                        getCarrierNames(item)
+                                        }}
+                                    </div>
+                                </td>
+
+                                <td>
+                                    {{
+                                    getDestinationLabel(item) ||
+                                    'לא הוגדר יעד'
+                                    }}
+                                </td>
+
+                                <td>
+                                    <div class="shipment-count-cell">
+                                        <strong>
+                                            {{ item.totalShipments }}
+                                        </strong>
+
+                                        <span>משלוחים</span>
+                                    </div>
+                                </td>
+
+                                <td>
+                                    {{
+                                    item.totalShippingPrice
+                                    | currency:
+                                    item.currency:
+                                    'symbol':
+                                    '1.2-2'
+                                    }}
+                                </td>
+
+                                <td>
+                                    {{
+                                    item.completedAt
+                                    | date:
+                                    'dd/MM/yyyy HH:mm'
+                                    }}
+                                </td>
+
+                                <td>
+                                    <div *ngIf="
+                      item.resultStatus ===
+                      'failed'
+                    " class="failure-reason-cell" [title]="
+                      item.failureReason ||
+                      'לא התקבל פירוט נוסף'
+                    ">
+                                        {{
+                                        item.failureReason ||
+                                        'לא התקבל פירוט נוסף'
+                                        }}
+                                    </div>
+
+                                    <span *ngIf="
+                      item.resultStatus !==
+                      'failed'
+                    " class="empty-value">
+                                        —
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <button type="button" class="details-button" (click)="
+                      $event.stopPropagation();
+                      toggleDetails(
+                        item.checkoutId
+                      )
+                    ">
+                                        {{
+                                        expandedCheckoutId ===
+                                        item.checkoutId
+                                        ? 'סגירה'
+                                        : 'צפייה'
+                                        }}
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <tr *ngIf="
+                  expandedCheckoutId ===
+                  item.checkoutId
+                " class="details-row">
+                                <td colspan="9">
+                                    <div class="details-panel">
+                                        <div *ngIf="
+                        item.resultStatus ===
+                        'failed'
+                      " class="failure-panel">
+                                            <div>
+                                                <span>שלב הכשל</span>
+
+                                                <strong>
+                                                    {{
+                                                    getFailureStageLabel(
+                                                    item.failureStage
+                                                    )
+                                                    }}
+                                                </strong>
+                                            </div>
+
+                                            <div>
+                                                <span>סיבת הכשל</span>
+
+                                                <strong>
+                                                    {{
+                                                    item.failureReason ||
+                                                    'לא התקבל פירוט נוסף'
+                                                    }}
+                                                </strong>
+                                            </div>
+                                        </div>
+
+                                        <div class="details-summary">
+                                            <article>
+                                                <span>נמסרו</span>
+
+                                                <strong>
+                                                    {{
+                                                    item.deliveredShipments
+                                                    }}
+                                                </strong>
+                                            </article>
+
+                                            <article>
+                                                <span>נכשלו</span>
+
+                                                <strong>
+                                                    {{
+                                                    item.failedShipments
+                                                    }}
+                                                </strong>
+                                            </article>
+
+                                            <article>
+                                                <span>סטטוס Checkout</span>
+
+                                                <strong>
+                                                    {{
+                                                    item.checkoutStatus
+                                                    }}
+                                                </strong>
+                                            </article>
+
+                                            <article>
+                                                <span>נוצר בתאריך</span>
+
+                                                <strong>
+                                                    {{
+                                                    item.createdAt
+                                                    | date:
+                                                    'dd/MM/yyyy HH:mm'
+                                                    }}
+                                                </strong>
+                                            </article>
+                                        </div>
+
+                                        <div *ngIf="
+                        item.shipments.length === 0
+                      " class="no-shipments">
+                                            הכשל התרחש לפני יצירת
+                                            משלוחים.
+                                        </div>
+
+                                        <div *ngIf="
+                        item.shipments.length > 0
+                      " class="shipments-grid">
+                                            <article *ngFor="
+                          let shipment of
+                            item.shipments
+                        " class="shipment-card">
+                                                <div class="shipment-card-header">
+                                                    <div>
+                                                        <span class="shipment-label">
+                                                            משלוח
+                                                        </span>
+
+                                                        <strong>
+                                                            {{
+                                                            shipment.trackingNumber ||
+                                                            shipment
+                                                            .externalShipmentId ||
+                                                            shipment.id
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <span class="shipment-status" [class.delivered]="
+                              shipment.status ===
+                              'delivered'
+                            " [class.failed]="
+                              shipment.status ===
+                              'failed'
+                            ">
+                                                        {{
+                                                        getShipmentStatusLabel(
+                                                        shipment.status
+                                                        )
+                                                        }}
+                                                    </span>
+                                                </div>
+
+                                                <div class="shipment-meta">
+                                                    <div>
+                                                        <span>חברת שילוח</span>
+
+                                                        <strong>
+                                                            {{
+                                                            shipment.carrierName ||
+                                                            'לא ידוע'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>שירות</span>
+
+                                                        <strong>
+                                                            {{
+                                                            shipment.serviceName ||
+                                                            'לא ידוע'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>עלות</span>
+
+                                                        <strong>
+                                                            {{
+                                                            shipment.price
+                                                            | currency:
+                                                            shipment.currency:
+                                                            'symbol':
+                                                            '1.2-2'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>תאריך יצירה</span>
+
+                                                        <strong>
+                                                            {{
+                                                            shipment.createdAt
+                                                            | date:
+                                                            'dd/MM/yyyy HH:mm'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>איסוף</span>
+
+                                                        <strong>
+                                                            {{
+                                                            getAddressLabel(
+                                                            shipment.pickup
+                                                            )
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>מסירה</span>
+
+                                                        <strong>
+                                                            {{
+                                                            getAddressLabel(
+                                                            shipment.dropoff
+                                                            )
+                                                            }}
+                                                        </strong>
+                                                    </div>
+                                                </div>
+
+                                                <div *ngIf="
+                            shipment.deliveredAt
+                          " class="shipment-completed">
+                                                    נמסר בתאריך
+                                                    {{
+                                                    shipment.deliveredAt
+                                                    | date:
+                                                    'dd/MM/yyyy HH:mm'
+                                                    }}
+                                                </div>
+
+                                                <div *ngIf="
+                            shipment.failureReason
+                          " class="shipment-failure">
+                                                    {{
+                                                    shipment.failureReason
+                                                    }}
+                                                </div>
+
+                                                <a *ngIf="
+                            shipment.trackingUrl
+                          " class="tracking-link" [href]="
+                            shipment.trackingUrl
+                          " target="_blank" rel="noopener noreferrer" (click)="
+                            $event.stopPropagation()
+                          ">
+                                                    פתיחת מעקב
+                                                </a>
+                                                <div class="tracking-note">
+                                                    לחיצה על הכפתור תפתח את אתר חברת השילוח בחלון חדש.
+                                                </div>
+                                            </article>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </ng-container>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </ng-container>
 </div>
