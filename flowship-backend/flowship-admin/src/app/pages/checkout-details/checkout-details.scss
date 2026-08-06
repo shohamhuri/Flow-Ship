@@ -304,3 +304,64 @@ th {
     background: #ffe1e1;
     color: #b42318;
 }
+
+.checkout-split-reasons {
+    margin: 0 0 24px;
+    padding: 20px;
+    border: 1px solid #efd687;
+    border-radius: 18px;
+    background: #fff9e8;
+}
+
+.checkout-split-reasons-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 15px;
+
+    >span {
+        color: #866716;
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    >strong {
+        color: #15385d;
+        font-size: 16px;
+    }
+}
+
+.checkout-split-reasons-list {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.checkout-split-reason {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: #516981;
+    line-height: 1.5;
+}
+
+.reason-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    border-radius: 50%;
+    background: #f2d875;
+    color: #624d0b;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+@media (max-width: 760px) {
+    .checkout-split-reasons-header {
+        flex-direction: column;
+    }
+}

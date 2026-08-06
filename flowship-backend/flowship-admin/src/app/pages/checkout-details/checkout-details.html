@@ -172,8 +172,34 @@
                     </p>
                 </div>
             </div>
+            <div *ngIf="
+                       checkout.groupingSplitReasons.length > 0
+                         " class="checkout-split-reasons">
+                <div class="checkout-split-reasons-header">
+                    <span>למה ההזמנה פוצלה?</span>
 
+                    <strong>
+                        ההזמנה חולקה ל־
+                        {{ checkout.shipmentGroups.length }}
+                        קבוצות משלוח
+                    </strong>
+                </div>
+
+                <div class="checkout-split-reasons-list">
+                    <div *ngFor="
+        let reason of
+          checkout.groupingSplitReasons
+      " class="checkout-split-reason">
+                        <span class="reason-icon">✓</span>
+
+                        <span>
+                            {{ getSplitReasonLabel(reason) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
             <div class="groups-grid">
+
                 <article *ngFor="
             let group of checkout.shipmentGroups;
             let index = index

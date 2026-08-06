@@ -533,6 +533,15 @@ export class CheckoutService {
             /*
    * שמירת הקבוצות שנבחרו כחלק מהתוכנית הזוכה.
    */
+            /*
+           * שמירת סיבות הפיצול הכלליות של התוכנית הזוכה.
+           */
+            await this.checkoutRepository
+                .updateGroupingSplitReasons(
+                    tenant,
+                    checkoutId,
+                    grouping.splitReasons,
+                );
             await this.shipmentGroupsRepository
                 .saveGroupingResult(
                     tenant,

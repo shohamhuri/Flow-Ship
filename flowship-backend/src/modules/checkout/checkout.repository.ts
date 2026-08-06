@@ -93,6 +93,7 @@ export interface CheckoutDetails {
     status: string;
     customer: unknown;
     destination: Record<string, unknown> | null;
+    groupingSplitReasons: string[];
     totalItems: number;
     totalPrice: number;
     createdAt: Date;
@@ -313,6 +314,7 @@ export class CheckoutRepository {
             } | null;
             created_at: Date;
             updated_at: Date | null;
+            grouping_split_reasons: string[];
         }>(
             `
         select
@@ -325,7 +327,8 @@ export class CheckoutRepository {
             destination,
             raw_payload,
             created_at,
-            updated_at
+            updated_at,
+            grouping_split_reasons
         from "${schemaName}".checkouts
         where id = $1
         limit 1
@@ -531,6 +534,8 @@ export class CheckoutRepository {
             status: checkoutRow.status,
             customer: checkoutRow.customer,
             destination: checkoutRow.destination,
+            groupingSplitReasons:
+                checkoutRow.grouping_split_reasons ?? [],
             totalItems,
             totalPrice,
             createdAt: checkoutRow.created_at,
@@ -647,4 +652,36 @@ export class CheckoutRepository {
 
         return schemaName;
     }
+    async updateGroupingSplitReasons(
+        tenant: CurrentTenant,
+        checkoutId: string,
+        splitReasons: string[],
+    ): Promise<void> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        const rows = await this.databaseService.query<{
+            id: string;
+        }>(
+            `
+    update "${schemaName}".checkouts
+    set
+      grouping_split_reasons = $1::jsonb,
+      updated_at = now()
+    where id = $2
+    returning id
+    `,
+            [
+                JSON.stringify(splitReasons),
+                checkoutId,
+            ],
+        );
+
+        if (!rows[0]) {
+            throw new Error(
+                `Checkout not found: ${checkoutId}`,
+            );
+        }
+    }
+
 }

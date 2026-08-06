@@ -290,6 +290,7 @@ export interface CheckoutDetails {
   items: CheckoutDetailsItem[];
   shipmentGroups: CheckoutShipmentGroup[];
   shipments: CheckoutShipment[];
+  groupingSplitReasons: string[];
 }
 export interface AuthMeResponse {
   user: {

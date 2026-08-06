@@ -217,4 +217,22 @@ export class CheckoutDetailsComponent implements OnInit {
       ? 'איסוף'
       : 'מסירה';
   }
+  getSplitReasonLabel(
+    reason: string,
+  ): string {
+    switch (reason) {
+      case 'DIFFERENT_SUPPLY_SOURCES':
+        return 'הפריטים סופקו ממקורות אספקה שונים';
+
+      case 'DIFFERENT_SUPPLIERS':
+        return 'הפריטים שייכים לספקים שונים';
+
+      case 'INCOMPATIBLE_HANDLING_GROUPS':
+        return 'הפריטים דורשים קבוצות טיפול שונות';
+
+      default:
+        return reason;
+    }
+  }
+
 }
