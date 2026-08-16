@@ -11,13 +11,16 @@ async function bootstrap(): Promise<void> {
       forbidNonWhitelisted: true,
     }),
   );
-  const allowedOrigins = (
-    process.env.FRONTEND_URL ||
-    'http://localhost:4200,https://flowship-admin.web.app'
-  )
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+ const allowedOrigins = Array.from(
+  new Set([
+    'http://localhost:4200',
+    'https://flowship-admin.web.app',
+    ...(process.env.FRONTEND_URL ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  ]),
+);
 
   app.enableCors({
     origin: allowedOrigins,
