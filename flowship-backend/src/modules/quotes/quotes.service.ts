@@ -20,7 +20,7 @@ export class QuotesService {
     async getQuoteOptions(dto: QuoteRequestDto, tenant: TenantContext) {
         const carrierResult = await this.carriersService.getQuotes(
             {
-                originCity: dto.originCity,
+                pickupCities: dto.pickupCities,
                 destinationCity: dto.destinationCity,
                 weightKg: dto.weightKg,
             },

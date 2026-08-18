@@ -113,20 +113,32 @@ export class ShipmentCreationService {
              * לכן שומרים את המידע שקיים בפועל,
              * ולא ממציאים כתובת שאינה קיימת.
              */
-            const pickupAddress = {
-                sourceId: shipmentGroup.source.id,
-                sourceName: shipmentGroup.source.name,
-                sourceType: shipmentGroup.source.type,
+            if (shipmentGroup.sources.length === 0) {
+                throw new Error(
+                    `Shipment group ${shipmentGroup.groupId} has no supply sources`,
+                );
+            }
 
-                city: shipmentGroup.source.location.city,
+            const pickupAddresses =
+                shipmentGroup.sources.map(
+                    (source) => ({
+                        sourceId: source.id,
+                        sourceName: source.name,
+                        sourceType: source.type,
 
-                latitude:
-                    shipmentGroup.source.location.latitude,
+                        country: source.location.country,
+                        city: source.location.city,
+                        street: source.location.street,
+                        houseNumber:
+                            source.location.houseNumber,
 
-                longitude:
-                    shipmentGroup.source.location.longitude,
-            };
+                        latitude:
+                            source.location.latitude,
 
+                        longitude:
+                            source.location.longitude,
+                    }),
+                );
             const dropoffAddress = {
                 country: checkout.destination.country,
                 city: checkout.destination.city,
@@ -140,7 +152,7 @@ export class ShipmentCreationService {
             await this.shipmentsRepository.createShipmentStops(
                 tenant,
                 shipmentId,
-                pickupAddress,
+                pickupAddresses,
                 dropoffAddress,
             );
 

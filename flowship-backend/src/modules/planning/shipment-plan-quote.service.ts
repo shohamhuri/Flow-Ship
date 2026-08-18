@@ -103,12 +103,22 @@ export class ShipmentPlanQuoteService {
         destinationCity: string,
         tenant: CurrentTenant,
     ): Promise<ShipmentGroupQuoteResult> {
-        const originCity = group.source.location.city;
+        if (group.sources.length === 0) {
+            throw new Error(
+                `Shipment group ${group.groupId} has no supply sources`,
+            );
+        }
+
+        const pickupCities =
+            group.sources.map(
+                (source) =>
+                    source.location.city,
+            );
 
         const result =
             await this.carriersService.getQuotes(
                 {
-                    originCity,
+                    pickupCities,
                     destinationCity,
                     weightKg: group.totalWeight,
                 },
@@ -118,7 +128,7 @@ export class ShipmentPlanQuoteService {
         return {
             groupId: group.groupId,
 
-            originCity,
+            pickupCities,
             destinationCity,
             weightKg: group.totalWeight,
 

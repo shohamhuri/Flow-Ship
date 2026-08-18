@@ -3,7 +3,7 @@ import { QuotedShipmentPlan } from './shipment-plan-quote.interface';
 
 export interface SelectedGroupQuote {
     groupId: string;
-    originCity: string;
+    pickupCities: string[];
     destinationCity: string;
     weightKg: number;
     quote: CarrierQuoteOption;

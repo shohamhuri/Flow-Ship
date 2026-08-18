@@ -1,5 +1,6 @@
+
 export class QuoteRequestDto {
-    originCity!: string;
+    pickupCities!: string[];
     destinationCity!: string;
     weightKg!: number;
 }

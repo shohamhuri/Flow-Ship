@@ -115,8 +115,8 @@ export class ShipmentPlanDeliveryOptionsService {
         for (const quote of currentGroup.quotes) {
             currentCombination.push({
                 groupId: currentGroup.groupId,
-                originCity:
-                    currentGroup.originCity,
+                pickupCities:
+                    currentGroup.pickupCities,
                 destinationCity:
                     currentGroup.destinationCity,
                 weightKg:

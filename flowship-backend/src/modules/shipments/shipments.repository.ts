@@ -138,11 +138,41 @@ export class ShipmentsRepository {
     async createShipmentStops(
         tenant: CurrentTenant,
         shipmentId: string,
-        pickupAddress: Record<string, unknown>,
+        pickupAddresses: Record<string, unknown>[],
         dropoffAddress: Record<string, unknown>,
     ): Promise<void> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
+
+        let stopOrder = 1;
+
+        for (const pickupAddress of pickupAddresses) {
+            await this.db.query(
+                `
+            INSERT INTO "${schemaName}".shipment_stops
+            (
+                shipment_id,
+                stop_order,
+                stop_type,
+                address
+            )
+            VALUES
+            (
+                $1,
+                $2,
+                'pickup',
+                $3::jsonb
+            )
+            `,
+                [
+                    shipmentId,
+                    stopOrder,
+                    JSON.stringify(pickupAddress),
+                ],
+            );
+
+            stopOrder++;
+        }
 
         await this.db.query(
             `
@@ -154,12 +184,16 @@ export class ShipmentsRepository {
             address
         )
         VALUES
-            ($1, 1, 'pickup', $2::jsonb),
-            ($1, 2, 'dropoff', $3::jsonb)
+        (
+            $1,
+            $2,
+            'dropoff',
+            $3::jsonb
+        )
         `,
             [
                 shipmentId,
-                JSON.stringify(pickupAddress),
+                stopOrder,
                 JSON.stringify(dropoffAddress),
             ],
         );
@@ -260,6 +294,7 @@ export class ShipmentsRepository {
     async markPickupCompleted(
         tenant: CurrentTenant,
         shipmentId: string,
+        stopOrder: number,
         completedAt: Date = new Date(),
     ): Promise<void> {
         const schemaName =
@@ -267,21 +302,46 @@ export class ShipmentsRepository {
 
         await this.db.query(
             `
-    update "${schemaName}".shipment_stops
-    set
-      status = 'completed',
-      arrived_at = coalesce(arrived_at, $1),
-      completed_at = $1
-    where shipment_id = $2
-      and stop_type = 'pickup'
-    `,
+        update "${schemaName}".shipment_stops
+        set
+            status = 'completed',
+            arrived_at = coalesce(arrived_at, $1),
+            completed_at = $1
+        where shipment_id = $2
+          and stop_order = $3
+          and stop_type = 'pickup'
+        `,
             [
                 completedAt,
                 shipmentId,
+                stopOrder,
             ],
         );
     }
+    async areAllPickupsCompleted(
+        tenant: CurrentTenant,
+        shipmentId: string,
+    ): Promise<boolean> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
 
+        const rows = await this.db.query<{
+            remaining_count: string | number;
+        }>(
+            `
+        select count(*) as remaining_count
+        from "${schemaName}".shipment_stops
+        where shipment_id = $1
+          and stop_type = 'pickup'
+          and coalesce(status, '') <> 'completed'
+        `,
+            [shipmentId],
+        );
+
+        return Number(
+            rows[0]?.remaining_count ?? 0,
+        ) === 0;
+    }
     async updateStatus(
         tenant: CurrentTenant,
         shipmentId: string,

@@ -4,10 +4,9 @@ import { ShipmentPlanCandidate } from './shipment-plan.interface';
 export interface ShipmentGroupQuoteResult {
     groupId: string;
 
-    originCity: string;
+    pickupCities: string[];
     destinationCity: string;
     weightKg: number;
-
     quotes: CarrierQuoteOption[];
 
     failedProviders: unknown[];

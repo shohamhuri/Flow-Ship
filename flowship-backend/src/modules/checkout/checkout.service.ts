@@ -341,8 +341,8 @@ export class CheckoutService {
                                         groupId:
                                             groupQuote.groupId,
 
-                                        originCity:
-                                            groupQuote.originCity,
+                                        pickupCities:
+                                            groupQuote.pickupCities,
 
                                         destinationCity:
                                             groupQuote.destinationCity,
@@ -491,14 +491,19 @@ export class CheckoutService {
                                         groupId:
                                             group.groupId,
 
-                                        sourceId:
-                                            group.source.id,
+                                        sources:
+                                            group.sources.map(
+                                                (source) => ({
+                                                    sourceId:
+                                                        source.id,
 
-                                        sourceName:
-                                            group.source.name,
+                                                    sourceName:
+                                                        source.name,
 
-                                        supplierId:
-                                            group.supplierId,
+                                                    sourceType:
+                                                        source.type,
+                                                }),
+                                            ),
 
                                         handlingGroup:
                                             group.handlingGroup,
@@ -517,6 +522,12 @@ export class CheckoutService {
 
                                                     quantity:
                                                         item.quantity,
+
+                                                    sourceId:
+                                                        item.sourceId,
+
+                                                    supplierId:
+                                                        item.supplierId,
                                                 }),
                                             ),
                                     }),

@@ -29,19 +29,30 @@ export class ShipmentStatusService {
     async markPickedUp(
         tenant: CurrentTenant,
         shipmentId: string,
+        stopOrder: number,
         occurredAt: Date = new Date(),
     ): Promise<void> {
-        await this.shipmentsRepository.updateStatus(
-            tenant,
-            shipmentId,
-            'picked_up',
-        );
-
         await this.shipmentsRepository.markPickupCompleted(
             tenant,
             shipmentId,
+            stopOrder,
             occurredAt,
         );
+
+        const allPickupsCompleted =
+            await this.shipmentsRepository
+                .areAllPickupsCompleted(
+                    tenant,
+                    shipmentId,
+                );
+
+        if (allPickupsCompleted) {
+            await this.shipmentsRepository.updateStatus(
+                tenant,
+                shipmentId,
+                'picked_up',
+            );
+        }
 
         await this.synchronizeCheckoutStatus(
             tenant,
@@ -131,13 +142,20 @@ export class ShipmentStatusService {
 
         switch (dto.event) {
             case ShipmentEventType.PICKED_UP:
+                if (dto.stopOrder === undefined) {
+                    throw new BadRequestException(
+                        'stopOrder is required for pickup events',
+                    );
+                }
+
                 await this.markPickedUp(
                     tenant,
                     dto.shipmentId,
+                    dto.stopOrder,
                     occurredAt,
                 );
-                return;
 
+                return;
             case ShipmentEventType.IN_TRANSIT:
                 await this.markInTransit(
                     tenant,
