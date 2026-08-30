@@ -29,20 +29,27 @@ export class QuotesService {
 
         const quotes = carrierResult.quotes;
         const failedProviders = carrierResult.failedProviders;
-        const decisionCriteria =
-            await this.decisionService.getCriteriaForTenant(tenant);
-        const bestQuote = this.decisionService.selectBestQuote(
-            quotes,
-            decisionCriteria,
-        );
+        const decisionSettings =
+            await this.decisionService
+                .getDecisionSettings(tenant);
+
+        const bestQuote =
+            this.decisionService
+                .selectBestQuote(
+                    quotes,
+                    decisionSettings,
+                );
         return {
             ok: true,
+
             tenant: {
                 id: tenant.id,
                 name: tenant.name,
                 schemaName: tenant.schemaName,
             },
-            decisionCriteria,
+
+            decisionSettings,
+
             count: quotes.length,
             bestQuote,
             failedProviders,
