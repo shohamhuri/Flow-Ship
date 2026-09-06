@@ -1,13 +1,16 @@
 <section class="logs-page" dir="rtl">
-    <header class="page-header">
-        <div>
-            <div class="eyebrow">מערכת ניטור</div>
+    <header class="page-header hero-card">
+        <div class="hero-content">
+            <div class="eyebrow">
+                ניטור ספקי שילוח
+            </div>
 
             <h1>לוגים של ספקי שילוח</h1>
 
             <p>
-                מעקב אחר קריאות לספקים, זמני תגובה,
-                שגיאות והנתונים שנשלחו והתקבלו.
+                מעקב אחר כל הקריאות לחברות השילוח,
+                כולל זמני תגובה, הצלחות, שגיאות
+                והמידע שנשלח והתקבל.
             </p>
         </div>
 
@@ -19,6 +22,7 @@
             }
 
             <button type="button" class="refresh-button" [disabled]="loading" (click)="refresh()">
+
                 <span class="refresh-icon" [class.spinning]="loading">
                     ↻
                 </span>
@@ -27,7 +31,6 @@
             </button>
         </div>
     </header>
-
     <div class="summary-grid">
         <article class="summary-card">
             <div class="summary-icon">☰</div>
@@ -67,8 +70,8 @@
             </div>
         </article>
     </div>
-
     <form class="filters-card" [formGroup]="filterForm" (ngSubmit)="applyFilters()">
+
         <div class="search-field">
             <label for="logs-search">
                 חיפוש
@@ -78,7 +81,7 @@
                 <span>⌕</span>
 
                 <input id="logs-search" type="search" formControlName="search"
-                    placeholder="ספק, פעולה, מזהה לוג או הודעת שגיאה" />
+                    placeholder="חיפוש לפי ספק, פעולה או שגיאה" />
             </div>
         </div>
 
@@ -92,10 +95,7 @@
                     כל הספקים
                 </option>
 
-                @for (
-                provider of providers;
-                track provider.code
-                ) {
+                @for (provider of providers; track provider.code) {
                 <option [value]="provider.code">
                     {{ provider.name }}
                 </option>
@@ -133,10 +133,7 @@
                     כל הפעולות
                 </option>
 
-                @for (
-                action of actions;
-                track action.value
-                ) {
+                @for (action of actions; track action.value) {
                 <option [value]="action.value">
                     {{ action.label }}
                 </option>
@@ -162,7 +159,7 @@
 
         <div class="filter-field compact">
             <label for="page-size">
-                תוצאות
+                תוצאות בעמוד
             </label>
 
             <select id="page-size" formControlName="limit">
@@ -183,6 +180,7 @@
                 איפוס
             </button>
         </div>
+
     </form>
 
     <div class="logs-card">

@@ -1,5 +1,8 @@
 :host {
     display: block;
+    direction: rtl;
+    font-family: Arial, sans-serif;
+
 }
 
 * {
@@ -65,14 +68,21 @@
     padding: 0 18px;
     border-radius: 13px;
     font: inherit;
-    font-weight: 800;
+    font-weight: 700;
     cursor: pointer;
 }
+
+// button {
+//     font-family: inherit;
+// }
 
 .refresh-button {
     border: 1px solid rgba(255, 255, 255, 0.38);
     background: rgba(255, 255, 255, 0.1);
     color: #ffffff;
+    font-weight: 700;
+
+
 }
 
 .refresh-button:hover:not(:disabled) {
@@ -218,7 +228,7 @@ button:disabled {
     background: #f2f6fa;
     color: #244663;
     font-size: 14px;
-    font-weight: 800;
+    font-weight: 700;
 }
 
 .status-badge {
@@ -228,7 +238,7 @@ button:disabled {
     background: #edf1f5;
     color: #718198;
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 700;
 }
 
 .status-badge.active {
@@ -319,7 +329,7 @@ button:disabled {
     >span {
         color: #53677f;
         font-size: 14px;
-        font-weight: 800;
+        font-weight: 700;
     }
 
     input {
@@ -358,7 +368,7 @@ button:disabled {
     >span {
         padding: 0 14px;
         color: #65768c;
-        font-weight: 800;
+        font-weight: 700;
     }
 }
 
@@ -535,7 +545,7 @@ button:disabled {
     border-radius: 999px;
 
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 700;
 
     white-space: nowrap;
 }
@@ -637,7 +647,7 @@ button:disabled {
     color: #244663;
 
     font-size: 14px;
-    font-weight: 800;
+    font-weight: 700;
 }
 
 .strategy-actions {
@@ -690,7 +700,7 @@ button:disabled {
     background: #ffffff;
     color: #234564;
 
-    font-weight: 800;
+    font-weight: 700;
     cursor: pointer;
 }
 
@@ -842,5 +852,5 @@ button:disabled {
     background: #fff4cc;
     color: #7e6000;
     font-size: 13px;
-    font-weight: 800;
+    font-weight: 700;
 }
