@@ -27,7 +27,8 @@ export class DecisionCriteriaComponent implements OnInit {
   saving = false;
   errorMsg = '';
   successMsg = '';
-
+  cardPendingDelete: DecisionPriorityCard | null = null;
+  isDeleting = false;
   cards: DecisionPriorityCard[] = [];
   criteria: DecisionCriterion[] = [];
   providers: AdminProvider[] = [];
@@ -48,44 +49,65 @@ export class DecisionCriteriaComponent implements OnInit {
     this.loadPage();
   }
 
-  loadPage(): void {
+  loadPage(
+    clearMessages: boolean = true,
+  ): void {
     this.loading = true;
-    this.errorMsg = '';
-    this.successMsg = '';
+
+    if (clearMessages) {
+      this.errorMsg = '';
+      this.successMsg = '';
+    }
+
     this.cdr.detectChanges();
 
     forkJoin({
-      cardsRes: this.adminApi.getDecisionPriorityCards(),
-      criteriaRes: this.adminApi.getDecisionCriteria(),
-      providersRes: this.adminApi.getProviders(),
+      cardsRes:
+        this.adminApi
+          .getDecisionPriorityCards(),
+
+      criteriaRes:
+        this.adminApi
+          .getDecisionCriteria(),
+
+      providersRes:
+        this.adminApi
+          .getProviders(),
     }).subscribe({
-      next: ({ cardsRes, criteriaRes, providersRes }) => {
-        console.log('priority cards full response:', cardsRes);
-        console.log('criteria full response:', criteriaRes);
-        console.log('providers full response:', providersRes);
+      next: ({
+        cardsRes,
+        criteriaRes,
+        providersRes,
+      }) => {
+        this.cards =
+          cardsRes.cards ?? [];
 
-        this.cards = cardsRes.cards ?? [];
-        this.criteria = criteriaRes.criteria ?? [];
-        this.providers = providersRes.providers ?? [];
+        this.criteria =
+          criteriaRes.criteria ?? [];
 
-        console.log('cards after assign:', this.cards);
-        console.log('criteria after assign:', this.criteria);
-        console.log('providers after assign:', this.providers);
+        this.providers =
+          providersRes.providers ?? [];
 
         this.loading = false;
+
         this.cdr.detectChanges();
       },
-      error: (err) => {
-        console.error('load decision criteria page error:', err);
 
-        this.errorMsg = 'שגיאה בטעינת עמוד הקריטריונים';
+      error: (err) => {
+        console.error(
+          'load decision criteria page error:',
+          err,
+        );
+
+        this.errorMsg =
+          'שגיאה בטעינת עמוד הקריטריונים';
+
         this.loading = false;
 
         this.cdr.detectChanges();
       },
     });
   }
-
   drop(event: CdkDragDrop<DecisionPriorityCard[]>): void {
     if (event.previousIndex === event.currentIndex) {
       return;
@@ -166,24 +188,18 @@ export class DecisionCriteriaComponent implements OnInit {
       });
   }
 
-  deleteCard(card: DecisionPriorityCard): void {
-    const confirmed = confirm(`למחוק את הקובייה "${card.title}"?`);
+  openDeleteDialog(
+    card: DecisionPriorityCard,
+  ): void {
+    this.cardPendingDelete = card;
+  }
 
-    if (!confirmed) {
+  closeDeleteDialog(): void {
+    if (this.isDeleting) {
       return;
     }
 
-    this.adminApi.deleteDecisionPriorityCard(card.id).subscribe({
-      next: () => {
-        this.successMsg = 'הקובייה נמחקה';
-        this.loadPage();
-      },
-      error: (err) => {
-        console.error(err);
-        this.errorMsg = 'שגיאה במחיקת הקובייה';
-        this.cdr.detectChanges();
-      },
-    });
+    this.cardPendingDelete = null;
   }
 
   openCreatePanel(): void {
@@ -233,8 +249,24 @@ export class DecisionCriteriaComponent implements OnInit {
           this.loadPage();
         },
         error: (err) => {
-          console.error(err);
-          this.errorMsg = 'שגיאה ביצירת קובייה';
+          console.error(
+            'create decision card error:',
+            err,
+          );
+
+          const message =
+            err?.error?.message;
+
+          if (Array.isArray(message)) {
+            this.errorMsg =
+              message.join(', ');
+          } else if (typeof message === 'string') {
+            this.errorMsg = message;
+          } else {
+            this.errorMsg =
+              'שגיאה בהוספת הקריטריון';
+          }
+
           this.cdr.detectChanges();
         },
       });
@@ -271,5 +303,53 @@ export class DecisionCriteriaComponent implements OnInit {
 
   trackByCardId(index: number, card: DecisionPriorityCard): string {
     return card.id;
+  }
+  confirmDeleteCard(): void {
+    const card = this.cardPendingDelete;
+
+    if (!card || this.isDeleting) {
+      return;
+    }
+
+    this.isDeleting = true;
+    this.errorMsg = '';
+    this.successMsg = '';
+
+    this.adminApi
+      .deleteDecisionPriorityCard(card.id)
+      .subscribe({
+        next: () => {
+          // נעלים מיד מהמסך
+          this.cards = this.cards.filter(
+            (item) => item.id !== card.id,
+          );
+
+          this.cardPendingDelete = null;
+
+          this.successMsg =
+            'הקריטריון נמחק בהצלחה';
+
+          this.isDeleting = false;
+
+          this.cdr.detectChanges();
+
+          // ואז נביא גם את המצב האמיתי מהשרת
+          this.loadPage(false);
+        },
+
+        error: (err) => {
+          console.error(
+            'delete decision card error:',
+            err,
+          );
+
+          this.errorMsg =
+            'שגיאה במחיקת הקריטריון';
+
+          this.isDeleting = false;
+
+          this.cdr.detectChanges();
+        },
+      });
   }
 }

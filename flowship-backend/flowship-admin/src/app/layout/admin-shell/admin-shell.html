@@ -77,9 +77,9 @@
         <nav class="menu" (click)="closeUserMenu()">
             <a *ngFor="let item of menuItems" [routerLink]="item.route" routerLinkActive="active" class="menu-item">
                 <div class="menu-icon">
-                    {{ item.icon }}
+                    <lucide-icon [img]="item.icon" [size]="24" [strokeWidth]="1.8">
+                    </lucide-icon>
                 </div>
-
                 <div class="menu-text">
                     <div class="menu-label">
                         {{ item.label }}
@@ -114,9 +114,9 @@
                 </p>
             </div>
 
-            <div class="topbar-badge">
+            <!-- <div class="topbar-badge">
                 SaaS Multi-Tenant
-            </div>
+            </div> -->
         </header>
 
         <section class="page-content">

@@ -86,18 +86,31 @@
 }
 
 .menu-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
+    width: 52px;
+    height: 52px;
+
     display: flex;
     align-items: center;
     justify-content: center;
+
+    border-radius: 14px;
+
     background: rgba(255, 255, 255, 0.08);
-    font-size: 20px;
+
+    color: #ffffff;
+
+    flex-shrink: 0;
+}
+
+.menu-icon lucide-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .menu-item.active .menu-icon {
-    background: rgba(15, 39, 71, 0.12);
+    background: rgba(16, 45, 82, 0.12);
+    color: #102d52;
 }
 
 .menu-text {
