@@ -222,7 +222,10 @@ export class ShipmentsHistory implements OnInit {
 
       case 'sourcing':
         return 'איתור מקורות אספקה';
-
+      case 'shipment_creation':
+        return 'יצירת המשלוחים';
+      case 'failed':
+        return 'כשל בתהליך';
       default:
         return stage ?? 'לא ידוע';
     }

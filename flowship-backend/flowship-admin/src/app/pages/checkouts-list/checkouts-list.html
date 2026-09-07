@@ -4,7 +4,6 @@
             <div class="eyebrow">
                 Checkout Monitor
             </div>
-
             <h1>תהליכי Checkout</h1>
 
             <p>
@@ -14,8 +13,7 @@
         </div>
 
         <button type="button" class="refresh-button" (click)="loadCheckouts()" [disabled]="isLoading">
-            רענון נתונים
-        </button>
+            רענון </button>
     </section>
 
     <section class="summary-grid">
@@ -232,7 +230,7 @@
                                     {{ checkout.orderId }}
                                 </strong>
 
-                                <span>{{ checkout.id }}</span>
+                                <!-- <span>{{ checkout.id }}</span> -->
                             </div>
                         </td>
 

@@ -14,7 +14,7 @@
         </div>
 
         <button type="button" class="refresh-button" (click)="loadStrategies()" [disabled]="isLoading">
-            רענון נתונים
+            רענון
         </button>
     </section>
 
@@ -142,22 +142,22 @@
 
                             <div class="strategy-badges">
 
-                                <span class="status-badge" [class.active]="strategy.isEnabled">
+                                <!-- <span class="status-badge" [class.active]="strategy.isEnabled">
 
                                     {{
                                     strategy.isEnabled
                                     ? 'פעיל'
                                     : 'כבוי'
                                     }}
-                                </span>
+                                </span> -->
 
-                                <div class="influence-badge">
+                                <!-- <div class="influence-badge">
                                     <span>השפעה משוערת</span>
 
                                     <strong>
                                         {{ getEstimatedInfluence(index) }}%
                                     </strong>
-                                </div>
+                                </div> -->
 
                             </div>
 

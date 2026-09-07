@@ -230,6 +230,21 @@ export class CheckoutDetailsComponent implements OnInit {
       case 'INCOMPATIBLE_HANDLING_GROUPS':
         return 'הפריטים דורשים קבוצות טיפול שונות';
 
+      case 'COMPATIBLE_HANDLING_GROUP':
+        return 'הפריטים בעלי תנאי טיפול תואמים';
+
+      case 'SAME_SUPPLY_SOURCE':
+        return 'הפריטים מגיעים מאותו מקור אספקה';
+
+      case 'SAME_SUPPLIER':
+        return 'הפריטים שייכים לאותו ספק';
+
+      case 'MAX_WEIGHT_EXCEEDED':
+        return 'הקבוצה פוצלה בגלל חריגה מהמשקל המרבי';
+
+      case 'MAX_ITEMS_EXCEEDED':
+        return 'הקבוצה פוצלה בגלל חריגה ממספר הפריטים המרבי';
+
       default:
         return reason;
     }

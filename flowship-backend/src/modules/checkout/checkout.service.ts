@@ -74,6 +74,7 @@ export interface CheckoutProcessingResult {
 
 @Injectable()
 export class CheckoutService {
+
     constructor(
         private readonly sourcingService: SourcingService,
         private readonly groupingService: GroupingService,
@@ -105,6 +106,7 @@ export class CheckoutService {
         private readonly shipmentCreationService: ShipmentCreationService,
 
     ) { }
+
     async getCheckouts(
         tenant: CurrentTenant,
     ): Promise<CheckoutListRow[]> {
@@ -145,12 +147,15 @@ export class CheckoutService {
             tenant,
             checkoutId,
         );
+        let currentStage = 'checkout_received';
 
         try {
             /*
              * שלב 1:
              * מציאת כל מקורות האספקה האפשריים לכל פריט.
              */
+            currentStage = 'sourcing';
+
             const sourcing =
                 await this.sourcingService.findSourcesForCheckout(
                     checkout,
@@ -173,7 +178,7 @@ export class CheckoutService {
                     tenant,
                     checkoutId,
                 );
-
+            currentStage = 'grouping';
             /*
              * שלב 2:
              * יצירת כל הקצאות המקורות האפשריות,
@@ -201,6 +206,14 @@ export class CheckoutService {
             const selectedPlans =
                 this.shipmentPlanEvaluatorService
                     .evaluateAndSelect(validPlans);
+            currentStage = 'awaiting_quotes';
+            // בדיקה זמנית בלבד
+            if (checkout.orderId === 'ORDER-FAILURE-STAGE-001') {
+                throw new Error(
+                    'TEST FAILURE - awaiting quotes',
+                );
+            }
+
             const quotedPlans =
                 await this.shipmentPlanQuoteService
                     .getQuotesForPlans(
@@ -211,6 +224,7 @@ export class CheckoutService {
             const deliveryOptions =
                 this.shipmentPlanDeliveryOptionsService
                     .generateForPlans(quotedPlans);
+            currentStage = 'carrier_selection';
             const priorityCards =
                 await this.decisionService
                     .getActivePriorityCards(tenant);
@@ -547,6 +561,7 @@ export class CheckoutService {
             /*
            * שמירת סיבות הפיצול הכלליות של התוכנית הזוכה.
            */
+            currentStage = 'grouping';
             await this.checkoutRepository
                 .updateGroupingSplitReasons(
                     tenant,
@@ -565,6 +580,7 @@ export class CheckoutService {
              * רק לאחר שהקבוצות נשמרו במסד,
              * יוצרים Shipment אחד לכל Shipment Group.
              */
+            currentStage = 'shipment_creation';
             const createdShipments =
                 await this.shipmentCreationService.createShipments(
                     tenant,
@@ -623,6 +639,7 @@ export class CheckoutService {
             await this.checkoutProcessingRepository.markFailed(
                 tenant,
                 checkoutId,
+                currentStage,
                 errorMessage,
             );
 

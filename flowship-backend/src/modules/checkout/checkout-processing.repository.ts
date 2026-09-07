@@ -74,20 +74,25 @@ export class CheckoutProcessingRepository {
     async markFailed(
         tenant: CurrentTenant,
         checkoutId: string,
+        failureStage: string,
         errorMessage: string,
     ): Promise<void> {
         await this.databaseService.query(
             `
-            update ${tenant.schemaName}.checkout_processing
-            set
-                status = 'failed',
-                current_step = 'failed',
-                error_message = $2,
-                completed_at = now(),
-                updated_at = now()
-            where checkout_id = $1
-            `,
-            [checkoutId, errorMessage],
+        update ${tenant.schemaName}.checkout_processing
+        set
+            status = 'failed',
+            current_step = $2,
+            error_message = $3,
+            completed_at = now(),
+            updated_at = now()
+        where checkout_id = $1
+        `,
+            [
+                checkoutId,
+                failureStage,
+                errorMessage,
+            ],
         );
     }
 }
