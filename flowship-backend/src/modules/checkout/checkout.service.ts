@@ -207,12 +207,6 @@ export class CheckoutService {
                 this.shipmentPlanEvaluatorService
                     .evaluateAndSelect(validPlans);
             currentStage = 'awaiting_quotes';
-            // בדיקה זמנית בלבד
-            if (checkout.orderId === 'ORDER-FAILURE-STAGE-001') {
-                throw new Error(
-                    'TEST FAILURE - awaiting quotes',
-                );
-            }
 
             const quotedPlans =
                 await this.shipmentPlanQuoteService
