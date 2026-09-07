@@ -60,6 +60,17 @@ export class ShipmentCreationService {
                 );
             }
 
+            /*
+             * Shipment בלי מקור איסוף אינו חוקי.
+             * חשוב לבדוק את זה לפני יצירת רשומת shipment,
+             * כדי לא להשאיר shipment יתום ב-DB.
+             */
+            if (shipmentGroup.sources.length === 0) {
+                throw new Error(
+                    `Shipment group ${shipmentGroup.groupId} has no supply sources`,
+                );
+            }
+
             const quote = selectedGroupQuote.quote;
 
             const shipmentId =
@@ -108,17 +119,11 @@ export class ShipmentCreationService {
 
             /*
              * כרגע ל-SupplySource יש עיר וקואורדינטות,
-             * אך אין רחוב ומספר בית.
+             * אך אין בהכרח רחוב ומספר בית.
              *
-             * לכן שומרים את המידע שקיים בפועל,
+             * לכן שומרים רק את המידע שקיים בפועל,
              * ולא ממציאים כתובת שאינה קיימת.
              */
-            if (shipmentGroup.sources.length === 0) {
-                throw new Error(
-                    `Shipment group ${shipmentGroup.groupId} has no supply sources`,
-                );
-            }
-
             const pickupAddresses =
                 shipmentGroup.sources.map(
                     (source) => ({
@@ -139,6 +144,7 @@ export class ShipmentCreationService {
                             source.location.longitude,
                     }),
                 );
+
             const dropoffAddress = {
                 country: checkout.destination.country,
                 city: checkout.destination.city,
