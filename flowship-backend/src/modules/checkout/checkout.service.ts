@@ -203,11 +203,26 @@ export class CheckoutService {
             const validPlans = allPlans.filter(
                 (plan) => plan.status === 'grouped',
             );
+
+            if (validPlans.length === 0) {
+                const unresolvedSummary =
+                    generation.unresolvedItems
+                        .map(
+                            (item) =>
+                                `${item.sku} (itemIndex: ${item.itemIndex}, quantity: ${item.requestedQuantity})`,
+                        )
+                        .join(' | ');
+
+                throw new Error(
+                    unresolvedSummary
+                        ? `No valid shipment plans could be generated. Unresolved items: ${unresolvedSummary}`
+                        : 'No valid shipment plans could be generated',
+                );
+            }
+
             const selectedPlans =
                 this.shipmentPlanEvaluatorService
                     .evaluateAndSelect(validPlans);
-            currentStage = 'awaiting_quotes';
-
             const quotedPlans =
                 await this.shipmentPlanQuoteService
                     .getQuotesForPlans(
@@ -378,25 +393,7 @@ export class CheckoutService {
                 (plan) => plan.status === 'rejected',
             );
 
-            /*
-             * אם לא הצלחנו ליצור אפילו תוכנית חוקית אחת,
-             * אין אפשרות להמשיך לתהליך המשלוחים.
-             */
-            if (validPlans.length === 0) {
-                const unresolvedSummary =
-                    generation.unresolvedItems
-                        .map(
-                            (item) =>
-                                `${item.sku} (itemIndex: ${item.itemIndex}, quantity: ${item.requestedQuantity})`,
-                        )
-                        .join(' | ');
 
-                throw new Error(
-                    unresolvedSummary
-                        ? `No valid shipment plans could be generated. Unresolved items: ${unresolvedSummary}`
-                        : 'No valid shipment plans could be generated',
-                );
-            }
             console.dir(
                 {
                     generatedPlansCount:
