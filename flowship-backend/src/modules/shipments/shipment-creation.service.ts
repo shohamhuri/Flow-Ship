@@ -60,6 +60,17 @@ export class ShipmentCreationService {
                 );
             }
 
+            /*
+             * Shipment בלי מקור איסוף אינו חוקי.
+             * חשוב לבדוק את זה לפני יצירת רשומת shipment,
+             * כדי לא להשאיר shipment יתום ב-DB.
+             */
+            if (shipmentGroup.sources.length === 0) {
+                throw new Error(
+                    `Shipment group ${shipmentGroup.groupId} has no supply sources`,
+                );
+            }
+
             const quote = selectedGroupQuote.quote;
 
             const shipmentId =
@@ -108,24 +119,31 @@ export class ShipmentCreationService {
 
             /*
              * כרגע ל-SupplySource יש עיר וקואורדינטות,
-             * אך אין רחוב ומספר בית.
+             * אך אין בהכרח רחוב ומספר בית.
              *
-             * לכן שומרים את המידע שקיים בפועל,
+             * לכן שומרים רק את המידע שקיים בפועל,
              * ולא ממציאים כתובת שאינה קיימת.
              */
-            const pickupAddress = {
-                sourceId: shipmentGroup.source.id,
-                sourceName: shipmentGroup.source.name,
-                sourceType: shipmentGroup.source.type,
+            const pickupAddresses =
+                shipmentGroup.sources.map(
+                    (source) => ({
+                        sourceId: source.id,
+                        sourceName: source.name,
+                        sourceType: source.type,
 
-                city: shipmentGroup.source.location.city,
+                        country: source.location.country,
+                        city: source.location.city,
+                        street: source.location.street,
+                        houseNumber:
+                            source.location.houseNumber,
 
-                latitude:
-                    shipmentGroup.source.location.latitude,
+                        latitude:
+                            source.location.latitude,
 
-                longitude:
-                    shipmentGroup.source.location.longitude,
-            };
+                        longitude:
+                            source.location.longitude,
+                    }),
+                );
 
             const dropoffAddress = {
                 country: checkout.destination.country,
@@ -140,7 +158,7 @@ export class ShipmentCreationService {
             await this.shipmentsRepository.createShipmentStops(
                 tenant,
                 shipmentId,
-                pickupAddress,
+                pickupAddresses,
                 dropoffAddress,
             );
 

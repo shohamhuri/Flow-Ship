@@ -10,16 +10,27 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-
+import {
+  LucideAngularModule,
+  Home,
+  Truck,
+  SlidersHorizontal,
+  FileText,
+  Copy,
+  Compass,
+  Package,
+  Users,
+  LucideIconData,
+} from 'lucide-angular';
 import { AuthService } from '../../services/auth';
 import { AdminApiService } from '../../services/admin-api';
+
 type MenuItem = {
   label: string;
   subtitle: string;
   route: string;
-  icon: string;
+  icon: LucideIconData;
 };
-
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
@@ -28,6 +39,7 @@ type MenuItem = {
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
+    LucideAngularModule,
   ],
   templateUrl: './admin-shell.html',
   styleUrl: './admin-shell.scss',
@@ -45,49 +57,49 @@ export class AdminShellComponent implements OnInit {
       label: 'דף בית',
       subtitle: 'סקירה כללית',
       route: '/admin/home',
-      icon: '⌂',
+      icon: Home,
     },
     {
       label: 'חיבור לחברת שליחויות',
       subtitle: 'ניהול ספקים וחיבורים',
       route: '/admin/providers',
-      icon: '🚚',
+      icon: Truck,
     },
     {
       label: 'ניהול קריטריונים',
       subtitle: 'משקלים והעדפות החלטה',
       route: '/admin/decision-criteria',
-      icon: '◫',
+      icon: SlidersHorizontal,
     },
     {
       label: 'הצגת לוגים',
       subtitle: 'חיפושים, סינונים וקריאות',
       route: '/admin/provider-logs',
-      icon: '📝',
+      icon: FileText,
     },
     {
       label: 'ניהול קיבוץ משלוחים',
       subtitle: 'Grouping Engine',
       route: '/admin/grouping-management',
-      icon: '⧉',
+      icon: Copy,
     },
     {
       label: 'תהליכי Checkout',
       subtitle: 'הזמנות, תוכניות ותוצאות',
       route: '/admin/checkouts',
-      icon: '🧭',
+      icon: Compass,
     },
     {
       label: 'היסטוריית משלוחים',
       subtitle: 'משלוחים, סטטוסים וסינונים',
       route: '/admin/shipments-history',
-      icon: '📦',
+      icon: Package,
     },
     {
       label: 'רכישות קבוצתיות',
       subtitle: 'Shared / Group Buying',
       route: '/admin/group-purchases',
-      icon: '👥',
+      icon: Users,
     },
   ];
 

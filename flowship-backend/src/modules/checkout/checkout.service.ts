@@ -74,6 +74,7 @@ export interface CheckoutProcessingResult {
 
 @Injectable()
 export class CheckoutService {
+
     constructor(
         private readonly sourcingService: SourcingService,
         private readonly groupingService: GroupingService,
@@ -105,6 +106,7 @@ export class CheckoutService {
         private readonly shipmentCreationService: ShipmentCreationService,
 
     ) { }
+
     async getCheckouts(
         tenant: CurrentTenant,
     ): Promise<CheckoutListRow[]> {
@@ -145,12 +147,15 @@ export class CheckoutService {
             tenant,
             checkoutId,
         );
+        let currentStage = 'checkout_received';
 
         try {
             /*
              * שלב 1:
              * מציאת כל מקורות האספקה האפשריים לכל פריט.
              */
+            currentStage = 'sourcing';
+
             const sourcing =
                 await this.sourcingService.findSourcesForCheckout(
                     checkout,
@@ -173,7 +178,7 @@ export class CheckoutService {
                     tenant,
                     checkoutId,
                 );
-
+            currentStage = 'grouping';
             /*
              * שלב 2:
              * יצירת כל הקצאות המקורות האפשריות,
@@ -198,6 +203,23 @@ export class CheckoutService {
             const validPlans = allPlans.filter(
                 (plan) => plan.status === 'grouped',
             );
+
+            if (validPlans.length === 0) {
+                const unresolvedSummary =
+                    generation.unresolvedItems
+                        .map(
+                            (item) =>
+                                `${item.sku} (itemIndex: ${item.itemIndex}, quantity: ${item.requestedQuantity})`,
+                        )
+                        .join(' | ');
+
+                throw new Error(
+                    unresolvedSummary
+                        ? `No valid shipment plans could be generated. Unresolved items: ${unresolvedSummary}`
+                        : 'No valid shipment plans could be generated',
+                );
+            }
+
             const selectedPlans =
                 this.shipmentPlanEvaluatorService
                     .evaluateAndSelect(validPlans);
@@ -211,6 +233,7 @@ export class CheckoutService {
             const deliveryOptions =
                 this.shipmentPlanDeliveryOptionsService
                     .generateForPlans(quotedPlans);
+            currentStage = 'carrier_selection';
             const priorityCards =
                 await this.decisionService
                     .getActivePriorityCards(tenant);
@@ -341,8 +364,8 @@ export class CheckoutService {
                                         groupId:
                                             groupQuote.groupId,
 
-                                        originCity:
-                                            groupQuote.originCity,
+                                        pickupCities:
+                                            groupQuote.pickupCities,
 
                                         destinationCity:
                                             groupQuote.destinationCity,
@@ -370,25 +393,7 @@ export class CheckoutService {
                 (plan) => plan.status === 'rejected',
             );
 
-            /*
-             * אם לא הצלחנו ליצור אפילו תוכנית חוקית אחת,
-             * אין אפשרות להמשיך לתהליך המשלוחים.
-             */
-            if (validPlans.length === 0) {
-                const unresolvedSummary =
-                    generation.unresolvedItems
-                        .map(
-                            (item) =>
-                                `${item.sku} (itemIndex: ${item.itemIndex}, quantity: ${item.requestedQuantity})`,
-                        )
-                        .join(' | ');
 
-                throw new Error(
-                    unresolvedSummary
-                        ? `No valid shipment plans could be generated. Unresolved items: ${unresolvedSummary}`
-                        : 'No valid shipment plans could be generated',
-                );
-            }
             console.dir(
                 {
                     generatedPlansCount:
@@ -491,14 +496,19 @@ export class CheckoutService {
                                         groupId:
                                             group.groupId,
 
-                                        sourceId:
-                                            group.source.id,
+                                        sources:
+                                            group.sources.map(
+                                                (source) => ({
+                                                    sourceId:
+                                                        source.id,
 
-                                        sourceName:
-                                            group.source.name,
+                                                    sourceName:
+                                                        source.name,
 
-                                        supplierId:
-                                            group.supplierId,
+                                                    sourceType:
+                                                        source.type,
+                                                }),
+                                            ),
 
                                         handlingGroup:
                                             group.handlingGroup,
@@ -517,6 +527,12 @@ export class CheckoutService {
 
                                                     quantity:
                                                         item.quantity,
+
+                                                    sourceId:
+                                                        item.sourceId,
+
+                                                    supplierId:
+                                                        item.supplierId,
                                                 }),
                                             ),
                                     }),
@@ -533,6 +549,16 @@ export class CheckoutService {
             /*
    * שמירת הקבוצות שנבחרו כחלק מהתוכנית הזוכה.
    */
+            /*
+           * שמירת סיבות הפיצול הכלליות של התוכנית הזוכה.
+           */
+            currentStage = 'grouping';
+            await this.checkoutRepository
+                .updateGroupingSplitReasons(
+                    tenant,
+                    checkoutId,
+                    grouping.splitReasons,
+                );
             await this.shipmentGroupsRepository
                 .saveGroupingResult(
                     tenant,
@@ -545,6 +571,7 @@ export class CheckoutService {
              * רק לאחר שהקבוצות נשמרו במסד,
              * יוצרים Shipment אחד לכל Shipment Group.
              */
+            currentStage = 'shipment_creation';
             const createdShipments =
                 await this.shipmentCreationService.createShipments(
                     tenant,
@@ -603,6 +630,7 @@ export class CheckoutService {
             await this.checkoutProcessingRepository.markFailed(
                 tenant,
                 checkoutId,
+                currentStage,
                 errorMessage,
             );
 

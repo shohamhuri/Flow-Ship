@@ -20,7 +20,11 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "types": [
+      "node",
+      "jest"
+    ]
   },
   "include": [
     "src/**/*.ts"
@@ -30,7 +34,6 @@
     "dist",
     "test",
     "flowship-admin",
-    "flowship-admin/**/*",
-    "**/*.spec.ts"
+    "flowship-admin/**/*"
   ]
 }

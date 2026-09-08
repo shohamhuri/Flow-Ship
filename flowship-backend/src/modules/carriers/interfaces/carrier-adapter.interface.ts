@@ -3,7 +3,7 @@
 import { CarrierCode } from '../enums/carrier-code.enum';
 
 export interface CarrierQuoteRequest {
-    originCity: string;
+    pickupCities: string[];
     destinationCity: string;
     weightKg: number;
 }

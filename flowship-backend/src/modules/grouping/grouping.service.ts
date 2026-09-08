@@ -146,26 +146,31 @@ export class GroupingService {
                     item.category,
                 );
 
-            const groupingKey = [
-                source.id,
-                item.supplierId ?? 'NO_SUPPLIER',
-                handlingGroup,
-            ].join('::');
-
+            const groupingKey = handlingGroup;
             const shipmentItem: ShipmentGroupItem = {
                 sku: item.sku,
                 name: item.name,
                 quantity: item.quantity,
                 unitWeight: item.unitWeight ?? 0,
                 unitPrice: item.unitPrice ?? 0,
+
+                sourceId: source.id,
+
                 supplierId: item.supplierId,
                 category: item.category,
             };
-
             const existingGroup =
                 groupsByKey.get(groupingKey);
 
             if (existingGroup) {
+                if (
+                    !existingGroup.sources.some(
+                        (existingSource) =>
+                            existingSource.id === source.id,
+                    )
+                ) {
+                    existingGroup.sources.push(source);
+                }
                 if (
                     item.category &&
                     !existingGroup.categories.includes(
@@ -195,9 +200,7 @@ export class GroupingService {
             groupsByKey.set(groupingKey, {
                 groupId: randomUUID(),
 
-                source,
-
-                supplierId: item.supplierId,
+                sources: [source],
 
                 categories: item.category
                     ? [item.category]
@@ -218,8 +221,6 @@ export class GroupingService {
                     (item.unitPrice ?? 0),
 
                 groupingReasons: [
-                    'SAME_SUPPLY_SOURCE',
-                    'SAME_SUPPLIER',
                     'COMPATIBLE_HANDLING_GROUP',
                 ],
             });
@@ -274,35 +275,11 @@ export class GroupingService {
 
         const reasons = new Set<string>();
 
-        const sourceIds = new Set(
-            shipmentGroups.map(
-                (group) => group.source.id,
-            ),
-        );
-
-        const supplierIds = new Set(
-            shipmentGroups.map(
-                (group) =>
-                    group.supplierId ??
-                    'NO_SUPPLIER',
-            ),
-        );
-
         const handlingGroups = new Set(
             shipmentGroups.map(
                 (group) => group.handlingGroup,
             ),
         );
-
-        if (sourceIds.size > 1) {
-            reasons.add(
-                'DIFFERENT_SUPPLY_SOURCES',
-            );
-        }
-
-        if (supplierIds.size > 1) {
-            reasons.add('DIFFERENT_SUPPLIERS');
-        }
 
         if (handlingGroups.size > 1) {
             reasons.add(
@@ -467,6 +444,21 @@ export class GroupingService {
                     item.category,
                 );
             }
+            const itemSource =
+                originalGroup.sources.find(
+                    (source) =>
+                        source.id === item.sourceId,
+                );
+
+            if (
+                itemSource &&
+                !currentGroup.sources.some(
+                    (source) =>
+                        source.id === itemSource.id,
+                )
+            ) {
+                currentGroup.sources.push(itemSource);
+            }
         }
 
         if (currentGroup.items.length > 0) {
@@ -485,8 +477,7 @@ export class GroupingService {
         return {
             groupId: randomUUID(),
 
-            source: originalGroup.source,
-            supplierId: originalGroup.supplierId,
+            sources: [],
 
             categories: [],
             handlingGroup:

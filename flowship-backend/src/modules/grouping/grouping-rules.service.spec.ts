@@ -32,6 +32,18 @@ describe('GroupingRulesService', () => {
         findActiveStrategies: jest.MockedFunction<
             GroupingStrategySettingsRepository['findActiveStrategies']
         >;
+
+        findAllStrategies: jest.MockedFunction<
+            GroupingStrategySettingsRepository['findAllStrategies']
+        >;
+
+        updateStrategy: jest.MockedFunction<
+            GroupingStrategySettingsRepository['updateStrategy']
+        >;
+
+        reorderStrategies: jest.MockedFunction<
+            GroupingStrategySettingsRepository['reorderStrategies']
+        >;
     };
     const tenant: CurrentTenant = {
         id: 'tenant-1',
@@ -64,6 +76,9 @@ describe('GroupingRulesService', () => {
     beforeEach(async () => {
         repositoryMock = {
             findActiveStrategies: jest.fn(),
+            findAllStrategies: jest.fn(),
+            updateStrategy: jest.fn(),
+            reorderStrategies: jest.fn(),
         };
 
         const moduleRef =
@@ -426,6 +441,33 @@ describe('GroupingRulesService', () => {
                 );
             },
         );
+        it('should reject maxWeightKg when it is not a number', async () => {
+            const strategies = [
+                createStrategy({
+                    strategyKey:
+                        'split_by_max_weight',
+
+                    config: {
+                        maxWeightKg:
+                            '20' as any,
+                    },
+                }),
+            ];
+
+            repositoryMock
+                .findActiveStrategies
+                .mockResolvedValue(
+                    strategies,
+                );
+
+            await expect(
+                service.getActiveStrategies(
+                    tenant,
+                ),
+            ).rejects.toThrow(
+                'Invalid maxWeightKg configuration',
+            );
+        });
 
         it(
             'should reject zero max items configuration',
@@ -571,5 +613,259 @@ describe('GroupingRulesService', () => {
                 );
             },
         );
+    });
+    describe('getAllStrategies', () => {
+        it('should return all strategies from repository', async () => {
+            const strategies = [
+                createStrategy({
+                    id: 'strategy-1',
+                }),
+                createStrategy({
+                    id: 'strategy-2',
+                    strategyKey:
+                        'split_by_max_weight',
+                    config: {
+                        maxWeightKg: 25,
+                    },
+                }),
+            ];
+
+            repositoryMock
+                .findAllStrategies
+                .mockResolvedValue(
+                    strategies,
+                );
+
+            const result =
+                await service.getAllStrategies(
+                    tenant,
+                );
+
+            expect(
+                repositoryMock
+                    .findAllStrategies,
+            ).toHaveBeenCalledWith(
+                tenant,
+            );
+
+            expect(result).toEqual(
+                strategies,
+            );
+        });
+
+        it('should call findAllStrategies exactly once', async () => {
+            repositoryMock
+                .findAllStrategies
+                .mockResolvedValue([]);
+
+            await service.getAllStrategies(
+                tenant,
+            );
+
+            expect(
+                repositoryMock
+                    .findAllStrategies,
+            ).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('updateStrategy', () => {
+        it('should pass tenant, strategy id and changes to repository', async () => {
+            const updatedStrategy =
+                createStrategy({
+                    id: 'strategy-1',
+                    displayName:
+                        'Updated strategy',
+                });
+
+            repositoryMock
+                .updateStrategy
+                .mockResolvedValue(
+                    updatedStrategy,
+                );
+
+            const changes = {
+                displayName:
+                    'Updated strategy',
+                isEnabled: false,
+                executionOrder: 3,
+                conflictPriority: 5,
+            };
+
+            await service.updateStrategy(
+                tenant,
+                'strategy-1',
+                changes,
+            );
+
+            expect(
+                repositoryMock
+                    .updateStrategy,
+            ).toHaveBeenCalledWith(
+                tenant,
+                'strategy-1',
+                changes,
+            );
+        });
+
+        it('should return null when repository does not find the strategy', async () => {
+            repositoryMock
+                .updateStrategy
+                .mockResolvedValue(null);
+
+            const result =
+                await service.updateStrategy(
+                    tenant,
+                    'missing-strategy',
+                    {
+                        isEnabled: false,
+                    },
+                );
+
+            expect(result).toBeNull();
+        });
+
+        it('should return a valid updated strategy', async () => {
+            const updatedStrategy =
+                createStrategy({
+                    strategyKey:
+                        'split_by_max_weight',
+                    config: {
+                        maxWeightKg: 30,
+                    },
+                });
+
+            repositoryMock
+                .updateStrategy
+                .mockResolvedValue(
+                    updatedStrategy,
+                );
+
+            const result =
+                await service.updateStrategy(
+                    tenant,
+                    'strategy-1',
+                    {
+                        config: {
+                            maxWeightKg: 30,
+                        },
+                    },
+                );
+
+            expect(result).toBe(
+                updatedStrategy,
+            );
+        });
+
+        it('should reject an invalid strategy configuration returned after update', async () => {
+            const invalidStrategy =
+                createStrategy({
+                    strategyKey:
+                        'split_by_max_weight',
+
+                    config: {
+                        maxWeightKg: 0,
+                    },
+                });
+
+            repositoryMock
+                .updateStrategy
+                .mockResolvedValue(
+                    invalidStrategy,
+                );
+
+            await expect(
+                service.updateStrategy(
+                    tenant,
+                    'strategy-1',
+                    {
+                        config: {
+                            maxWeightKg: 0,
+                        },
+                    },
+                ),
+            ).rejects.toThrow(
+                'Invalid maxWeightKg configuration',
+            );
+        });
+
+        it('should reject an unsupported grouping strategy', async () => {
+            const unsupportedStrategy =
+                createStrategy({
+                    strategyKey:
+                        'unsupported_strategy' as any,
+                });
+
+            repositoryMock
+                .updateStrategy
+                .mockResolvedValue(
+                    unsupportedStrategy,
+                );
+
+            await expect(
+                service.updateStrategy(
+                    tenant,
+                    'strategy-1',
+                    {},
+                ),
+            ).rejects.toThrow(
+                'Unsupported grouping strategy: unsupported_strategy',
+            );
+        });
+    });
+
+    describe('reorderStrategies', () => {
+        it('should reorder strategies through repository and return the result', async () => {
+            const items = [
+                {
+                    id: 'strategy-2',
+                    executionOrder: 1,
+                    conflictPriority: 10,
+                },
+                {
+                    id: 'strategy-1',
+                    executionOrder: 2,
+                    conflictPriority: 5,
+                },
+            ];
+
+            const reordered = [
+                createStrategy({
+                    id: 'strategy-2',
+                    executionOrder: 1,
+                    conflictPriority: 10,
+                }),
+
+                createStrategy({
+                    id: 'strategy-1',
+                    executionOrder: 2,
+                    conflictPriority: 5,
+                }),
+            ];
+
+            repositoryMock
+                .reorderStrategies
+                .mockResolvedValue(
+                    reordered,
+                );
+
+            const result =
+                await service.reorderStrategies(
+                    tenant,
+                    items,
+                );
+
+            expect(
+                repositoryMock
+                    .reorderStrategies,
+            ).toHaveBeenCalledWith(
+                tenant,
+                items,
+            );
+
+            expect(result).toEqual(
+                reordered,
+            );
+        });
     });
 });

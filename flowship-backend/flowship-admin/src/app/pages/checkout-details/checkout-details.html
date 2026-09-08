@@ -1,6 +1,6 @@
 <div class="checkout-details-page">
     <button type="button" class="back-button" (click)="goBack()">
-        ← חזרה לרשימה
+        → חזרה לרשימה
     </button>
 
     <div *ngIf="isLoading" class="state-message">
@@ -172,8 +172,34 @@
                     </p>
                 </div>
             </div>
+            <div *ngIf="
+                       checkout.groupingSplitReasons.length > 0
+                         " class="checkout-split-reasons">
+                <div class="checkout-split-reasons-header">
+                    <span>למה ההזמנה פוצלה?</span>
 
+                    <strong>
+                        ההזמנה חולקה ל־
+                        {{ checkout.shipmentGroups.length }}
+                        קבוצות משלוח
+                    </strong>
+                </div>
+
+                <div class="checkout-split-reasons-list">
+                    <div *ngFor="
+        let reason of
+          checkout.groupingSplitReasons
+      " class="checkout-split-reason">
+                        <span class="reason-icon">✓</span>
+
+                        <span>
+                            {{ getSplitReasonLabel(reason) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
             <div class="groups-grid">
+
                 <article *ngFor="
             let group of checkout.shipmentGroups;
             let index = index
@@ -192,7 +218,9 @@
                     <div class="group-meta">
                         <div>
                             <span>סוג מקור</span>
-                            <strong>{{ group.sourceType }}</strong>
+                            <strong>
+                                {{ group.sourceType || 'לא צוין' }}
+                            </strong>
                         </div>
 
                         <div>
@@ -232,7 +260,7 @@
                         <span *ngFor="
                 let reason of group.groupingReasons
               ">
-                            {{ reason }}
+                            {{ getSplitReasonLabel(reason) }}
                         </span>
                     </div>
 
@@ -301,7 +329,7 @@
                         <div>
                             <span>חברת שילוח</span>
                             <strong>
-                                {{ shipment.providerCode }}
+                                {{ shipment.carrierName || 'לא צוין' }}
                             </strong>
                         </div>
 
@@ -313,16 +341,43 @@
                         </div>
                     </div>
 
-                    <div class="stops">
-                        <div *ngFor="let stop of shipment.stops" class="stop">
-                            <span>
-                                {{ getStopLabel(stop) }}
-                            </span>
+                    <div class="route-section">
 
-                            <strong>
-                                {{ getAddressLabel(stop.address) }}
-                            </strong>
+                        <div class="route-title">
+                            מסלול המשלוח
                         </div>
+
+                        <div class="stops">
+
+                            <div *ngFor="
+                let stop of shipment.stops;
+                let i = index;
+                let last = last
+            " class="stop">
+
+                                <div class="stop-marker">
+                                    <div class="stop-number">
+                                        {{ i + 1 }}
+                                    </div>
+
+                                    <div *ngIf="!last" class="stop-line">
+                                    </div>
+                                </div>
+
+                                <div class="stop-content">
+                                    <span>
+                                        {{ getStopLabel(stop) }}
+                                    </span>
+
+                                    <strong>
+                                        {{ getAddressLabel(stop.address) }}
+                                    </strong>
+                                </div>
+
+                            </div>
+
+                        </div>
+
                     </div>
                 </article>
             </div>

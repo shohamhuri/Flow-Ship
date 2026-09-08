@@ -1,41 +1,47 @@
 <div class="criteria-page">
+
     <section class="hero-card">
-        <div>
-            <div class="eyebrow">Decision Engine</div>
-            <h1>ניהול קריטריונים</h1>
+        <div class="hero-content">
+            <div class="eyebrow">Carrier Decision</div>
+
+            <h1>איך לבחור חברת שילוח?</h1>
+
             <p>
-                סדרי את הקוביות לפי החשיבות העסקית. הקובייה העליונה משפיעה הכי הרבה
-                על בחירת חברת השילוח, והקוביות שמתחתיה משפיעות פחות.
+                הגדר מה חשוב יותר בעת בחירת חברת השילוח:
+                מחיר, מהירות או העדפת ספק.
+                סדר הקריטריונים קובע את מידת ההשפעה שלהם על ההחלטה.
             </p>
         </div>
 
         <button type="button" class="primary-btn" (click)="openCreatePanel()">
-            + צור קובייה
+            + הוסף קריטריון
         </button>
     </section>
 
-    <section class="explain-card">
-        <div class="explain-item">
+
+    <section class="quick-help">
+        <div>
             <strong>איך זה עובד?</strong>
-            <span>גוררים קוביות למעלה או למטה לפי חשיבות.</span>
+            <span>
+                גרירה למעלה מגדילה את ההשפעה של הקריטריון.
+            </span>
         </div>
 
-        <div class="explain-item">
-            <strong>חברת שילוח</strong>
-            <span>כרגע אפשר לבחור ALL, ובהמשך גם חברה ספציפית.</span>
-        </div>
-
-        <div class="explain-item">
-            <strong>קריטריון</strong>
-            <span>המערכת מאפשרת רק קריטריונים שהיא יודעת לחשב.</span>
+        <div>
+            <strong>כל החברות או חברה מסוימת</strong>
+            <span>
+                ניתן להחיל קריטריון על כל חברות השילוח או על ספק מסוים.
+            </span>
         </div>
     </section>
 
+
     <div *ngIf="loading && !cards.length" class="state-card">
-        טוען קוביות...
+        טוען קריטריונים...
     </div>
+
     <div *ngIf="saving" class="saving-pill">
-        שומר סדר...
+        שומר שינויים...
     </div>
 
     <div *ngIf="errorMsg" class="error-card">
@@ -46,11 +52,15 @@
         {{ successMsg }}
     </div>
 
+
     <section *ngIf="showCreatePanel" class="create-panel">
+
         <div class="panel-header">
             <div>
-                <h2>יצירת קוביית תעדוף</h2>
-                <p>בחרי חברת שילוח וקריטריון. הקובייה תתווסף לסוף הרשימה.</p>
+                <h2>הוספת קריטריון</h2>
+                <p>
+                    בחרי על אילו חברות הוא יחול ומהו הקריטריון.
+                </p>
             </div>
 
             <button type="button" class="ghost-btn" (click)="closeCreatePanel()">
@@ -59,10 +69,14 @@
         </div>
 
         <div class="form-grid">
+
             <label>
                 חברת שילוח
+
                 <select [(ngModel)]="newCard.providerId">
-                    <option [ngValue]="null">ALL - כל החברות</option>
+                    <option [ngValue]="null">
+                        כל חברות השילוח
+                    </option>
 
                     <option *ngFor="let provider of providers" [ngValue]="provider.id">
                         {{ provider.name }}
@@ -70,80 +84,115 @@
                 </select>
             </label>
 
+
             <label>
                 קריטריון
+
                 <select [(ngModel)]="newCard.criterionKey">
-                    <option value="" disabled>בחרי קריטריון</option>
+                    <option value="" disabled>
+                        בחרי קריטריון
+                    </option>
 
                     <option *ngFor="let criterion of criteria" [value]="criterion.key">
                         {{ criterion.label }}
                     </option>
                 </select>
+
                 <div *ngIf="isDuplicateNewCard()" class="duplicate-warning">
-                    קובייה כזאת כבר קיימת. אי אפשר ליצור אותה שוב.
+                    הקריטריון הזה כבר קיים עבור חברת השילוח שנבחרה.
                 </div>
             </label>
+
         </div>
 
+
         <div class="panel-actions">
+
             <button type="button" class="primary-btn" (click)="createCard()" [disabled]="isDuplicateNewCard()">
-                צור קובייה
+                הוסף קריטריון
             </button>
 
             <button type="button" class="secondary-btn" (click)="closeCreatePanel()">
                 ביטול
             </button>
+
         </div>
     </section>
 
+
     <section class="cards-section" *ngIf="cards.length">
+
         <div class="section-header">
             <div>
-                <h2>סדר עדיפויות פעיל</h2>
+                <h2>סדר העדיפויות</h2>
+
                 <p>
-                    {{ activeCardsCount }} קוביות פעילות. גרירה למעלה מעלה את החשיבות.
+                    {{ activeCardsCount }} קריטריונים פעילים.
+                    הקריטריון הראשון משפיע יותר מהבאים אחריו.
                 </p>
             </div>
         </div>
 
+
         <div cdkDropList class="cards-list" (cdkDropListDropped)="drop($event)">
-            <article *ngFor="let card of cards; let i = index; trackBy: trackByCardId" cdkDrag class="priority-card"
-                [class.inactive]="!card.isActive">
+
+            <article *ngFor="
+                    let card of cards;
+                    let i = index;
+                    trackBy: trackByCardId
+                " cdkDrag class="priority-card" [class.inactive]="!card.isActive">
+
                 <div class="drag-handle" cdkDragHandle title="גרירה">
                     ⋮⋮
                 </div>
+
 
                 <div class="rank-box">
                     <span>עדיפות</span>
                     <strong>#{{ i + 1 }}</strong>
                 </div>
 
+
                 <div class="card-main">
-                    <div class="card-top">
-                        <span class="provider-pill">
-                            {{ card.providerName }}
-                        </span>
 
-                        <span class="criterion-pill">
+                    <div class="card-heading">
+
+                        <h3>
                             {{ card.criterionLabel }}
+                        </h3>
+
+                        <span *ngIf="!card.isActive" class="status-text">
+                            כבוי
                         </span>
 
-                        <span class="active-pill" [class.off]="!card.isActive">
-                            {{ card.isActive ? 'פעיל' : 'כבוי' }}
-                        </span>
                     </div>
 
-                    <h3>{{ card.title }}</h3>
+                    <div class="provider-line">
+                        {{
+                        card.providerId
+                        ? card.providerName
+                        : 'כל חברות השילוח'
+                        }}
+                    </div>
 
                     <p>
-                        {{ card.criterionDescription || 'קריטריון תעדוף במנוע ההחלטות' }}
+                        {{
+                        card.criterionDescription
+                        || 'קריטריון לבחירת חברת שילוח'
+                        }}
                     </p>
+
                 </div>
 
+
                 <div class="weight-preview">
-                    <span>השפעה משוערת</span>
+                    <span>השפעה</span>
+
                     <strong *ngIf="card.isActive">
-                        {{ getRankWeight(i) * 100 | number:'1.0-0' }}%
+                        {{
+                        getRankWeight(i) * 100
+                        | number:'1.0-0'
+                        }}%
                     </strong>
 
                     <strong *ngIf="!card.isActive">
@@ -151,16 +200,74 @@
                     </strong>
                 </div>
 
-                <div class="card-actions">
-                    <button type="button" class="small-btn" (click)="toggleCard(card)">
-                        {{ card.isActive ? 'כבה' : 'הפעל' }}
-                    </button>
 
-                    <button type="button" class="danger-btn" (click)="deleteCard(card)">
+                <div class="card-actions">
+
+                    <button type="button" class="small-btn" (click)="toggleCard(card)">
+                        {{
+                        card.isActive
+                        ? 'כבה'
+                        : 'הפעל'
+                        }}
+                    </button>
+                    <button type="button" class="danger-btn" (click)="openDeleteDialog(card)">
                         מחק
                     </button>
+
                 </div>
+
             </article>
+
         </div>
     </section>
+    <div *ngIf="cardPendingDelete" class="dialog-backdrop" (click)="closeDeleteDialog()">
+
+        <section class="confirm-dialog" (click)="$event.stopPropagation()">
+
+            <div class="dialog-icon">
+                !
+            </div>
+
+            <h2>מחיקת קריטריון</h2>
+
+            <p>
+                האם למחוק את הקריטריון
+                <strong>
+                    {{ cardPendingDelete.criterionLabel }}
+                </strong>
+                <ng-container *ngIf="cardPendingDelete.providerId">
+
+                    עבור
+                    <strong>
+                        {{ cardPendingDelete.providerName }}
+                    </strong>
+
+                </ng-container>
+                ?
+            </p>
+
+            <span class="dialog-note">
+                הפעולה תסיר את הקריטריון מסדר העדיפויות.
+            </span>
+
+            <div class="dialog-actions">
+
+                <button type="button" class="dialog-cancel" (click)="closeDeleteDialog()" [disabled]="isDeleting">
+                    ביטול
+                </button>
+
+                <button type="button" class="dialog-delete" (click)="confirmDeleteCard()" [disabled]="isDeleting">
+
+                    {{
+                    isDeleting
+                    ? 'מוחק...'
+                    : 'כן, מחק'
+                    }}
+
+                </button>
+
+            </div>
+
+        </section>
+    </div>
 </div>

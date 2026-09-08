@@ -6,16 +6,17 @@ export interface ShipmentGroupItem {
     quantity: number;
     unitWeight: number;
     unitPrice: number;
+
+    sourceId: string;
+
     supplierId?: string;
     category?: string;
 }
-
 export interface ShipmentGroup {
     groupId: string;
 
-    source: SupplySource;
+    sources: SupplySource[];
 
-    supplierId?: string;
     categories: string[];
     items: ShipmentGroupItem[];
 

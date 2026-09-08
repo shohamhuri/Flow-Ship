@@ -15,7 +15,11 @@ export type DecisionCriterion = {
     weight: number;
     isActive: boolean;
 };
-
+export type DecisionSettings = {
+    priceWeight: number;
+    speedWeight: number;
+    providerPriorityWeight: number;
+};
 export type ScoredQuote = CarrierQuoteOption & {
     score: number;
     scoreBreakdown: {
@@ -177,64 +181,91 @@ export class DecisionService {
 
     selectBestQuote(
         quotes: CarrierQuoteOption[],
-        criteria: DecisionCriterion[],
+        settings: DecisionSettings,
     ): ScoredQuote | null {
         if (quotes.length === 0) {
             return null;
         }
 
-        const prices = quotes.map((q) => q.price);
-        const estimatedDays = quotes.map((q) => q.estimatedDays);
+        const prices =
+            quotes.map((quote) => quote.price);
 
-        const minPrice = Math.min(...prices);
-        const maxPrice = Math.max(...prices);
-
-        const minDays = Math.min(...estimatedDays);
-        const maxDays = Math.max(...estimatedDays);
-
-        const scoredQuotes = quotes.map((quote) => {
-            const priceScore = this.calculateInverseScore(
-                quote.price,
-                minPrice,
-                maxPrice,
+        const estimatedDays =
+            quotes.map(
+                (quote) => quote.estimatedDays,
             );
 
-            const speedScore = this.calculateInverseScore(
-                quote.estimatedDays,
-                minDays,
-                maxDays,
-            );
+        const minPrice =
+            Math.min(...prices);
 
-            const providerPriorityScore = quote.providerPriority ?? 0.5;
+        const maxPrice =
+            Math.max(...prices);
 
-            let score = 0;
+        const minDays =
+            Math.min(...estimatedDays);
 
-            for (const criterion of criteria) {
-                if (criterion.key === 'price') {
-                    score += priceScore * criterion.weight;
-                }
+        const maxDays =
+            Math.max(...estimatedDays);
 
-                if (criterion.key === 'speed') {
-                    score += speedScore * criterion.weight;
-                }
+        const scoredQuotes =
+            quotes.map((quote) => {
+                const priceScore =
+                    this.calculateInverseScore(
+                        quote.price,
+                        minPrice,
+                        maxPrice,
+                    );
 
-                if (criterion.key === 'provider_priority') {
-                    score += providerPriorityScore * criterion.weight;
-                }
-            }
+                const speedScore =
+                    this.calculateInverseScore(
+                        quote.estimatedDays,
+                        minDays,
+                        maxDays,
+                    );
 
-            return {
-                ...quote,
-                score: Number(score.toFixed(4)),
-                scoreBreakdown: {
-                    priceScore: Number(priceScore.toFixed(4)),
-                    speedScore: Number(speedScore.toFixed(4)),
-                    providerPriorityScore: Number(providerPriorityScore.toFixed(4)),
-                },
-            };
-        });
+                const providerPriorityScore =
+                    quote.providerPriority ?? 0.5;
 
-        return scoredQuotes.sort((a, b) => b.score - a.score)[0];
+                const score =
+                    priceScore *
+                    settings.priceWeight +
+                    speedScore *
+                    settings.speedWeight +
+                    providerPriorityScore *
+                    settings.providerPriorityWeight;
+
+                return {
+                    ...quote,
+
+                    score:
+                        Number(
+                            score.toFixed(4),
+                        ),
+
+                    scoreBreakdown: {
+                        priceScore:
+                            Number(
+                                priceScore.toFixed(4),
+                            ),
+
+                        speedScore:
+                            Number(
+                                speedScore.toFixed(4),
+                            ),
+
+                        providerPriorityScore:
+                            Number(
+                                providerPriorityScore
+                                    .toFixed(4),
+                            ),
+                    },
+                };
+            });
+
+        return scoredQuotes.sort(
+            (a, b) =>
+                b.score - a.score,
+        )[0];
     }
     selectBestDeliveryOption(
         options: ShipmentPlanDeliveryOption[],
@@ -578,5 +609,49 @@ on conflict (checkout_id)        do update set
             ]
 
         );
+    }
+    async getDecisionSettings(
+        tenant: TenantContext,
+    ): Promise<DecisionSettings> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        const rows = await this.db.query<{
+            price_weight: string | number;
+            speed_weight: string | number;
+            provider_priority_weight: string | number;
+        }>(
+            `
+        select
+            price_weight,
+            speed_weight,
+            provider_priority_weight
+        from ${schemaName}.decision_settings
+        where is_active = true
+        order by created_at desc
+        limit 1
+        `,
+        );
+
+        const row = rows[0];
+
+        if (!row) {
+            return {
+                priceWeight: 0.6,
+                speedWeight: 0.3,
+                providerPriorityWeight: 0.1,
+            };
+        }
+
+        return {
+            priceWeight:
+                Number(row.price_weight),
+
+            speedWeight:
+                Number(row.speed_weight),
+
+            providerPriorityWeight:
+                Number(row.provider_priority_weight),
+        };
     }
 }
