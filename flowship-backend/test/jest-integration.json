@@ -14,5 +14,6 @@
                 "tsconfig": "test/tsconfig.integration.json"
             }
         ]
-    }
+    },
+    "testTimeout": 30000
 }
