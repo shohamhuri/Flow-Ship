@@ -23,4 +23,4 @@ jobs:
         run: npm ci
 
       - name: Run Unit Tests
-        run: npm test -- --runInBand
+        run: npm test -- --runInBand  
