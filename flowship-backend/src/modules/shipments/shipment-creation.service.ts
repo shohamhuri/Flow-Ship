@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
-
+import {
+    DbService,
+} from '../../infrastructure/database/db.service';
 import { CurrentTenant } from '../tenants/tenants.service';
 import { Checkout } from '../checkout/interfaces/checkout.interface';
 
@@ -17,6 +19,8 @@ export interface CreatedShipmentResult {
 export class ShipmentCreationService {
     constructor(
         private readonly shipmentsRepository: ShipmentsRepository,
+        private readonly db:
+            DbService,
     ) { }
 
     async createShipments(
@@ -91,129 +95,147 @@ export class ShipmentCreationService {
          * רק אם כל הקבוצות עברו validation,
          * מתחילים ליצור shipments.
          */
-        const createdShipments:
-            CreatedShipmentResult[] = [];
+        return this.db.transaction(
+            async (tx) => {
+                const createdShipments:
+                    CreatedShipmentResult[] = [];
 
-        for (
-            const {
-                selectedGroupQuote,
-                shipmentGroup,
-            } of validatedGroups
-        ) {
-            const quote =
-                selectedGroupQuote.quote;
 
-            const shipmentId =
-                await this.shipmentsRepository.createShipment(
-                    tenant,
-                    {
-                        checkoutId,
-                        orderId:
-                            checkout.orderId,
+                for (
+                    const {
+                        selectedGroupQuote,
+                        shipmentGroup,
+                    } of validatedGroups
+                ) {
+                    const quote =
+                        selectedGroupQuote.quote;
+
+
+                    const shipmentId =
+                        await this
+                            .shipmentsRepository
+                            .createShipment(
+                                tenant,
+                                {
+                                    checkoutId,
+
+                                    orderId:
+                                        checkout.orderId,
+
+                                    shipmentGroupId:
+                                        shipmentGroup.groupId,
+
+                                    selectedPlanId:
+                                        winningPlan.id,
+
+                                    selectedDeliveryOptionKey:
+                                        selectedDeliveryOption.id,
+
+                                    providerId:
+                                        quote.providerId,
+
+                                    providerCode:
+                                        quote.providerCode,
+
+                                    adapterKey:
+                                        quote.adapterKey,
+
+                                    carrierName:
+                                        quote.carrierName,
+
+                                    serviceName:
+                                        quote.serviceName,
+
+                                    price:
+                                        quote.price,
+
+                                    currency:
+                                        quote.currency,
+
+                                    estimatedDeliveryDays:
+                                        quote.estimatedDays,
+
+                                    status:
+                                        'created',
+                                },
+
+                                tx,
+                            );
+
+
+                    const pickupAddresses =
+                        shipmentGroup.sources.map(
+                            (source) => ({
+                                sourceId:
+                                    source.id,
+
+                                sourceName:
+                                    source.name,
+
+                                sourceType:
+                                    source.type,
+
+                                country:
+                                    source.location.country,
+
+                                city:
+                                    source.location.city,
+
+                                street:
+                                    source.location.street,
+
+                                houseNumber:
+                                    source.location.houseNumber,
+
+                                latitude:
+                                    source.location.latitude,
+
+                                longitude:
+                                    source.location.longitude,
+                            }),
+                        );
+
+
+                    const dropoffAddress = {
+                        country:
+                            checkout.destination.country,
+
+                        city:
+                            checkout.destination.city,
+
+                        street:
+                            checkout.destination.street,
+
+                        houseNumber:
+                            checkout.destination.houseNumber,
+
+                        postalCode:
+                            checkout.destination.postalCode,
+                    };
+
+
+                    await this
+                        .shipmentsRepository
+                        .createShipmentStops(
+                            tenant,
+                            shipmentId,
+                            pickupAddresses,
+                            dropoffAddress,
+                            tx,
+                        );
+
+
+                    createdShipments.push({
+                        shipmentId,
 
                         shipmentGroupId:
                             shipmentGroup.groupId,
+                    });
+                }
 
-                        selectedPlanId:
-                            winningPlan.id,
 
-                        selectedDeliveryOptionKey:
-                            selectedDeliveryOption.id,
-
-                        providerId:
-                            quote.providerId,
-
-                        providerCode:
-                            quote.providerCode,
-
-                        adapterKey:
-                            quote.adapterKey,
-
-                        carrierName:
-                            quote.carrierName,
-
-                        serviceName:
-                            quote.serviceName,
-
-                        price:
-                            quote.price,
-
-                        currency:
-                            quote.currency,
-
-                        estimatedDeliveryDays:
-                            quote.estimatedDays,
-
-                        status:
-                            'created',
-                    },
-                );
-
-            const pickupAddresses =
-                shipmentGroup.sources.map(
-                    (source) => ({
-                        sourceId:
-                            source.id,
-
-                        sourceName:
-                            source.name,
-
-                        sourceType:
-                            source.type,
-
-                        country:
-                            source.location.country,
-
-                        city:
-                            source.location.city,
-
-                        street:
-                            source.location.street,
-
-                        houseNumber:
-                            source.location.houseNumber,
-
-                        latitude:
-                            source.location.latitude,
-
-                        longitude:
-                            source.location.longitude,
-                    }),
-                );
-
-            const dropoffAddress = {
-                country:
-                    checkout.destination.country,
-
-                city:
-                    checkout.destination.city,
-
-                street:
-                    checkout.destination.street,
-
-                houseNumber:
-                    checkout.destination.houseNumber,
-
-                postalCode:
-                    checkout.destination.postalCode,
-            };
-
-            await this.shipmentsRepository
-                .createShipmentStops(
-                    tenant,
-                    shipmentId,
-                    pickupAddresses,
-                    dropoffAddress,
-                );
-
-            createdShipments.push({
-                shipmentId,
-
-                shipmentGroupId:
-                    shipmentGroup.groupId,
-            });
-        }
-
-        return createdShipments;
+                return createdShipments;
+            },
+        );
     }
 }

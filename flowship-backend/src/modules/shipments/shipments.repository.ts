@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { DbService } from '../../infrastructure/database/db.service';
-import { CurrentTenant } from '../tenants/tenants.service';
-
+import {
+    DbService,
+    DbTransaction,
+} from '../../infrastructure/database/db.service'; import { CurrentTenant } from '../tenants/tenants.service';
+type DbExecutor = Pick<
+    DbTransaction,
+    'query' | 'queryOne'
+>;
 type CreateShipmentParams = {
     checkoutId: string;
     shipmentGroupId: string;
@@ -61,14 +66,16 @@ export class ShipmentsRepository {
     async createShipment(
         tenant: CurrentTenant,
         shipment: CreateShipmentData,
+        executor: DbExecutor = this.db,
     ): Promise<string> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        const rows = await this.db.query<{
-            id: string;
-        }>(
-            `
+        const rows =
+            await executor.query<{
+                id: string;
+            }>(
+                `
         INSERT INTO "${schemaName}".shipments
         (
             checkout_id,
@@ -102,28 +109,28 @@ export class ShipmentsRepository {
         )
         RETURNING id
         `,
-            [
-                shipment.checkoutId,
-                shipment.orderId,
-                shipment.shipmentGroupId,
+                [
+                    shipment.checkoutId,
+                    shipment.orderId,
+                    shipment.shipmentGroupId,
 
-                shipment.selectedPlanId,
-                shipment.selectedDeliveryOptionKey,
+                    shipment.selectedPlanId,
+                    shipment.selectedDeliveryOptionKey,
 
-                shipment.providerId ?? null,
-                shipment.providerCode,
-                shipment.adapterKey,
+                    shipment.providerId ?? null,
+                    shipment.providerCode,
+                    shipment.adapterKey,
 
-                shipment.carrierName,
-                shipment.serviceName,
+                    shipment.carrierName,
+                    shipment.serviceName,
 
-                shipment.price,
-                shipment.currency,
-                shipment.estimatedDeliveryDays,
+                    shipment.price,
+                    shipment.currency,
+                    shipment.estimatedDeliveryDays,
 
-                shipment.status,
-            ],
-        );
+                    shipment.status,
+                ],
+            );
 
         const createdShipment = rows[0];
 
@@ -138,8 +145,11 @@ export class ShipmentsRepository {
     async createShipmentStops(
         tenant: CurrentTenant,
         shipmentId: string,
-        pickupAddresses: Record<string, unknown>[],
-        dropoffAddress: Record<string, unknown>,
+        pickupAddresses:
+            Record<string, unknown>[],
+        dropoffAddress:
+            Record<string, unknown>,
+        executor: DbExecutor = this.db,
     ): Promise<void> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
@@ -147,7 +157,7 @@ export class ShipmentsRepository {
         let stopOrder = 1;
 
         for (const pickupAddress of pickupAddresses) {
-            await this.db.query(
+            await executor.query(
                 `
             INSERT INTO "${schemaName}".shipment_stops
             (
@@ -174,7 +184,7 @@ export class ShipmentsRepository {
             stopOrder++;
         }
 
-        await this.db.query(
+        await executor.query(
             `
         INSERT INTO "${schemaName}".shipment_stops
         (
@@ -220,7 +230,7 @@ export class ShipmentsRepository {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await this.db.query(
+        await executor.query(
             `
     update "${schemaName}".shipments
     set
@@ -247,7 +257,7 @@ export class ShipmentsRepository {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await this.db.query(
+        await executor.query(
             `
     update "${schemaName}".shipments
     set
@@ -274,7 +284,7 @@ export class ShipmentsRepository {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await this.db.query(
+        await executor.query(
             `
     update "${schemaName}".shipment_stops
     set
@@ -300,7 +310,7 @@ export class ShipmentsRepository {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await this.db.query(
+        await executor.query(
             `
         update "${schemaName}".shipment_stops
         set
@@ -350,7 +360,7 @@ export class ShipmentsRepository {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await this.db.query(
+        await executor.query(
             `
     update "${schemaName}".shipments
     set
