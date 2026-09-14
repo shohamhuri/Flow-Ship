@@ -157,8 +157,7 @@ export class ShipmentsRepository {
         let stopOrder = 1;
 
         for (const pickupAddress of pickupAddresses) {
-            await executor.query(
-                `
+            await this.db.query(`
             INSERT INTO "${schemaName}".shipment_stops
             (
                 shipment_id,
@@ -184,8 +183,7 @@ export class ShipmentsRepository {
             stopOrder++;
         }
 
-        await executor.query(
-            `
+        await this.db.query(`
         INSERT INTO "${schemaName}".shipment_stops
         (
             shipment_id,
@@ -230,8 +228,7 @@ export class ShipmentsRepository {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await executor.query(
-            `
+        await this.db.query(`
     update "${schemaName}".shipments
     set
       status = 'delivered',
@@ -257,7 +254,7 @@ export class ShipmentsRepository {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await executor.query(
+        await this.db.query(
             `
     update "${schemaName}".shipments
     set
@@ -284,7 +281,7 @@ export class ShipmentsRepository {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await executor.query(
+        await this.db.query(
             `
     update "${schemaName}".shipment_stops
     set
@@ -310,7 +307,7 @@ export class ShipmentsRepository {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await executor.query(
+        await this.db.query(
             `
         update "${schemaName}".shipment_stops
         set
@@ -360,7 +357,7 @@ export class ShipmentsRepository {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await executor.query(
+        await this.db.query(
             `
     update "${schemaName}".shipments
     set
