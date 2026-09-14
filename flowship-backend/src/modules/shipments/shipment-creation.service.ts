@@ -41,44 +41,75 @@ export class ShipmentCreationService {
             );
         }
 
-        const createdShipments: CreatedShipmentResult[] = [];
+        /*
+         * קודם מאמתים את כל הקבוצות.
+         * בשלב הזה אסור לכתוב שום דבר ל-DB.
+         */
+        const validatedGroups =
+            selectedDeliveryOption.selectedGroupQuotes.map(
+                (selectedGroupQuote) => {
+                    const shipmentGroup =
+                        winningPlan.grouping!.shipmentGroups.find(
+                            (group) =>
+                                group.groupId ===
+                                selectedGroupQuote.groupId,
+                        );
+
+                    if (!shipmentGroup) {
+                        throw new Error(
+                            `Shipment group ${selectedGroupQuote.groupId} was not found in plan ${winningPlan.id}`,
+                        );
+                    }
+
+                    if (
+                        !shipmentGroup.sources ||
+                        shipmentGroup.sources.length === 0
+                    ) {
+                        throw new Error(
+                            `Shipment group ${shipmentGroup.groupId} has no supply sources`,
+                        );
+                    }
+
+                    for (
+                        const source of shipmentGroup.sources
+                    ) {
+                        if (!source.location) {
+                            throw new Error(
+                                `Source ${source.id} has no location`,
+                            );
+                        }
+                    }
+
+                    return {
+                        selectedGroupQuote,
+                        shipmentGroup,
+                    };
+                },
+            );
+
+        /*
+         * רק אם כל הקבוצות עברו validation,
+         * מתחילים ליצור shipments.
+         */
+        const createdShipments:
+            CreatedShipmentResult[] = [];
 
         for (
-            const selectedGroupQuote of
-            selectedDeliveryOption.selectedGroupQuotes
+            const {
+                selectedGroupQuote,
+                shipmentGroup,
+            } of validatedGroups
         ) {
-            const shipmentGroup =
-                winningPlan.grouping.shipmentGroups.find(
-                    (group) =>
-                        group.groupId ===
-                        selectedGroupQuote.groupId,
-                );
-
-            if (!shipmentGroup) {
-                throw new Error(
-                    `Shipment group ${selectedGroupQuote.groupId} was not found in plan ${winningPlan.id}`,
-                );
-            }
-
-            /*
-             * Shipment בלי מקור איסוף אינו חוקי.
-             * חשוב לבדוק את זה לפני יצירת רשומת shipment,
-             * כדי לא להשאיר shipment יתום ב-DB.
-             */
-            if (shipmentGroup.sources.length === 0) {
-                throw new Error(
-                    `Shipment group ${shipmentGroup.groupId} has no supply sources`,
-                );
-            }
-
-            const quote = selectedGroupQuote.quote;
+            const quote =
+                selectedGroupQuote.quote;
 
             const shipmentId =
                 await this.shipmentsRepository.createShipment(
                     tenant,
                     {
                         checkoutId,
-                        orderId: checkout.orderId,
+                        orderId:
+                            checkout.orderId,
 
                         shipmentGroupId:
                             shipmentGroup.groupId,
@@ -113,27 +144,32 @@ export class ShipmentCreationService {
                         estimatedDeliveryDays:
                             quote.estimatedDays,
 
-                        status: 'created',
+                        status:
+                            'created',
                     },
                 );
 
-            /*
-             * כרגע ל-SupplySource יש עיר וקואורדינטות,
-             * אך אין בהכרח רחוב ומספר בית.
-             *
-             * לכן שומרים רק את המידע שקיים בפועל,
-             * ולא ממציאים כתובת שאינה קיימת.
-             */
             const pickupAddresses =
                 shipmentGroup.sources.map(
                     (source) => ({
-                        sourceId: source.id,
-                        sourceName: source.name,
-                        sourceType: source.type,
+                        sourceId:
+                            source.id,
 
-                        country: source.location.country,
-                        city: source.location.city,
-                        street: source.location.street,
+                        sourceName:
+                            source.name,
+
+                        sourceType:
+                            source.type,
+
+                        country:
+                            source.location.country,
+
+                        city:
+                            source.location.city,
+
+                        street:
+                            source.location.street,
+
                         houseNumber:
                             source.location.houseNumber,
 
@@ -146,24 +182,33 @@ export class ShipmentCreationService {
                 );
 
             const dropoffAddress = {
-                country: checkout.destination.country,
-                city: checkout.destination.city,
-                street: checkout.destination.street,
+                country:
+                    checkout.destination.country,
+
+                city:
+                    checkout.destination.city,
+
+                street:
+                    checkout.destination.street,
+
                 houseNumber:
                     checkout.destination.houseNumber,
+
                 postalCode:
                     checkout.destination.postalCode,
             };
 
-            await this.shipmentsRepository.createShipmentStops(
-                tenant,
-                shipmentId,
-                pickupAddresses,
-                dropoffAddress,
-            );
+            await this.shipmentsRepository
+                .createShipmentStops(
+                    tenant,
+                    shipmentId,
+                    pickupAddresses,
+                    dropoffAddress,
+                );
 
             createdShipments.push({
                 shipmentId,
+
                 shipmentGroupId:
                     shipmentGroup.groupId,
             });
