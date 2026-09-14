@@ -223,6 +223,8 @@ export class CheckoutService {
             const selectedPlans =
                 this.shipmentPlanEvaluatorService
                     .evaluateAndSelect(validPlans);
+            currentStage =
+                'awaiting_quotes';
             const quotedPlans =
                 await this.shipmentPlanQuoteService
                     .getQuotesForPlans(
