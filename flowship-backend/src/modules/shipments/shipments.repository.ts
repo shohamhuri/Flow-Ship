@@ -232,11 +232,11 @@ export class ShipmentsRepository {
     update "${schemaName}".shipments
     set
       status = 'delivered',
-      delivered_at = $1,
-      failed_at = null,
-      failure_reason = null,
-      updated_at = now()
-    where id = $2
+    delivered_at = coalesce(delivered_at, $1),
+    failed_at = null,
+    failure_reason = null
+where id = $2
+  and status not in ('delivered', 'failed')
     `,
             [
                 deliveredAt,
@@ -258,12 +258,12 @@ export class ShipmentsRepository {
             `
     update "${schemaName}".shipments
     set
-      status = 'failed',
-      failed_at = $1,
-      failure_reason = $2,
-      delivered_at = null,
-      updated_at = now()
-    where id = $3
+       status = 'failed',
+    failed_at = coalesce(failed_at, $1),
+    failure_reason = coalesce(failure_reason, $2),
+    delivered_at = null
+where id = $3
+  and status not in ('delivered', 'failed')
     `,
             [
                 failedAt,
@@ -311,9 +311,9 @@ export class ShipmentsRepository {
             `
         update "${schemaName}".shipment_stops
         set
-            status = 'completed',
-            arrived_at = coalesce(arrived_at, $1),
-            completed_at = $1
+           status = 'completed',
+    arrived_at = coalesce(arrived_at, $1),
+    completed_at = coalesce(completed_at, $1)
         where shipment_id = $2
           and stop_order = $3
           and stop_type = 'pickup'
@@ -361,9 +361,10 @@ export class ShipmentsRepository {
             `
     update "${schemaName}".shipments
     set
-      status = $1,
-      updated_at = now()
+       status = $1,
+        updated_at = now()
     where id = $2
+      and status not in ('delivered', 'failed')
     `,
             [
                 status,
