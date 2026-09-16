@@ -157,8 +157,7 @@ export class ShipmentsRepository {
         let stopOrder = 1;
 
         for (const pickupAddress of pickupAddresses) {
-            await this.db.query(`
-            INSERT INTO "${schemaName}".shipment_stops
+            await executor.query(`            INSERT INTO "${schemaName}".shipment_stops
             (
                 shipment_id,
                 stop_order,
@@ -183,8 +182,7 @@ export class ShipmentsRepository {
             stopOrder++;
         }
 
-        await this.db.query(`
-        INSERT INTO "${schemaName}".shipment_stops
+        await executor.query(`        INSERT INTO "${schemaName}".shipment_stops
         (
             shipment_id,
             stop_order,

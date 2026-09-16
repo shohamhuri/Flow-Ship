@@ -670,6 +670,13 @@ describe('GroupingRulesService', () => {
     });
 
     describe('updateStrategy', () => {
+        beforeEach(() => {
+            repositoryMock
+                .findAllStrategies
+                .mockResolvedValue([
+                    createStrategy(),
+                ]);
+        });
         it('should pass tenant, strategy id and changes to repository', async () => {
             const updatedStrategy =
                 createStrategy({
@@ -758,6 +765,17 @@ describe('GroupingRulesService', () => {
         });
 
         it('should reject an invalid strategy configuration returned after update', async () => {
+            repositoryMock
+                .findAllStrategies
+                .mockResolvedValue([
+                    createStrategy({
+                        strategyKey:
+                            'split_by_max_weight',
+                        config: {
+                            maxWeightKg: 20,
+                        },
+                    }),
+                ]);
             const invalidStrategy =
                 createStrategy({
                     strategyKey:
@@ -790,6 +808,14 @@ describe('GroupingRulesService', () => {
         });
 
         it('should reject an unsupported grouping strategy', async () => {
+            repositoryMock
+                .findAllStrategies
+                .mockResolvedValue([
+                    createStrategy({
+                        strategyKey:
+                            'unsupported_strategy' as any,
+                    }),
+                ]);
             const unsupportedStrategy =
                 createStrategy({
                     strategyKey:

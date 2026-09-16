@@ -20,6 +20,7 @@ type ProviderRow = {
     is_mock: boolean;
     is_active: boolean;
     priority_score: string | number;
+    settings: Record<string, unknown> | null;
     created_at: Date;
     updated_at: Date;
 };
@@ -58,19 +59,23 @@ export class AdminService {
 
         const providers = await this.db.query<ProviderRow>(
             `
-      select
-        id,
-        code,
-        name,
-        adapter_key,
-        is_mock,
-        is_active,
-        priority_score,
-        created_at,
-        updated_at
-      from ${schemaName}.providers
-      order by created_at asc
-      `,
+    select
+        p.id,
+        p.code,
+        p.name,
+        p.adapter_key,
+        p.is_mock,
+        p.is_active,
+        p.priority_score,
+        pc.settings,
+        p.created_at,
+        p.updated_at
+    from ${schemaName}.providers p
+    left join ${schemaName}.provider_configs pc
+        on pc.provider_id = p.id
+        and pc.is_enabled = true
+    order by p.created_at asc
+    `,
         );
 
         return providers.map((provider) => ({
@@ -81,10 +86,12 @@ export class AdminService {
             isMock: provider.is_mock,
             isActive: provider.is_active,
             priorityScore: Number(provider.priority_score),
+            settings: provider.settings ?? null,
             createdAt: provider.created_at,
             updatedAt: provider.updated_at,
         }));
     }
+
     async updateProvider(
         tenant: TenantContext,
         providerId: string,
@@ -137,6 +144,61 @@ export class AdminService {
             priorityScore: Number(provider.priority_score),
             createdAt: provider.created_at,
             updatedAt: provider.updated_at,
+        };
+    }
+    async updateProviderConfig(
+        tenant: TenantContext,
+        providerId: string,
+        dto: {
+            vehicleWeightRules?: {
+                scooterMaxWeightKg: number;
+                carMaxWeightKg: number;
+            };
+            defaultUrgency?: 'urgent' | 'express' | 'standard';
+        },
+    ) {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        const rows = await this.db.query<{
+            id: string;
+            provider_id: string;
+            settings: Record<string, unknown>;
+            is_enabled: boolean;
+            updated_at: Date;
+        }>(
+            `
+        update ${schemaName}.provider_configs
+        set
+            settings = settings || $1::jsonb,
+            updated_at = now()
+        where provider_id = $2
+          and is_enabled = true
+        returning
+            id,
+            provider_id,
+            settings,
+            is_enabled,
+            updated_at
+        `,
+            [
+                JSON.stringify(dto),
+                providerId,
+            ],
+        );
+
+        const config = rows[0];
+
+        if (!config) {
+            return null;
+        }
+
+        return {
+            id: config.id,
+            providerId: config.provider_id,
+            settings: config.settings,
+            isEnabled: config.is_enabled,
+            updatedAt: config.updated_at,
         };
     }
     async getDecisionSettings(tenant: TenantContext) {

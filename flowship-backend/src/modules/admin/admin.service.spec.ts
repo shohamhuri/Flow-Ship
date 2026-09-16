@@ -9,6 +9,7 @@ describe('AdminService', () => {
 
     let dbMock: {
         query: jest.Mock;
+        transaction: jest.Mock;
     };
 
     const tenant = {
@@ -95,6 +96,13 @@ describe('AdminService', () => {
     beforeEach(() => {
         dbMock = {
             query: jest.fn(),
+            transaction: jest.fn(
+                async (callback) => {
+                    return callback({
+                        query: dbMock.query,
+                    });
+                },
+            ),
         };
 
         service = new AdminService(
@@ -126,9 +134,8 @@ describe('AdminService', () => {
             expect(sql).toContain(
                 '"queen".providers',
             );
-
             expect(sql).toContain(
-                'order by created_at asc',
+                'order by p.created_at asc',
             );
         });
 
@@ -151,6 +158,7 @@ describe('AdminService', () => {
                     isMock: true,
                     isActive: true,
                     priorityScore: 0.85,
+                    settings: null,
                     createdAt:
                         providerRow.created_at,
                     updatedAt:
@@ -264,6 +272,87 @@ describe('AdminService', () => {
                     'missing-provider',
                     {
                         isActive: true,
+                    },
+                );
+
+            expect(result).toBeNull();
+        });
+    });
+    describe('updateProviderConfig', () => {
+        it('should update provider config settings', async () => {
+            const updatedAt =
+                new Date('2026-09-16T16:57:35.766Z');
+
+            dbMock.query.mockResolvedValue([
+                {
+                    id: 'config-1',
+                    provider_id: 'provider-1',
+                    settings: {
+                        defaultUrgency: 'urgent',
+                        vehicleWeightRules: {
+                            scooterMaxWeightKg: 10,
+                            carMaxWeightKg: 50,
+                        },
+                    },
+                    is_enabled: true,
+                    updated_at: updatedAt,
+                },
+            ]);
+
+            const result =
+                await service.updateProviderConfig(
+                    tenant,
+                    'provider-1',
+                    {
+                        defaultUrgency: 'urgent',
+                        vehicleWeightRules: {
+                            scooterMaxWeightKg: 10,
+                            carMaxWeightKg: 50,
+                        },
+                    },
+                );
+
+            expect(
+                dbMock.query,
+            ).toHaveBeenCalledWith(
+                expect.stringContaining(
+                    '"queen".provider_configs',
+                ),
+                [
+                    JSON.stringify({
+                        defaultUrgency: 'urgent',
+                        vehicleWeightRules: {
+                            scooterMaxWeightKg: 10,
+                            carMaxWeightKg: 50,
+                        },
+                    }),
+                    'provider-1',
+                ],
+            );
+
+            expect(result).toEqual({
+                id: 'config-1',
+                providerId: 'provider-1',
+                settings: {
+                    defaultUrgency: 'urgent',
+                    vehicleWeightRules: {
+                        scooterMaxWeightKg: 10,
+                        carMaxWeightKg: 50,
+                    },
+                },
+                isEnabled: true,
+                updatedAt,
+            });
+        });
+        it('should return null when provider config does not exist', async () => {
+            dbMock.query.mockResolvedValue([]);
+
+            const result =
+                await service.updateProviderConfig(
+                    tenant,
+                    'missing-provider',
+                    {
+                        defaultUrgency: 'urgent',
                     },
                 );
 

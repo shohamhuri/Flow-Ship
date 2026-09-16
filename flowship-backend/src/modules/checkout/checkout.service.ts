@@ -229,7 +229,7 @@ export class CheckoutService {
                 await this.shipmentPlanQuoteService
                     .getQuotesForPlans(
                         selectedPlans,
-                        checkout.destination.city,
+                        checkout.destination,
                         tenant,
                     );
             const deliveryOptions =

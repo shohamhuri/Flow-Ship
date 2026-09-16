@@ -1082,7 +1082,13 @@ describe('CheckoutService', () => {
                 [
                     validPlan,
                 ],
-                'Tel Aviv',
+                {
+                    city: 'Tel Aviv',
+                    country: 'Israel',
+                    houseNumber: '100',
+                    postalCode: '6100000',
+                    street: 'Dizengoff',
+                },
                 tenant,
             );
         });

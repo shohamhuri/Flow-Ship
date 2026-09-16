@@ -13,7 +13,6 @@ type TenantContext = {
     schemaName: string;
     status: string;
 };
-
 type ProviderRow = {
     id: string;
     code: string;
@@ -22,6 +21,8 @@ type ProviderRow = {
     is_mock: boolean;
     is_active: boolean;
     priority_score: string | number;
+
+    settings: Record<string, unknown> | null;
 };
 
 type ProviderCallStatus = 'success' | 'failed';
@@ -38,12 +39,22 @@ export class CarriersService {
 
         const providers = await this.db.query<ProviderRow>(
             `
-      select id, code, name, adapter_key, is_mock, is_active, priority_score
-      from ${schemaName}.providers
-      where is_active = true
-      `,
+    select
+        p.id,
+        p.code,
+        p.name,
+        p.adapter_key,
+        p.is_mock,
+        p.is_active,
+        p.priority_score,
+        pc.settings
+    from ${schemaName}.providers p
+    left join ${schemaName}.provider_configs pc
+        on pc.provider_id = p.id
+        and pc.is_enabled = true
+    where p.is_active = true
+    `,
         );
-
         const results = await Promise.allSettled(
             providers.map(async (provider) => {
                 const startedAt = Date.now();
@@ -53,8 +64,12 @@ export class CarriersService {
                         provider.adapter_key as CarrierCode,
                     );
 
-                    const quotes = await adapter.getQuote(request);
-
+                    const quotes = await adapter.getQuote(
+                        request,
+                        {
+                            settings: provider.settings,
+                        },
+                    );
                     const responseTimeMs = Date.now() - startedAt;
 
                     const quotesWithProvider = quotes.map((quote) => ({
