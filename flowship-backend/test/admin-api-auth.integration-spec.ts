@@ -515,13 +515,17 @@ describe(
         0.70,
         true
     )
+    on conflict (key)
+    do update set
+        label = excluded.label,
+        description = excluded.description,
+        weight = excluded.weight,
+        is_active = excluded.is_active
     `,
                     [
                         criterionAId,
                     ],
                 );
-
-
                 await db.query(
                     `
     insert into ${schemaB}.decision_criteria (
@@ -540,6 +544,12 @@ describe(
         0.30,
         true
     )
+    on conflict (key)
+    do update set
+        label = excluded.label,
+        description = excluded.description,
+        weight = excluded.weight,
+        is_active = excluded.is_active
     `,
                     [
                         criterionBId,

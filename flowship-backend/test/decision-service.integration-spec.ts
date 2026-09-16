@@ -143,18 +143,17 @@ describe('DecisionService Integration', () => {
          */
         await db.query(
             `
-            update flow_ship_test_a.decision_criteria
-            set is_active = false
-            `,
+    delete from flow_ship_test_a.decision_criteria
+    where key in ('price', 'speed')
+    `,
         );
 
         await db.query(
             `
-            update flow_ship_test_b.decision_criteria
-            set is_active = false
-            `,
+    delete from flow_ship_test_b.decision_criteria
+    where key in ('price', 'speed')
+    `,
         );
-
         await db.query(
             `
             update flow_ship_test_a.decision_priority_cards
@@ -188,65 +187,75 @@ describe('DecisionService Integration', () => {
          */
         await db.query(
             `
-            insert into flow_ship_test_a.decision_criteria (
-                id,
-                key,
-                label,
-                description,
-                weight,
-                is_active
-            )
-            values
-                (
-                    $1,
-                    'price',
-                    'Integration Price A',
-                    'Price criterion A',
-                    0.7,
-                    true
-                ),
-                (
-                    $2,
-                    'speed',
-                    'Integration Speed A',
-                    'Speed criterion A',
-                    0.3,
-                    true
-                )
-            `,
+    insert into flow_ship_test_a.decision_criteria (
+        id,
+        key,
+        label,
+        description,
+        weight,
+        is_active
+    )
+    values
+        (
+            $1,
+            'price',
+            'Integration Price A',
+            'Price criterion A',
+            0.7,
+            true
+        ),
+        (
+            $2,
+            'speed',
+            'Integration Speed A',
+            'Speed criterion A',
+            0.3,
+            true
+        )
+    on conflict (key)
+    do update set
+        label = excluded.label,
+        description = excluded.description,
+        weight = excluded.weight,
+        is_active = excluded.is_active
+    `,
             [
                 criterionAPriceId,
                 criterionASpeedId,
             ],
         );
-
         /*
          * Tenant B
          */
         await db.query(
             `
-            insert into flow_ship_test_b.decision_criteria (
-                id,
-                key,
-                label,
-                description,
-                weight,
-                is_active
-            )
-            values (
-                $1,
-                'price',
-                'Integration Price B',
-                'Price criterion B',
-                0.9,
-                true
-            )
-            `,
+    insert into flow_ship_test_b.decision_criteria (
+        id,
+        key,
+        label,
+        description,
+        weight,
+        is_active
+    )
+    values (
+        $1,
+        'price',
+        'Integration Price B',
+        'Price criterion B',
+        0.9,
+        true
+    )
+    on conflict (key)
+    do update set
+        label = excluded.label,
+        description = excluded.description,
+        weight = excluded.weight,
+        is_active = excluded.is_active
+    `,
             [
                 criterionBPriceId,
             ],
         );
-
         /*
          * Decision settings.
          */
