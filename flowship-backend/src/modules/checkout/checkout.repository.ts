@@ -145,8 +145,7 @@ export class CheckoutRepository {
             `,
             [
                 checkoutId,
-                null,
-                platform,
+                null, platform,
                 checkout.orderId,
                 checkout.orderId,
                 JSON.stringify({}),
