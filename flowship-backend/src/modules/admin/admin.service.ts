@@ -614,22 +614,36 @@ export class AdminService {
         tenant: TenantContext,
         dto: ReorderDecisionPriorityCardsDto,
     ) {
-        const schemaName = this.safeSchemaName(tenant.schemaName);
-
-        for (const card of dto.cards) {
-            await this.db.query(
-                `
-      update ${schemaName}.decision_priority_cards
-      set
-        priority_rank = $1,
-        updated_at = now()
-      where id = $2
-      `,
-                [card.priorityRank, card.id],
+        const schemaName =
+            this.safeSchemaName(
+                tenant.schemaName,
             );
-        }
 
-        return this.getDecisionPriorityCards(tenant);
+        await this.db.transaction(
+            async (executor) => {
+                for (
+                    const card of dto.cards
+                ) {
+                    await executor.query(
+                        `
+                    update ${schemaName}.decision_priority_cards
+                    set
+                        priority_rank = $1,
+                        updated_at = now()
+                    where id = $2
+                    `,
+                        [
+                            card.priorityRank,
+                            card.id,
+                        ],
+                    );
+                }
+            },
+        );
+
+        return this.getDecisionPriorityCards(
+            tenant,
+        );
     }
     async deleteDecisionPriorityCard(
         tenant: TenantContext,
