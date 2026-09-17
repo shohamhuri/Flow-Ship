@@ -163,6 +163,7 @@ describe('AdminService', () => {
                         providerRow.created_at,
                     updatedAt:
                         providerRow.updated_at,
+                    configCapabilities: {},
                 },
             ]);
 

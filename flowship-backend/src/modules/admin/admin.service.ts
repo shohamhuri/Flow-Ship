@@ -23,6 +23,7 @@ type ProviderRow = {
     settings: Record<string, unknown> | null;
     created_at: Date;
     updated_at: Date;
+    config_capabilities: Record<string, boolean>;
 };
 type DecisionSettingsRow = {
     id: string;
@@ -69,7 +70,8 @@ export class AdminService {
         p.priority_score,
         pc.settings,
         p.created_at,
-        p.updated_at
+        p.updated_at,
+        p.config_capabilities
     from ${schemaName}.providers p
     left join ${schemaName}.provider_configs pc
         on pc.provider_id = p.id
@@ -86,6 +88,8 @@ export class AdminService {
             isMock: provider.is_mock,
             isActive: provider.is_active,
             priorityScore: Number(provider.priority_score),
+            configCapabilities:
+                provider.config_capabilities ?? {},
             settings: provider.settings ?? null,
             createdAt: provider.created_at,
             updatedAt: provider.updated_at,

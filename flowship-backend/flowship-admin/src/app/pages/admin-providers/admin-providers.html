@@ -68,57 +68,63 @@
 
                 <tbody>
 
-                    <tr *ngFor="let provider of providers">
+                    <ng-container *ngFor="let provider of providers">
+                        <tr>
 
-                        <td class="provider-name">
-                            {{ provider.name }}
-                        </td>
+                            <td class="provider-name">
+                                {{ provider.name }}
+                            </td>
 
-                        <td class="mono">
-                            {{ provider.code }}
-                        </td>
+                            <td class="mono">
+                                {{ provider.code }}
+                            </td>
 
-                        <td class="mono">
-                            {{ provider.adapterKey }}
-                        </td>
+                            <td class="mono">
+                                {{ provider.adapterKey }}
+                            </td>
 
-                        <td>
-                            <span class="badge" [class.yes]="provider.isMock">
-                                {{ provider.isMock ? 'כן' : 'לא' }}
-                            </span>
-                        </td>
+                            <td>
+                                <span class="badge" [class.yes]="provider.isMock">
+                                    {{ provider.isMock ? 'כן' : 'לא' }}
+                                </span>
+                            </td>
 
-                        <td>
-                            <span class="status" [class.active]="provider.isActive">
-                                {{ provider.isActive ? 'פעיל' : 'כבוי' }}
-                            </span>
-                        </td>
+                            <td>
+                                <span class="status" [class.active]="provider.isActive">
+                                    {{ provider.isActive ? 'פעיל' : 'כבוי' }}
+                                </span>
+                            </td>
 
-                        <td>
-                            <input type="number" min="0" max="1" step="0.1" [(ngModel)]="provider.priorityScore"
-                                class="priority-input" />
-                        </td>
+                            <td>
+                                <input type="number" min="0" max="1" step="0.1" [(ngModel)]="provider.priorityScore"
+                                    class="priority-input" />
+                            </td>
 
-                        <td class="updated-at">
-                            {{ provider.updatedAt | date:'dd/MM/yyyy HH:mm' }}
-                        </td>
+                            <td class="updated-at">
+                                {{ provider.updatedAt | date:'dd/MM/yyyy HH:mm' }}
+                            </td>
 
-                        <td>
-                            <div class="actions">
+                            <td>
+                                <div class="actions">
 
-                                <button type="button" class="secondary-action" (click)="toggleProvider(provider)">
-                                    {{ provider.isActive ? 'כבה' : 'הפעל' }}
-                                </button>
+                                    <button type="button" class="secondary-action" (click)="toggleProvider(provider)">
+                                        {{ provider.isActive ? 'כבה' : 'הפעל' }}
+                                    </button>
 
-                                <button type="button" class="save-action" (click)="savePriority(provider)">
-                                    שמור
-                                </button>
+                                    <button type="button" class="save-action" (click)="savePriority(provider)">
+                                        שמור
+                                    </button>
+                                    <button type="button" class="secondary-action"
+                                        (click)="openProviderSettings(provider)">
+                                        הגדרות
+                                    </button>
+                                </div>
+                            </td>
 
-                            </div>
-                        </td>
+                        </tr>
 
-                    </tr>
 
+                    </ng-container>
                 </tbody>
 
             </table>
@@ -131,4 +137,98 @@
 
     </section>
 
+</div>
+<!-- Delivery Center settings dialog -->
+<div *ngIf="selectedProvider" class="dialog-backdrop" (click)="
+    !savingProviderConfig &&
+    (selectedProvider = null)
+">
+    <div class="provider-settings-dialog" (click)="$event.stopPropagation()">
+        <div class="dialog-header">
+            <div>
+                <h3>הגדרות {{ selectedProvider.name }}</h3>
+                <p>
+                    הגדרות ברירת המחדל לחישוב מחיר המשלוח
+                </p>
+            </div>
+
+            <button type="button" class="dialog-close" [disabled]="savingProviderConfig"
+                (click)="selectedProvider = null">
+                ×
+            </button>
+        </div>
+        <div class="dialog-fields">
+            <div *ngIf="providerConfigError" class="provider-config-error">
+                {{ providerConfigError }}
+            </div>
+            <!-- Provider has configurable settings -->
+            <ng-container *ngIf="selectedProvider.settings as settings">
+
+                <!-- Vehicle weight rules -->
+                <ng-container *ngIf="
+                selectedProvider.configCapabilities['vehicleWeightRules'] &&
+                settings.vehicleWeightRules
+            ">
+                    <label>
+                        <span>משקל מקסימלי לקטנוע (ק״ג)</span>
+
+                        <input type="number" min="0" [disabled]="savingProviderConfig"
+                            [(ngModel)]="settings.vehicleWeightRules.scooterMaxWeightKg"
+                            (ngModelChange)="providerConfigError = ''" />
+                    </label>
+
+                    <label>
+                        <span>משקל מקסימלי לרכב (ק״ג)</span>
+                        <input type="number" min="0" [disabled]="savingProviderConfig"
+                            [(ngModel)]="settings.vehicleWeightRules.carMaxWeightKg"
+                            (ngModelChange)="providerConfigError = ''" />
+                    </label>
+                </ng-container>
+
+                <!-- Default urgency -->
+                <label *ngIf="
+                selectedProvider.configCapabilities['defaultUrgency']
+            ">
+                    <span>סוג משלוח ברירת מחדל</span>
+
+                    <select [disabled]="savingProviderConfig" [(ngModel)]="settings.defaultUrgency">
+                        <option value="urgent">דחוף</option>
+                        <option value="express">מהיום להיום</option>
+                        <option value="standard">ליום הבא</option>
+                    </select>
+                </label>
+
+            </ng-container>
+
+
+            <!-- No configurable settings -->
+            <div *ngIf="
+            !selectedProvider.configCapabilities['vehicleWeightRules'] &&
+            !selectedProvider.configCapabilities['defaultUrgency']
+        " class="no-provider-settings">
+                אין כרגע הגדרות נוספות לניהול עבור ספק זה.
+            </div>
+
+        </div>
+        <div class="dialog-actions">
+            <button type="button" class="secondary-action" [disabled]="savingProviderConfig"
+                (click)="selectedProvider = null">
+                ביטול
+            </button>
+
+            <button *ngIf="
+        selectedProvider.configCapabilities['vehicleWeightRules'] ||
+        selectedProvider.configCapabilities['defaultUrgency']
+    " type="button" class="save-action" [disabled]="savingProviderConfig"
+                (click)="saveProviderConfig(selectedProvider)">
+                <span *ngIf="savingProviderConfig" class="button-spinner"></span>
+
+                {{
+                savingProviderConfig
+                ? 'שומר...'
+                : 'שמור הגדרות'
+                }}
+            </button>
+        </div>
+    </div>
 </div>

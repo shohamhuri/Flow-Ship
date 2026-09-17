@@ -41,6 +41,14 @@ export interface ProviderLogsResponse {
   total: number;
   logs: ProviderCallLog[];
 }
+export type ProviderSettings = {
+  vehicleWeightRules?: {
+    scooterMaxWeightKg: number;
+    carMaxWeightKg: number;
+  };
+  defaultUrgency?: 'urgent' | 'express' | 'standard';
+};
+
 export type AdminProvider = {
   id: string;
   code: string;
@@ -49,8 +57,10 @@ export type AdminProvider = {
   isMock: boolean;
   isActive: boolean;
   priorityScore: number;
+  settings: ProviderSettings | null;
   createdAt: string;
   updatedAt: string;
+  configCapabilities: Record<string, boolean>;
 };
 export type DecisionPriorityCard = {
   id: string;
@@ -486,6 +496,15 @@ export class AdminApiService {
         headers: {
         },
       },
+    );
+  }
+  updateProviderConfig(
+    providerId: string,
+    body: ProviderSettings,
+  ) {
+    return this.http.patch(
+      `${this.baseUrl}/admin/providers/${providerId}/config`,
+      body,
     );
   }
   getDecisionPriorityCards() {
