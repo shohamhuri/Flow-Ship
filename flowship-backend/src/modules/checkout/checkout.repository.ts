@@ -32,8 +32,26 @@ export interface CheckoutDetailsItem {
     unitPrice: number | null;
     supplierId: string | null;
     category: string | null;
-}
 
+    sourcing: CheckoutSourcingResult[];
+}
+export interface CheckoutSourcingResult {
+    sourceId: string;
+    sourceName: string;
+    sourceType: string;
+
+    availableQuantity: number;
+    requestedQuantity: number;
+    hasEnoughStock: boolean;
+
+    priorityScore: number;
+    distanceKm: number | null;
+    distanceScore: number;
+    totalScore: number;
+
+    isSelected: boolean;
+    rejectionReasons: string[];
+}
 export interface CheckoutShipmentGroupItem {
     checkoutItemId: string;
     sku: string;
@@ -367,7 +385,46 @@ export class CheckoutRepository {
         `,
             [checkoutId],
         );
-
+        const sourcingRows =
+            await this.databaseService.query<{
+                checkout_item_id: string;
+                source_id: string;
+                source_name: string;
+                source_type: string;
+                available_quantity: number;
+                requested_quantity: number;
+                has_enough_stock: boolean;
+                priority_score: number;
+                distance_km: number | null;
+                distance_score: number;
+                total_score: number;
+                is_selected: boolean;
+                rejection_reasons: string[];
+            }>(
+                `
+        select
+            checkout_item_id,
+            source_id,
+            source_name,
+            source_type,
+            available_quantity,
+            requested_quantity,
+            has_enough_stock,
+            priority_score,
+            distance_km,
+            distance_score,
+            total_score,
+            is_selected,
+            rejection_reasons
+        from "${schemaName}".checkout_sourcing_results
+        where checkout_id = $1
+        order by
+            checkout_item_id asc,
+            is_selected desc,
+            total_score desc
+        `,
+                [checkoutId],
+            );
         const shipmentGroupRows =
             await this.databaseService.query<{
                 id: string;
@@ -549,8 +606,45 @@ export class CheckoutRepository {
                 unitPrice: item.unit_price,
                 supplierId: item.supplier_id,
                 category: item.category,
-            })),
 
+                sourcing: sourcingRows
+                    .filter(
+                        (source) =>
+                            source.checkout_item_id === item.id,
+                    )
+                    .map((source) => ({
+                        sourceId: source.source_id,
+                        sourceName: source.source_name,
+                        sourceType: source.source_type,
+
+                        availableQuantity:
+                            source.available_quantity,
+
+                        requestedQuantity:
+                            source.requested_quantity,
+
+                        hasEnoughStock:
+                            source.has_enough_stock,
+
+                        priorityScore:
+                            source.priority_score,
+
+                        distanceKm:
+                            source.distance_km,
+
+                        distanceScore:
+                            source.distance_score,
+
+                        totalScore:
+                            source.total_score,
+
+                        isSelected:
+                            source.is_selected,
+
+                        rejectionReasons:
+                            source.rejection_reasons ?? [],
+                    })),
+            })),
             shipmentGroups: shipmentGroupRows.map(
                 (group) => ({
                     id: group.id,

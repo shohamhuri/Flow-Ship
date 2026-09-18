@@ -9,15 +9,19 @@ import {
     CheckoutItem,
 } from '../checkout/interfaces/checkout.interface';
 import { CurrentTenant } from '../tenants/tenants.service';
-import { INVENTORY_PROVIDER } from './sourcing.tokens';
-import type { InventoryProvider } from './interfaces/inventory-provider.interface';
+import {
+    DISTANCE_PROVIDER,
+    INVENTORY_PROVIDER,
+} from './sourcing.tokens'; import type { InventoryProvider } from './interfaces/inventory-provider.interface';
 import {
     ItemSourcingResult,
     RankedSupplySource,
 } from './interfaces/source-ranking.interface';
 import { SourceInventory } from './interfaces/source-inventory.interface';
 import { SupplySource } from './interfaces/supply-source.interface';
-
+import type {
+    DistanceProvider,
+} from './interfaces/distance-provider.interface';
 @Injectable()
 export class SourcingService {
     constructor(
@@ -25,6 +29,8 @@ export class SourcingService {
 
         @Inject(INVENTORY_PROVIDER)
         private readonly inventoryProvider: InventoryProvider,
+        @Inject(DISTANCE_PROVIDER)
+        private readonly distanceProvider: DistanceProvider,
     ) { }
 
     async findSourcesForCheckout(
@@ -42,14 +48,82 @@ export class SourcingService {
                 skus,
             ),
         ]);
+        const distanceEntries = await Promise.all(
+            sources.map(async (source) => {
+                if (!source.isActive) {
+                    return [
+                        source.id,
+                        undefined,
+                    ] as const;
+                }
+                const canSupplyAnyItem = checkout.items.some(
+                    (item) => {
+                        const inventoryRecord = inventory.find(
+                            (record) =>
+                                record.sourceId === source.id &&
+                                record.sku === item.sku,
+                        );
 
+                        const availableQuantity =
+                            inventoryRecord?.availableQuantity ?? 0;
+
+                        return availableQuantity >= item.quantity;
+                    },
+                );
+
+                if (!canSupplyAnyItem) {
+                    return [
+                        source.id,
+                        undefined,
+                    ] as const;
+                }
+                try {
+                    const result =
+                        await this.distanceProvider.getDistance(
+                            source.location,
+                            checkout.destination,
+                        );
+
+                    return [
+                        source.id,
+                        result.distanceKm,
+                    ] as const;
+                } catch (error) {
+                    await this.auditLogsService.createLog({
+                        schemaName: tenant.schemaName,
+                        action: 'sourcing.distance_calculation_failed',
+                        entityType: 'supply_source',
+                        entityId: source.id,
+                        status: 'warning',
+                        metadata: {
+                            storeId: checkout.storeId,
+                            sourceId: source.id,
+                            sourceName: source.name,
+                            error:
+                                error instanceof Error
+                                    ? error.message
+                                    : String(error),
+                        },
+                    });
+
+                    return [
+                        source.id,
+                        undefined,
+                    ] as const;
+                }
+            }),
+        );
+        const distanceBySourceId = new Map(
+            distanceEntries,
+        );
         const results = checkout.items.map((item) =>
             this.findSourceForItem(
                 item,
-                checkout.destination.city,
                 sources,
                 inventory,
-            ),
+                distanceBySourceId,
+            )
+
         );
 
         const unresolvedItems = results
@@ -106,20 +180,18 @@ export class SourcingService {
 
     private findSourceForItem(
         item: CheckoutItem,
-        destinationCity: string,
         sources: SupplySource[],
         inventory: SourceInventory[],
-    ): ItemSourcingResult {
+        distanceBySourceId: Map<string, number | undefined>,): ItemSourcingResult {
         const rankedSources = sources.map((source) =>
             this.rankSource(
                 source,
                 item.sku,
                 item.quantity,
-                destinationCity,
                 inventory,
-            ),
+                distanceBySourceId.get(source.id),
+            )
         );
-
         const possibleSources = rankedSources
             .filter(
                 (rankedSource) =>
@@ -148,8 +220,8 @@ export class SourcingService {
         source: SupplySource,
         sku: string,
         requestedQuantity: number,
-        destinationCity: string,
         inventory: SourceInventory[],
+        distanceKm?: number,
     ): RankedSupplySource {
         const inventoryRecord = inventory.find(
             (record) =>
@@ -179,10 +251,7 @@ export class SourcingService {
             this.calculatePriorityScore(source);
 
         const distanceScore =
-            this.calculateDistanceScore(
-                source,
-                destinationCity,
-            );
+            this.calculateDistanceScore(distanceKm);
 
         const priorityWeight = 0.6;
         const distanceWeight = 0.4;
@@ -200,6 +269,7 @@ export class SourcingService {
             hasEnoughStock,
 
             priorityScore,
+            distanceKm,
             distanceScore,
 
             scoreBreakdown: {
@@ -221,18 +291,19 @@ export class SourcingService {
     }
 
     private calculateDistanceScore(
-        source: SupplySource,
-        destinationCity: string,
+        distanceKm?: number,
     ): number {
-        const sourceCity =
-            source.location.city.trim().toLowerCase();
+        if (
+            distanceKm === undefined ||
+            distanceKm < 0
+        ) {
+            return 0;
+        }
 
-        const targetCity =
-            destinationCity.trim().toLowerCase();
-
-        return sourceCity === targetCity ? 1 : 0.5; // 0.5 אותה עיר → 1 , עיר אחרת 
+        return this.normalizeScore(
+            1 / (1 + distanceKm / 20),
+        );
     }
-
     private normalizeScore(score: number): number {
         if (score < 0) {
             return 0;

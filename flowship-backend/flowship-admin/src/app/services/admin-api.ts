@@ -217,6 +217,23 @@ export interface CheckoutListItem {
   createdAt: string;
   updatedAt: string | null;
 }
+export interface CheckoutSourcingResult {
+  sourceId: string;
+  sourceName: string;
+  sourceType: string;
+
+  availableQuantity: number;
+  requestedQuantity: number;
+  hasEnoughStock: boolean;
+
+  priorityScore: number;
+  distanceKm: number | null;
+  distanceScore: number;
+  totalScore: number;
+
+  isSelected: boolean;
+  rejectionReasons: string[];
+}
 export interface CheckoutDetailsItem {
   id: string;
   sku: string;
@@ -226,8 +243,9 @@ export interface CheckoutDetailsItem {
   unitPrice: string | number | null;
   supplierId: string | null;
   category: string | null;
-}
 
+  sourcing: CheckoutSourcingResult[];
+}
 export interface CheckoutShipmentGroupItem {
   checkoutItemId: string;
   sku: string;

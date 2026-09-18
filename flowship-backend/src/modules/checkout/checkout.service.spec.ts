@@ -49,7 +49,7 @@ import {
 import {
     DecisionService,
 } from '../decision/decision.service';
-
+import { SourcingResultsRepository } from '../sourcing/sourcing-results.repository';
 import {
     ShipmentCreationService,
 } from '../shipments/shipment-creation.service';
@@ -342,7 +342,9 @@ describe('CheckoutService', () => {
             ],
         },
     ] as any;
-
+    const sourcingResultsRepositoryMock = {
+        saveResults: jest.fn(),
+    };
     const deliveryOption = {
         id: 'delivery-option-1',
 
@@ -515,6 +517,7 @@ describe('CheckoutService', () => {
 
         service = new CheckoutService(
             sourcingServiceMock as unknown as SourcingService,
+            sourcingResultsRepositoryMock as unknown as SourcingResultsRepository,
 
             groupingServiceMock as unknown as GroupingService,
 
