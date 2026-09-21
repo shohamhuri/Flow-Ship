@@ -466,6 +466,75 @@
     }
 }
 
+/* DELIVERY URGENCY OPTIONS */
+
+.urgency-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.urgency-title {
+    color: #475569;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.urgency-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.dialog-fields .urgency-option {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    min-height: 44px;
+    padding: 0 12px;
+
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+
+    background: #f8fafc;
+
+    cursor: pointer;
+
+    transition: 0.15s ease;
+
+    &:hover {
+        border-color: #94a3b8;
+        background: #f1f5f9;
+    }
+
+    span {
+        color: #0f2747;
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    input[type='checkbox'] {
+        width: 16px;
+        height: 16px;
+
+        margin: 0;
+        padding: 0;
+
+        flex-shrink: 0;
+
+        accent-color: #0f2747;
+
+        cursor: pointer;
+
+        box-shadow: none;
+    }
+}
+
 .dialog-actions {
     display: flex;
     justify-content: flex-start;

@@ -1,5 +1,6 @@
 import {
     IsIn,
+    IsArray,
     IsNumber,
     IsOptional,
     Min,
@@ -8,6 +9,7 @@ import {
     ValidatorConstraint,
     ValidatorConstraintInterface,
     ValidationArguments,
+    ArrayMinSize,
 } from 'class-validator';
 
 import { Type } from 'class-transformer';
@@ -54,15 +56,18 @@ export class UpdateProviderConfigDto {
     @ValidateNested()
     @Type(() => VehicleWeightRulesDto)
     vehicleWeightRules?: VehicleWeightRulesDto;
-
     @IsOptional()
-    @IsIn([
-        'urgent',
-        'express',
-        'standard',
-    ])
-    defaultUrgency?:
-        | 'urgent'
-        | 'express'
-        | 'standard';
+    @IsArray()
+    @ArrayMinSize(1)
+    @IsIn(
+        [
+            'urgent',
+            'express',
+            'standard',
+        ],
+        { each: true },
+    )
+    allowedUrgencies?: Array<
+        'urgent' | 'express' | 'standard'
+    >;
 }

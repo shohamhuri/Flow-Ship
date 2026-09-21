@@ -49,4 +49,27 @@ describe('UpdateProviderConfigDto', () => {
             }),
         );
     });
+    it('should reject empty allowedUrgencies', async () => {
+        const dto = plainToInstance(
+            UpdateProviderConfigDto,
+            {
+                allowedUrgencies: [],
+            },
+        );
+
+        const errors = await validate(dto);
+
+        expect(errors).toHaveLength(1);
+
+        expect(errors[0].property).toBe(
+            'allowedUrgencies',
+        );
+
+        expect(errors[0].constraints).toEqual(
+            expect.objectContaining({
+                arrayMinSize:
+                    'allowedUrgencies must contain at least 1 elements',
+            }),
+        );
+    });
 });

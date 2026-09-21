@@ -34,7 +34,7 @@ describe('DeliveryCenterAdapter', () => {
                         scooterMaxWeightKg: 10,
                         carMaxWeightKg: 50,
                     },
-                    defaultUrgency: 'urgent',
+                    allowedUrgencies: ['urgent'],
                 },
             },
         );
@@ -72,7 +72,7 @@ describe('DeliveryCenterAdapter', () => {
                         scooterMaxWeightKg: 10,
                         carMaxWeightKg: 50,
                     },
-                    defaultUrgency: 'urgent',
+                    allowedUrgencies: ['urgent'],
                 },
             },
         );
@@ -106,7 +106,7 @@ describe('DeliveryCenterAdapter', () => {
                         scooterMaxWeightKg: 10,
                         carMaxWeightKg: 50,
                     },
-                    defaultUrgency: 'urgent',
+                    allowedUrgencies: ['urgent'],
                 },
             },
         );
@@ -125,7 +125,7 @@ describe('DeliveryCenterAdapter', () => {
             }),
         );
     });
-    it('should use default urgency from provider settings', async () => {
+    it('should use allowed urgency from provider settings', async () => {
         await adapter.getQuote(
             {
                 pickupCities: ['Tel Aviv'],
@@ -140,7 +140,7 @@ describe('DeliveryCenterAdapter', () => {
                         scooterMaxWeightKg: 10,
                         carMaxWeightKg: 50,
                     },
-                    defaultUrgency: 'express',
+                    allowedUrgencies: ['express'],
                 },
             },
         );
@@ -155,6 +155,88 @@ describe('DeliveryCenterAdapter', () => {
                     urgency: 'express',
                 }),
             }),
+        );
+    });
+    it('should request a quote for each allowed urgency', async () => {
+        (global.fetch as jest.Mock)
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    success: true,
+                    price: 120,
+                }),
+            } as Response)
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    success: true,
+                    price: 90,
+                }),
+            } as Response);
+
+        const quotes = await adapter.getQuote(
+            {
+                pickupCities: ['Tel Aviv'],
+                destinationCity: 'Ramat Gan',
+                weightKg: 2,
+                pickupAddress: 'Dizengoff 1, Tel Aviv',
+                destinationAddress: 'Bialik 1, Ramat Gan',
+            },
+            {
+                settings: {
+                    vehicleWeightRules: {
+                        scooterMaxWeightKg: 10,
+                        carMaxWeightKg: 50,
+                    },
+                    allowedUrgencies: [
+                        'urgent',
+                        'express',
+                    ],
+                },
+            },
+        );
+
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+
+        expect(global.fetch).toHaveBeenNthCalledWith(
+            1,
+            'https://delivery.org.il/api/calculate-price',
+            expect.objectContaining({
+                body: JSON.stringify({
+                    pickup_address: 'Dizengoff 1, Tel Aviv',
+                    delivery_address: 'Bialik 1, Ramat Gan',
+                    vehicle_type: 'scooter',
+                    urgency: 'urgent',
+                }),
+            }),
+        );
+
+        expect(global.fetch).toHaveBeenNthCalledWith(
+            2,
+            'https://delivery.org.il/api/calculate-price',
+            expect.objectContaining({
+                body: JSON.stringify({
+                    pickup_address: 'Dizengoff 1, Tel Aviv',
+                    delivery_address: 'Bialik 1, Ramat Gan',
+                    vehicle_type: 'scooter',
+                    urgency: 'express',
+                }),
+            }),
+        );
+
+        expect(quotes).toHaveLength(2);
+
+        expect(quotes).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    serviceName: 'Urgent Delivery',
+                    price: 120,
+                }),
+                expect.objectContaining({
+                    serviceName: 'Express Delivery',
+                    price: 90,
+                }),
+            ]),
         );
     });
     it('should prefer request vehicleType over weight rules', async () => {
@@ -173,7 +255,7 @@ describe('DeliveryCenterAdapter', () => {
                         scooterMaxWeightKg: 10,
                         carMaxWeightKg: 50,
                     },
-                    defaultUrgency: 'urgent',
+                    allowedUrgencies: ['urgent'],
                 },
             },
         );

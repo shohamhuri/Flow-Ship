@@ -185,26 +185,47 @@
                     </label>
                 </ng-container>
 
-                <!-- Default urgency -->
-                <label *ngIf="
-                selectedProvider.configCapabilities['defaultUrgency']
-            ">
-                    <span>סוג משלוח ברירת מחדל</span>
+                <!-- Allowed urgencies -->
+                <div *ngIf="selectedProvider.configCapabilities['allowedUrgencies']" class="urgency-settings">
+                    <span class="urgency-title">
+                        סוגי משלוח זמינים
+                    </span>
 
-                    <select [disabled]="savingProviderConfig" [(ngModel)]="settings.defaultUrgency">
-                        <option value="urgent">דחוף</option>
-                        <option value="express">מהיום להיום</option>
-                        <option value="standard">ליום הבא</option>
-                    </select>
-                </label>
+                    <div class="urgency-options">
 
+                        <label class="urgency-option">
+                            <input type="checkbox" [disabled]="savingProviderConfig"
+                                [checked]="settings.allowedUrgencies?.includes('urgent')"
+                                (change)="toggleAllowedUrgency('urgent', $event)" />
+
+                            <span>דחוף</span>
+                        </label>
+
+                        <label class="urgency-option">
+                            <input type="checkbox" [disabled]="savingProviderConfig"
+                                [checked]="settings.allowedUrgencies?.includes('express')"
+                                (change)="toggleAllowedUrgency('express', $event)" />
+
+                            <span>מהיום להיום</span>
+                        </label>
+
+                        <label class="urgency-option">
+                            <input type="checkbox" [disabled]="savingProviderConfig"
+                                [checked]="settings.allowedUrgencies?.includes('standard')"
+                                (change)="toggleAllowedUrgency('standard', $event)" />
+
+                            <span>ליום הבא</span>
+                        </label>
+
+                    </div>
+                </div>
             </ng-container>
 
 
             <!-- No configurable settings -->
             <div *ngIf="
             !selectedProvider.configCapabilities['vehicleWeightRules'] &&
-            !selectedProvider.configCapabilities['defaultUrgency']
+            !selectedProvider.configCapabilities['allowedUrgencies']
         " class="no-provider-settings">
                 אין כרגע הגדרות נוספות לניהול עבור ספק זה.
             </div>
@@ -218,7 +239,7 @@
 
             <button *ngIf="
         selectedProvider.configCapabilities['vehicleWeightRules'] ||
-        selectedProvider.configCapabilities['defaultUrgency']
+        selectedProvider.configCapabilities['allowedUrgencies']
     " type="button" class="save-action" [disabled]="savingProviderConfig"
                 (click)="saveProviderConfig(selectedProvider)">
                 <span *ngIf="savingProviderConfig" class="button-spinner"></span>

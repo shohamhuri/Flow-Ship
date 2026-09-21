@@ -46,9 +46,11 @@ export type ProviderSettings = {
     scooterMaxWeightKg: number;
     carMaxWeightKg: number;
   };
-  defaultUrgency?: 'urgent' | 'express' | 'standard';
-};
 
+  allowedUrgencies?: Array<
+    'urgent' | 'express' | 'standard'
+  >;
+};
 export type AdminProvider = {
   id: string;
   code: string;

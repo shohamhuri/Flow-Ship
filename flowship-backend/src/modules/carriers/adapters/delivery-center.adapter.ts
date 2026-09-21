@@ -49,7 +49,9 @@ export class DeliveryCenterAdapter implements CarrierAdapter {
                     scooterMaxWeightKg?: number;
                     carMaxWeightKg?: number;
                 };
-                defaultUrgency?: 'urgent' | 'express' | 'standard';
+                allowedUrgencies?: Array<
+                    'urgent' | 'express' | 'standard'
+                >;
             }
             | undefined;
 
@@ -68,71 +70,77 @@ export class DeliveryCenterAdapter implements CarrierAdapter {
                         ? 'car'
                         : 'commercial'
             );
+        const allowedUrgencies =
+            request.urgency
+                ? [request.urgency]
+                : settings?.allowedUrgencies?.length
+                    ? settings.allowedUrgencies
+                    : ['urgent'] as const;
 
-        const urgency =
-            request.urgency ??
-            settings?.defaultUrgency ??
-            'urgent';
-        const deliveryCenterBody = {
-            pickup_address: request.pickupAddress,
-            delivery_address: request.destinationAddress,
-            vehicle_type: vehicleType,
-            urgency,
-        };
+        const quotes = await Promise.all(
+            allowedUrgencies.map(async (urgency) => {
+                const deliveryCenterBody = {
+                    pickup_address: request.pickupAddress,
+                    delivery_address: request.destinationAddress,
+                    vehicle_type: vehicleType,
+                    urgency,
+                };
 
+                const response = await fetch(
+                    this.apiUrl,
+                    {
+                        method: 'POST',
 
-        const response = await fetch(
-            this.apiUrl,
-            {
-                method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
 
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                        body: JSON.stringify(deliveryCenterBody),
+                    },
+                );
 
-                body: JSON.stringify(deliveryCenterBody),
-            },
+                if (!response.ok) {
+                    const body = await response.text();
+
+                    throw new Error(
+                        `Delivery Center API failed for urgency "${urgency}" (${response.status}): ${body}`,
+                    );
+                }
+
+                const data =
+                    (await response.json()) as DeliveryCenterResponse;
+
+                if (
+                    typeof data.price !== 'number' ||
+                    !Number.isFinite(data.price)
+                ) {
+                    throw new Error(
+                        `Delivery Center returned invalid price for urgency "${urgency}"`,
+                    );
+                }
+
+                return {
+                    carrierName: 'Delivery Center',
+
+                    serviceName:
+                        urgency === 'urgent'
+                            ? 'Urgent Delivery'
+                            : urgency === 'express'
+                                ? 'Express Delivery'
+                                : 'Standard Delivery',
+
+                    price: data.price,
+
+                    currency: 'ILS',
+
+                    estimatedDays:
+                        urgency === 'standard'
+                            ? 1
+                            : 0,
+                } satisfies CarrierQuoteOption;
+            }),
         );
 
-        if (!response.ok) {
-            const body = await response.text();
-
-            throw new Error(
-                `Delivery Center API failed (${response.status}): ${body}`,
-            );
-        }
-
-        const data =
-            (await response.json()) as DeliveryCenterResponse;
-
-        if (
-            typeof data.price !== 'number' ||
-            !Number.isFinite(data.price)
-        ) {
-            throw new Error(
-                'Delivery Center returned invalid price',
-            );
-        }
-
-        return [
-            {
-                carrierName: 'Delivery Center',
-
-                serviceName:
-                    urgency === 'urgent'
-                        ? 'Urgent Delivery'
-                        : urgency === 'express'
-                            ? 'Express Delivery'
-                            : 'Standard Delivery',
-
-                price: data.price,
-
-                currency: 'ILS',
-                estimatedDays:
-                    urgency === 'standard'
-                        ? 1
-                        : 0,
-            },
-        ];
+        return quotes;
     }
 }

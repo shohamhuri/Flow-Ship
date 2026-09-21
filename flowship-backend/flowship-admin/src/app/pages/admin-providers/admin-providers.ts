@@ -97,7 +97,15 @@ export class AdminProvidersComponent implements OnInit {
     }
 
     this.providerConfigError = '';
+    if (
+      provider.configCapabilities['allowedUrgencies'] &&
+      !provider.settings.allowedUrgencies?.length
+    ) {
+      this.providerConfigError =
+        'יש לבחור לפחות סוג משלוח אחד.';
 
+      return;
+    }
     const vehicleWeightRules =
       provider.settings.vehicleWeightRules;
 
@@ -153,5 +161,34 @@ export class AdminProvidersComponent implements OnInit {
     this.providerConfigError = '';
 
     this.selectedProvider = structuredClone(provider);
+  }
+  toggleAllowedUrgency(
+    urgency: 'urgent' | 'express' | 'standard',
+    event: Event,
+  ): void {
+    if (!this.selectedProvider?.settings) {
+      return;
+    }
+
+    const checkbox = event.target as HTMLInputElement;
+
+    const current =
+      this.selectedProvider.settings.allowedUrgencies ?? [];
+
+    if (checkbox.checked) {
+      if (!current.includes(urgency)) {
+        this.selectedProvider.settings.allowedUrgencies = [
+          ...current,
+          urgency,
+        ];
+      }
+    } else {
+      this.selectedProvider.settings.allowedUrgencies =
+        current.filter(
+          (item) => item !== urgency,
+        );
+    }
+
+    this.providerConfigError = '';
   }
 }
