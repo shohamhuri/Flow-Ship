@@ -15,7 +15,7 @@ import { ItemSourcingResult } from '../sourcing/interfaces/source-ranking.interf
 import { SourcingService } from '../sourcing/sourcing.service';
 
 import { CurrentTenant } from '../tenants/tenants.service';
-
+import { SourcingResultsRepository } from '../sourcing/sourcing-results.repository';
 import { CheckoutProcessingRepository } from './checkout-processing.repository';
 import {
     CheckoutDetails,
@@ -77,6 +77,8 @@ export class CheckoutService {
 
     constructor(
         private readonly sourcingService: SourcingService,
+        private readonly sourcingResultsRepository:
+            SourcingResultsRepository,
         private readonly groupingService: GroupingService,
 
         private readonly shipmentPlanGeneratorService:
@@ -161,6 +163,14 @@ export class CheckoutService {
                     checkout,
                     tenant,
                 );
+
+            await this.sourcingResultsRepository.saveResults(
+                tenant,
+                checkoutId,
+                sourcing,
+                checkoutItemIdsBySku,
+            );
+
             const activeGroupingStrategies =
                 await this.groupingRulesService
                     .getActiveStrategies(tenant);
@@ -223,11 +233,13 @@ export class CheckoutService {
             const selectedPlans =
                 this.shipmentPlanEvaluatorService
                     .evaluateAndSelect(validPlans);
+            currentStage =
+                'awaiting_quotes';
             const quotedPlans =
                 await this.shipmentPlanQuoteService
                     .getQuotesForPlans(
                         selectedPlans,
-                        checkout.destination.city,
+                        checkout.destination,
                         tenant,
                     );
             const deliveryOptions =

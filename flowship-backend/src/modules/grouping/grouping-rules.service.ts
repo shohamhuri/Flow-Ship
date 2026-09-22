@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { CurrentTenant } from '../tenants/tenants.service';
 import { GroupingStrategySettingsRepository } from './grouping-strategy-settings.repository';
 import {
+    GroupingStrategyConfig,
     GroupingStrategySetting,
 } from './interfaces/grouping-strategy-setting.interface';
 
@@ -131,23 +132,67 @@ export class GroupingRulesService {
             isEnabled?: boolean;
             executionOrder?: number;
             conflictPriority?: number;
-            config?: Record<string, unknown>;
+            config?: GroupingStrategyConfig;
         },
     ): Promise<GroupingStrategySetting | null> {
-        const strategy =
+
+        const strategies =
             await this
                 .groupingStrategySettingsRepository
-                .updateStrategy(
+                .findAllStrategies(
                     tenant,
-                    strategyId,
-                    changes,
                 );
 
-        if (strategy) {
-            this.validateStrategyConfig(strategy);
+        const currentStrategy =
+            strategies.find(
+                (strategy) =>
+                    strategy.id === strategyId,
+            );
+
+        if (!currentStrategy) {
+            return null;
         }
 
-        return strategy;
+        const strategyToValidate: GroupingStrategySetting = {
+            ...currentStrategy,
+
+            displayName:
+                changes.displayName ??
+                currentStrategy.displayName,
+
+            isEnabled:
+                changes.isEnabled ??
+                currentStrategy.isEnabled,
+
+            executionOrder:
+                changes.executionOrder ??
+                currentStrategy.executionOrder,
+
+            conflictPriority:
+                changes.conflictPriority ??
+                currentStrategy.conflictPriority,
+
+            config:
+                changes.config !== undefined
+                    ? changes.config
+                    : currentStrategy.config,
+        };
+
+        /*
+         * חשוב:
+         * validation לפני כתיבה ל-DB.
+         */
+        this.validateStrategyConfig(
+            strategyToValidate,
+        );
+
+        return this
+            .groupingStrategySettingsRepository
+            .updateStrategy(
+                tenant,
+                strategyId,
+                changes,
+            );
     }
     async reorderStrategies(
         tenant: CurrentTenant,

@@ -74,15 +74,20 @@ describe('SourcingService', () => {
             sku,
             availableQuantity,
         }) as any;
-
+    const distanceProviderMock = {
+        getDistance: jest.fn(),
+    };
     beforeEach(() => {
         jest.clearAllMocks();
-
+        distanceProviderMock.getDistance.mockResolvedValue({
+            distanceKm: 20,
+            durationMinutes: 30,
+        });
         service = new SourcingService(
             auditLogsServiceMock as unknown as AuditLogsService,
             inventoryProviderMock as unknown as InventoryProvider,
+            distanceProviderMock,
         );
-
         auditLogsServiceMock.createLog.mockResolvedValue(
             undefined,
         );
@@ -302,16 +307,14 @@ describe('SourcingService', () => {
         ).toBe('source-high');
     });
 
-    it('should give distance score 1 when source city matches destination city', async () => {
-        const checkout = createCheckout(
-            [createItem('SKU-1')],
-            'Tel Aviv',
-        );
+    it('should calculate distance score from real distance', async () => {
+        const checkout = createCheckout([
+            createItem('SKU-1'),
+        ]);
 
         inventoryProviderMock.getSources.mockResolvedValue([
             createSource({
                 id: 'source-1',
-                city: 'Tel Aviv',
             }),
         ]);
 
@@ -323,6 +326,11 @@ describe('SourcingService', () => {
             ),
         ]);
 
+        distanceProviderMock.getDistance.mockResolvedValue({
+            distanceKm: 10,
+            durationMinutes: 15,
+        });
+
         const result =
             await service.findSourcesForCheckout(
                 checkout,
@@ -331,30 +339,142 @@ describe('SourcingService', () => {
 
         expect(
             result[0].selectedSource!.distanceScore,
-        ).toBe(1);
-    });
-
-    it('should compare cities case-insensitively and ignore surrounding spaces', async () => {
-        const checkout = createCheckout(
-            [createItem('SKU-1')],
-            '  TEL AVIV ',
+        ).toBeCloseTo(
+            1 / (1 + 10 / 20),
         );
+        expect(
+            result[0].possibleSources[0].distanceKm,
+        ).toBe(10);
+        expect(
+            distanceProviderMock.getDistance,
+        ).toHaveBeenCalledTimes(1);
+    });
+    it('should continue sourcing when distance calculation fails for one source', async () => {
+        const checkout = createCheckout([
+            createItem('SKU-1'),
+        ]);
+
+        const failedSource = createSource({
+            id: 'source-distance-failed',
+            priority: 0.5,
+        });
+
+        const validSource = createSource({
+            id: 'source-distance-valid',
+            priority: 0.5,
+        });
 
         inventoryProviderMock.getSources.mockResolvedValue([
-            createSource({
-                id: 'source-1',
-                city: ' tel aviv ',
-            }),
+            failedSource,
+            validSource,
         ]);
 
         inventoryProviderMock.getInventory.mockResolvedValue([
             createInventory(
-                'source-1',
+                'source-distance-failed',
+                'SKU-1',
+                10,
+            ),
+            createInventory(
+                'source-distance-valid',
                 'SKU-1',
                 10,
             ),
         ]);
 
+        distanceProviderMock.getDistance
+            .mockRejectedValueOnce(
+                new Error('Google Routes unavailable'),
+            )
+            .mockResolvedValueOnce({
+                distanceKm: 10,
+                durationMinutes: 15,
+            });
+
+        const result =
+            await service.findSourcesForCheckout(
+                checkout,
+                tenant,
+            );
+
+        const failedDistanceSource =
+            result[0].possibleSources.find(
+                (source) =>
+                    source.source.id ===
+                    'source-distance-failed',
+            )!;
+
+        const validDistanceSource =
+            result[0].possibleSources.find(
+                (source) =>
+                    source.source.id ===
+                    'source-distance-valid',
+            )!;
+
+        expect(failedDistanceSource).toBeDefined();
+        expect(
+            failedDistanceSource.distanceKm,
+        ).toBeUndefined();
+
+        expect(
+            failedDistanceSource.distanceScore,
+        ).toBe(0);
+
+        expect(
+            validDistanceSource.distanceKm,
+        ).toBe(10);
+
+        expect(
+            validDistanceSource.distanceScore,
+        ).toBeCloseTo(
+            1 / (1 + 10 / 20),
+        );
+
+        expect(
+            result[0].selectedSource!.source.id,
+        ).toBe('source-distance-valid');
+
+        expect(
+            distanceProviderMock.getDistance,
+        ).toHaveBeenCalledTimes(2);
+    });
+    it('should not calculate distance for an inactive source', async () => {
+        const checkout = createCheckout([
+            createItem('SKU-1'),
+        ]);
+
+        const inactiveSource = createSource({
+            id: 'source-inactive',
+            isActive: false,
+        });
+
+        const activeSource = createSource({
+            id: 'source-active',
+        });
+
+        inventoryProviderMock.getSources.mockResolvedValue([
+            inactiveSource,
+            activeSource,
+        ]);
+
+        inventoryProviderMock.getInventory.mockResolvedValue([
+            createInventory(
+                'source-inactive',
+                'SKU-1',
+                10,
+            ),
+            createInventory(
+                'source-active',
+                'SKU-1',
+                10,
+            ),
+        ]);
+
+        distanceProviderMock.getDistance.mockResolvedValue({
+            distanceKm: 10,
+            durationMinutes: 15,
+        });
+
         const result =
             await service.findSourcesForCheckout(
                 checkout,
@@ -362,11 +482,278 @@ describe('SourcingService', () => {
             );
 
         expect(
-            result[0].selectedSource!.distanceScore,
-        ).toBe(1);
-    });
+            distanceProviderMock.getDistance,
+        ).toHaveBeenCalledTimes(1);
 
-    it('should give distance score 0.5 when source city differs from destination city', async () => {
+        expect(
+            distanceProviderMock.getDistance,
+        ).toHaveBeenCalledWith(
+            activeSource.location,
+            checkout.destination,
+        );
+
+        const rejectedInactiveSource =
+            result[0].rejectedSources.find(
+                (source) =>
+                    source.source.id ===
+                    'source-inactive',
+            );
+
+        expect(rejectedInactiveSource).toBeDefined();
+
+        expect(
+            rejectedInactiveSource!.rejectionReasons,
+        ).toContain('SOURCE_INACTIVE');
+
+        expect(
+            rejectedInactiveSource!.distanceKm,
+        ).toBeUndefined();
+
+        expect(
+            rejectedInactiveSource!.distanceScore,
+        ).toBe(0);
+    });
+    it('should not calculate distance for a source that cannot supply any checkout item', async () => {
+        const checkout = createCheckout([
+            createItem('SKU-1', 5),
+            createItem('SKU-2', 3),
+        ]);
+
+        const insufficientSource = createSource({
+            id: 'source-insufficient',
+        });
+
+        const validSource = createSource({
+            id: 'source-valid',
+        });
+
+        inventoryProviderMock.getSources.mockResolvedValue([
+            insufficientSource,
+            validSource,
+        ]);
+
+        inventoryProviderMock.getInventory.mockResolvedValue([
+            createInventory(
+                'source-insufficient',
+                'SKU-1',
+                2,
+            ),
+            createInventory(
+                'source-insufficient',
+                'SKU-2',
+                1,
+            ),
+            createInventory(
+                'source-valid',
+                'SKU-1',
+                10,
+            ),
+            createInventory(
+                'source-valid',
+                'SKU-2',
+                10,
+            ),
+        ]);
+
+        distanceProviderMock.getDistance.mockResolvedValue({
+            distanceKm: 10,
+            durationMinutes: 15,
+        });
+
+        await service.findSourcesForCheckout(
+            checkout,
+            tenant,
+        );
+
+        expect(
+            distanceProviderMock.getDistance,
+        ).toHaveBeenCalledTimes(1);
+
+        expect(
+            distanceProviderMock.getDistance,
+        ).toHaveBeenCalledWith(
+            validSource.location,
+            checkout.destination,
+        );
+    });
+    it('should calculate distance when a source can supply at least one checkout item', async () => {
+        const checkout = createCheckout([
+            createItem('SKU-1', 5),
+            createItem('SKU-2', 3),
+        ]);
+
+        const partialSource = createSource({
+            id: 'source-partial',
+        });
+
+        inventoryProviderMock.getSources.mockResolvedValue([
+            partialSource,
+        ]);
+
+        inventoryProviderMock.getInventory.mockResolvedValue([
+            // Not enough for SKU-1
+            createInventory(
+                'source-partial',
+                'SKU-1',
+                2,
+            ),
+
+            // Enough for SKU-2
+            createInventory(
+                'source-partial',
+                'SKU-2',
+                10,
+            ),
+        ]);
+
+        distanceProviderMock.getDistance.mockResolvedValue({
+            distanceKm: 15,
+            durationMinutes: 20,
+        });
+
+        const result =
+            await service.findSourcesForCheckout(
+                checkout,
+                tenant,
+            );
+
+        expect(
+            distanceProviderMock.getDistance,
+        ).toHaveBeenCalledTimes(1);
+
+        expect(
+            distanceProviderMock.getDistance,
+        ).toHaveBeenCalledWith(
+            partialSource.location,
+            checkout.destination,
+        );
+
+        expect(
+            result[1].selectedSource?.source.id,
+        ).toBe('source-partial');
+
+        expect(
+            result[1].selectedSource?.distanceKm,
+        ).toBe(15);
+    });
+    it('should create audit log when distance calculation fails', async () => {
+        const checkout = createCheckout([
+            createItem('SKU-1'),
+        ]);
+
+        const source = createSource({
+            id: 'source-distance-failed',
+        });
+
+        inventoryProviderMock.getSources.mockResolvedValue([
+            source,
+        ]);
+
+        inventoryProviderMock.getInventory.mockResolvedValue([
+            createInventory(
+                'source-distance-failed',
+                'SKU-1',
+                10,
+            ),
+        ]);
+
+        distanceProviderMock.getDistance.mockRejectedValue(
+            new Error('Google Routes unavailable'),
+        );
+
+        await service.findSourcesForCheckout(
+            checkout,
+            tenant,
+        );
+
+        expect(
+            auditLogsServiceMock.createLog,
+        ).toHaveBeenCalledWith({
+            schemaName: 'queen',
+            action: 'sourcing.distance_calculation_failed',
+            entityType: 'supply_source',
+            entityId: 'source-distance-failed',
+            status: 'warning',
+            metadata: {
+                storeId: 'store-1',
+                sourceId: 'source-distance-failed',
+                sourceName: 'Source source-distance-failed',
+                error: 'Google Routes unavailable',
+            },
+        });
+    });
+    it('should give a higher distance score to a closer source', async () => {
+        const checkout = createCheckout([
+            createItem('SKU-1'),
+        ]);
+
+        const closeSource = createSource({
+            id: 'source-close',
+            priority: 0.5,
+        });
+
+        const farSource = createSource({
+            id: 'source-far',
+            priority: 0.5,
+        });
+
+        inventoryProviderMock.getSources.mockResolvedValue([
+            closeSource,
+            farSource,
+        ]);
+
+        inventoryProviderMock.getInventory.mockResolvedValue([
+            createInventory(
+                'source-close',
+                'SKU-1',
+                10,
+            ),
+            createInventory(
+                'source-far',
+                'SKU-1',
+                10,
+            ),
+        ]);
+
+        distanceProviderMock.getDistance
+            .mockResolvedValueOnce({
+                distanceKm: 5,
+                durationMinutes: 10,
+            })
+            .mockResolvedValueOnce({
+                distanceKm: 40,
+                durationMinutes: 50,
+            });
+
+        const result =
+            await service.findSourcesForCheckout(
+                checkout,
+                tenant,
+            );
+
+        const close =
+            result[0].possibleSources.find(
+                (source) =>
+                    source.source.id === 'source-close',
+            )!;
+
+        const far =
+            result[0].possibleSources.find(
+                (source) =>
+                    source.source.id === 'source-far',
+            )!;
+
+        expect(
+            close.distanceScore,
+        ).toBeGreaterThan(
+            far.distanceScore,
+        );
+
+        expect(
+            result[0].selectedSource!.source.id,
+        ).toBe('source-close');
+    });
+    it('should give distance score 0.5 for a 20 km distance', async () => {
         const checkout = createCheckout(
             [createItem('SKU-1')],
             'Tel Aviv',
@@ -386,7 +773,10 @@ describe('SourcingService', () => {
                 10,
             ),
         ]);
-
+        distanceProviderMock.getDistance.mockResolvedValue({
+            distanceKm: 20,
+            durationMinutes: 30,
+        });
         const result =
             await service.findSourcesForCheckout(
                 checkout,
@@ -481,7 +871,10 @@ describe('SourcingService', () => {
                 10,
             ),
         ]);
-
+        distanceProviderMock.getDistance.mockResolvedValue({
+            distanceKm: 20,
+            durationMinutes: 30,
+        });
         const result =
             await service.findSourcesForCheckout(
                 checkout,
@@ -489,17 +882,18 @@ describe('SourcingService', () => {
             );
 
         // priority: 0.5 * 0.6 = 0.3
-        // distance: 1 * 0.4 = 0.4
-        // total = 0.7
+        // distance: 0.5 * 0.4 = 0.2
+        // total = 0.5
+
         expect(
             result[0].selectedSource!.totalScore,
-        ).toBe(0.7);
+        ).toBe(0.5);
 
         expect(
             result[0].selectedSource!.scoreBreakdown,
         ).toEqual({
             priority: 0.5,
-            distance: 1,
+            distance: 0.5,
         });
     });
 

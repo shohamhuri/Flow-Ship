@@ -6,6 +6,12 @@ export interface CarrierQuoteRequest {
     pickupCities: string[];
     destinationCity: string;
     weightKg: number;
+
+    pickupAddress?: string;
+    destinationAddress?: string;
+
+    vehicleType?: 'scooter' | 'car' | 'commercial';
+    urgency?: 'urgent' | 'express' | 'standard';
 }
 
 export interface CarrierQuoteOption {
@@ -20,8 +26,15 @@ export interface CarrierQuoteOption {
     adapterKey?: string;
 }
 
+export interface CarrierAdapterConfig {
+    settings?: Record<string, unknown> | null;
+}
+
 export interface CarrierAdapter {
     code: CarrierCode;
 
-    getQuote(request: CarrierQuoteRequest): Promise<CarrierQuoteOption[]>;
+    getQuote(
+        request: CarrierQuoteRequest,
+        config?: CarrierAdapterConfig,
+    ): Promise<CarrierQuoteOption[]>;
 }

@@ -3,7 +3,9 @@ import { MockCarrierAdapter } from './adapters/mock-carrier.adapter';
 import { MockYangoAdapter } from './adapters/mock-yango.adapter';
 import { CarrierCode } from './enums/carrier-code.enum';
 import { CarrierAdapter } from './interfaces/carrier-adapter.interface';
-
+import {
+    DeliveryCenterAdapter,
+} from './adapters/delivery-center.adapter';
 @Injectable()
 export class CarrierRegistry {
     private readonly adapters: Map<CarrierCode, CarrierAdapter>;
@@ -11,10 +13,15 @@ export class CarrierRegistry {
     constructor(
         private readonly mockCarrierAdapter: MockCarrierAdapter,
         private readonly mockYangoAdapter: MockYangoAdapter,
+        private readonly deliveryCenterAdapter: DeliveryCenterAdapter,
     ) {
         this.adapters = new Map<CarrierCode, CarrierAdapter>([
             [this.mockCarrierAdapter.code, this.mockCarrierAdapter],
             [this.mockYangoAdapter.code, this.mockYangoAdapter],
+            [
+                this.deliveryCenterAdapter.code,
+                this.deliveryCenterAdapter,
+            ],
         ]);
     }
 

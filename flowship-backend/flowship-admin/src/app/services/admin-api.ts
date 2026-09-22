@@ -41,6 +41,16 @@ export interface ProviderLogsResponse {
   total: number;
   logs: ProviderCallLog[];
 }
+export type ProviderSettings = {
+  vehicleWeightRules?: {
+    scooterMaxWeightKg: number;
+    carMaxWeightKg: number;
+  };
+
+  allowedUrgencies?: Array<
+    'urgent' | 'express' | 'standard'
+  >;
+};
 export type AdminProvider = {
   id: string;
   code: string;
@@ -49,8 +59,10 @@ export type AdminProvider = {
   isMock: boolean;
   isActive: boolean;
   priorityScore: number;
+  settings: ProviderSettings | null;
   createdAt: string;
   updatedAt: string;
+  configCapabilities: Record<string, boolean>;
 };
 export type DecisionPriorityCard = {
   id: string;
@@ -207,6 +219,23 @@ export interface CheckoutListItem {
   createdAt: string;
   updatedAt: string | null;
 }
+export interface CheckoutSourcingResult {
+  sourceId: string;
+  sourceName: string;
+  sourceType: string;
+
+  availableQuantity: number;
+  requestedQuantity: number;
+  hasEnoughStock: boolean;
+
+  priorityScore: number;
+  distanceKm: number | null;
+  distanceScore: number;
+  totalScore: number;
+
+  isSelected: boolean;
+  rejectionReasons: string[];
+}
 export interface CheckoutDetailsItem {
   id: string;
   sku: string;
@@ -216,8 +245,9 @@ export interface CheckoutDetailsItem {
   unitPrice: string | number | null;
   supplierId: string | null;
   category: string | null;
-}
 
+  sourcing: CheckoutSourcingResult[];
+}
 export interface CheckoutShipmentGroupItem {
   checkoutItemId: string;
   sku: string;
@@ -486,6 +516,15 @@ export class AdminApiService {
         headers: {
         },
       },
+    );
+  }
+  updateProviderConfig(
+    providerId: string,
+    body: ProviderSettings,
+  ) {
+    return this.http.patch(
+      `${this.baseUrl}/admin/providers/${providerId}/config`,
+      body,
     );
   }
   getDecisionPriorityCards() {

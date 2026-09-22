@@ -249,5 +249,32 @@ export class CheckoutDetailsComponent implements OnInit {
         return reason;
     }
   }
+  getSourcingRejectionReasonLabel(
+    reason: string,
+  ): string {
+    switch (reason) {
+      case 'SOURCE_INACTIVE':
+        return 'מקור האספקה אינו פעיל';
 
+      case 'INSUFFICIENT_INVENTORY':
+        return 'אין מספיק מלאי';
+
+      default:
+        return reason;
+    }
+  }
+  getSourceTypeLabel(
+    sourceType: string,
+  ): string {
+    switch (sourceType) {
+      case 'warehouse':
+        return 'מחסן';
+
+      case 'branch':
+        return 'סניף';
+
+      default:
+        return sourceType;
+    }
+  }
 }

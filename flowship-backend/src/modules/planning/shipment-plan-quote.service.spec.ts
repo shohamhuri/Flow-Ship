@@ -3,7 +3,13 @@ import { CarriersService } from '../carriers/carriers.service';
 
 describe('ShipmentPlanQuoteService', () => {
     let service: ShipmentPlanQuoteService;
-
+    const destination = {
+        country: 'Israel',
+        city: 'Tel Aviv',
+        street: 'Dizengoff',
+        houseNumber: '50',
+        postalCode: '6433222',
+    };
     const carriersServiceMock = {
         getQuotes: jest.fn(),
     };
@@ -25,10 +31,12 @@ describe('ShipmentPlanQuoteService', () => {
             isActive: true,
             priority: 0.8,
             location: {
+                country: 'Israel',
                 city,
+                street: 'Test Street',
+                houseNumber: '10',
             },
         }) as any;
-
     const createGroup = ({
         groupId,
         sources,
@@ -108,7 +116,7 @@ describe('ShipmentPlanQuoteService', () => {
         const result =
             await service.getQuotesForPlans(
                 [],
-                'Tel Aviv',
+                destination,
                 tenant,
             );
 
@@ -148,7 +156,7 @@ describe('ShipmentPlanQuoteService', () => {
 
         await service.getQuotesForPlans(
             [plan],
-            'Tel Aviv',
+            destination,
             tenant,
         );
 
@@ -162,6 +170,10 @@ describe('ShipmentPlanQuoteService', () => {
                 destinationCity:
                     'Tel Aviv',
                 weightKg: 7,
+                pickupAddress:
+                    'Test Street 10, Jerusalem',
+                destinationAddress:
+                    'Dizengoff 50, Tel Aviv',
             },
             tenant,
         );
@@ -200,7 +212,7 @@ describe('ShipmentPlanQuoteService', () => {
 
         await service.getQuotesForPlans(
             [plan],
-            'Tel Aviv',
+            destination,
             tenant,
         );
 
@@ -215,6 +227,10 @@ describe('ShipmentPlanQuoteService', () => {
                 destinationCity:
                     'Tel Aviv',
                 weightKg: 12,
+                pickupAddress:
+                    'Test Street 10, Netivot | Test Street 10, Beer Sheva',
+                destinationAddress:
+                    'Dizengoff 50, Tel Aviv',
             },
             tenant,
         );
@@ -257,7 +273,7 @@ describe('ShipmentPlanQuoteService', () => {
         const result =
             await service.getQuotesForPlans(
                 [plan],
-                'Tel Aviv',
+                destination,
                 tenant,
             );
 
@@ -311,7 +327,7 @@ describe('ShipmentPlanQuoteService', () => {
         const result =
             await service.getQuotesForPlans(
                 [plan],
-                'Tel Aviv',
+                destination,
                 tenant,
             );
 
@@ -373,7 +389,7 @@ describe('ShipmentPlanQuoteService', () => {
         const result =
             await service.getQuotesForPlans(
                 [plan],
-                'Tel Aviv',
+                destination,
                 tenant,
             );
 
@@ -426,7 +442,7 @@ describe('ShipmentPlanQuoteService', () => {
         const result =
             await service.getQuotesForPlans(
                 [plan],
-                'Tel Aviv',
+                destination,
                 tenant,
             );
 
@@ -471,7 +487,7 @@ describe('ShipmentPlanQuoteService', () => {
         const result =
             await service.getQuotesForPlans(
                 [plan],
-                'Tel Aviv',
+                destination,
                 tenant,
             );
 
@@ -528,7 +544,7 @@ describe('ShipmentPlanQuoteService', () => {
         const result =
             await service.getQuotesForPlans(
                 [plan],
-                'Tel Aviv',
+                destination,
                 tenant,
             );
 
@@ -593,7 +609,7 @@ describe('ShipmentPlanQuoteService', () => {
         const result =
             await service.getQuotesForPlans(
                 [plan],
-                'Tel Aviv',
+                destination,
                 tenant,
             );
 
@@ -663,7 +679,7 @@ describe('ShipmentPlanQuoteService', () => {
                     plan1,
                     plan2,
                 ],
-                'Tel Aviv',
+                destination,
                 tenant,
             );
 
@@ -712,7 +728,7 @@ describe('ShipmentPlanQuoteService', () => {
         const result =
             await service.getQuotesForPlans(
                 [plan],
-                'Tel Aviv',
+                destination,
                 tenant,
             );
 

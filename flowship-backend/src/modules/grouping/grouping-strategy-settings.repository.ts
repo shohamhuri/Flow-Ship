@@ -205,24 +205,30 @@ export class GroupingStrategySettingsRepository {
             conflictPriority: number;
         }>,
     ): Promise<GroupingStrategySetting[]> {
-        for (const item of items) {
-            await this.databaseService.query(
-                `
-      update ${tenant.schemaName}.grouping_strategy_settings
-      set
-        execution_order = $1,
-        conflict_priority = $2,
-        updated_at = now()
-      where id = $3
-      `,
-                [
-                    item.executionOrder,
-                    item.conflictPriority,
-                    item.id,
-                ],
-            );
-        }
+        await this.databaseService.transaction(
+            async (executor) => {
+                for (const item of items) {
+                    await executor.query(
+                        `
+                    update ${tenant.schemaName}.grouping_strategy_settings
+                    set
+                        execution_order = $1,
+                        conflict_priority = $2,
+                        updated_at = now()
+                    where id = $3
+                    `,
+                        [
+                            item.executionOrder,
+                            item.conflictPriority,
+                            item.id,
+                        ],
+                    );
+                }
+            },
+        );
 
-        return this.findAllStrategies(tenant);
+        return this.findAllStrategies(
+            tenant,
+        );
     }
 }

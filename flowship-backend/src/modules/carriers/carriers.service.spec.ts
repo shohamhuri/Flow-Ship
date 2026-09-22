@@ -69,7 +69,7 @@ describe('CarriersService', () => {
             const [sql] = dbQueryMock.mock.calls[0];
 
             expect(sql).toContain('from "flow_ship_test".providers');
-            expect(sql).toContain('where is_active = true');
+            expect(sql).toContain('where p.is_active = true');
         });
 
         it('should return an empty result when there are no active providers', async () => {
@@ -105,7 +105,12 @@ describe('CarriersService', () => {
             await service.getQuotes(request, tenant);
 
             expect(getAdapterMock).toHaveBeenCalledWith(CarrierCode.MOCK);
-            expect(adapter.getQuote).toHaveBeenCalledWith(request);
+            expect(adapter.getQuote).toHaveBeenCalledWith(
+                request,
+                {
+                    settings: undefined,
+                },
+            );
         });
 
         it('should enrich returned quotes with provider metadata', async () => {

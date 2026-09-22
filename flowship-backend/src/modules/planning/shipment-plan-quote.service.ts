@@ -8,7 +8,7 @@ import {
     QuotedShipmentPlan,
     ShipmentGroupQuoteResult,
 } from './interfaces/shipment-plan-quote.interface';
-
+import { CheckoutDestination } from '../checkout/interfaces/checkout.interface';
 @Injectable()
 export class ShipmentPlanQuoteService {
     constructor(
@@ -17,14 +17,13 @@ export class ShipmentPlanQuoteService {
 
     async getQuotesForPlans(
         plans: ShipmentPlanCandidate[],
-        destinationCity: string,
-        tenant: CurrentTenant,
+        destination: CheckoutDestination, tenant: CurrentTenant,
     ): Promise<QuotedShipmentPlan[]> {
         return Promise.all(
             plans.map((plan) =>
                 this.getQuotesForPlan(
                     plan,
-                    destinationCity,
+                    destination,
                     tenant,
                 ),
             ),
@@ -33,8 +32,7 @@ export class ShipmentPlanQuoteService {
 
     private async getQuotesForPlan(
         plan: ShipmentPlanCandidate,
-        destinationCity: string,
-        tenant: CurrentTenant,
+        destination: CheckoutDestination, tenant: CurrentTenant,
     ): Promise<QuotedShipmentPlan> {
         const shipmentGroups =
             plan.grouping?.shipmentGroups ?? [];
@@ -43,7 +41,7 @@ export class ShipmentPlanQuoteService {
             shipmentGroups.map((group) =>
                 this.getQuotesForGroup(
                     group,
-                    destinationCity,
+                    destination,
                     tenant,
                 ),
             ),
@@ -100,8 +98,7 @@ export class ShipmentPlanQuoteService {
         group: NonNullable<
             ShipmentPlanCandidate['grouping']
         >['shipmentGroups'][number],
-        destinationCity: string,
-        tenant: CurrentTenant,
+        destination: CheckoutDestination, tenant: CurrentTenant,
     ): Promise<ShipmentGroupQuoteResult> {
         if (group.sources.length === 0) {
             throw new Error(
@@ -114,13 +111,24 @@ export class ShipmentPlanQuoteService {
                 (source) =>
                     source.location.city,
             );
+        const pickupAddress =
+            group.sources
+                .map(
+                    (source) =>
+                        `${source.location.street} ${source.location.houseNumber}, ${source.location.city}`,
+                )
+                .join(' | ');
 
+        const destinationAddress =
+            `${destination.street} ${destination.houseNumber}, ${destination.city}`;
         const result =
             await this.carriersService.getQuotes(
                 {
                     pickupCities,
-                    destinationCity,
+                    destinationCity: destination.city,
                     weightKg: group.totalWeight,
+                    pickupAddress,
+                    destinationAddress,
                 },
                 tenant,
             );
@@ -129,7 +137,7 @@ export class ShipmentPlanQuoteService {
             groupId: group.groupId,
 
             pickupCities,
-            destinationCity,
+            destinationCity: destination.city,
             weightKg: group.totalWeight,
 
             quotes: result.quotes,

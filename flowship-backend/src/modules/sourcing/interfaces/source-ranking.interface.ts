@@ -14,6 +14,8 @@ export interface RankedSupplySource {
     hasEnoughStock: boolean;
 
     priorityScore: number;
+
+    distanceKm?: number;
     distanceScore: number;
 
     scoreBreakdown: ScoreBreakdown;
@@ -22,7 +24,6 @@ export interface RankedSupplySource {
 
     rejectionReasons: string[];
 }
-
 export interface ItemSourcingResult {
     sku: string;
     requestedQuantity: number;

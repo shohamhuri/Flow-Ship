@@ -135,29 +135,116 @@
                     </thead>
 
                     <tbody>
-                        <tr *ngFor="let item of checkout.items">
-                            <td>{{ item.sku }}</td>
-                            <td>{{ item.name }}</td>
-                            <td>{{ item.quantity }}</td>
-                            <td>
-                                {{
-                                +item.unitPrice!
-                                | currency:
-                                'ILS':
-                                'symbol':
-                                '1.2-2'
-                                }}
-                            </td>
-                            <td>
-                                {{ item.unitWeight }} ק״ג
-                            </td>
-                            <td>
-                                {{ item.supplierId || '—' }}
-                            </td>
-                            <td>
-                                {{ item.category || '—' }}
-                            </td>
-                        </tr>
+                        <ng-container *ngFor="let item of checkout.items">
+
+                            <!-- פרטי המוצר -->
+                            <tr>
+                                <td>{{ item.sku }}</td>
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.quantity }}</td>
+
+                                <td>
+                                    {{
+                                    +item.unitPrice!
+                                    | currency:
+                                    'ILS':
+                                    'symbol':
+                                    '1.2-2'
+                                    }}
+                                </td>
+
+                                <td>
+                                    {{ item.unitWeight }} ק״ג
+                                </td>
+
+                                <td>
+                                    {{ item.supplierId || '—' }}
+                                </td>
+
+                                <td>
+                                    {{ item.category || '—' }}
+                                </td>
+                            </tr>
+
+                            <!-- פירוט בחירת מקור -->
+                            <tr *ngIf="item.sourcing.length">
+                                <td colspan="7">
+
+                                    <div class="sourcing-details">
+
+                                        <div class="sourcing-title">
+                                            בחירת מקור אספקה
+                                        </div>
+
+                                        <div class="sourcing-sources">
+
+                                            <div *ngFor="let source of item.sourcing" class="sourcing-source"
+                                                [class.sourcing-source-selected]="source.isSelected">
+
+                                                <div class="sourcing-source-header">
+                                                    <strong>
+                                                        {{ source.sourceName }}
+                                                    </strong>
+
+                                                    <span *ngIf="source.isSelected">
+                                                        ✓ נבחר
+                                                    </span>
+                                                </div>
+
+                                                <div class="sourcing-source-data">
+
+                                                    <span>
+                                                        סוג:
+                                                        {{ getSourceTypeLabel(source.sourceType) }} </span>
+
+                                                    <span>
+                                                        מרחק:
+                                                        {{
+                                                        source.distanceKm !== null
+                                                        ? (source.distanceKm | number:'1.0-2') + ' ק״מ'
+                                                        : 'לא זמין'
+                                                        }}
+                                                    </span>
+
+                                                    <span>
+                                                        מלאי:
+                                                        {{ source.availableQuantity }}
+                                                        /
+                                                        נדרש {{ source.requestedQuantity }}
+                                                    </span>
+
+                                                    <span>
+                                                        ציון עדיפות:
+                                                        {{ source.priorityScore | number:'1.2-2' }}
+                                                    </span>
+
+                                                    <span>
+                                                        ציון מרחק:
+                                                        {{ source.distanceScore | number:'1.2-2' }}
+                                                    </span>
+
+                                                    <span>
+                                                        ציון כולל:
+                                                        {{ source.totalScore | number:'1.3-3' }}
+                                                    </span>
+
+                                                </div>
+
+                                                <div *ngIf="source.rejectionReasons.length" class="sourcing-rejection">
+                                                    <span *ngFor="let reason of source.rejectionReasons">
+                                                        {{ getSourcingRejectionReasonLabel(reason) }} </span>
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </td>
+                            </tr>
+
+                        </ng-container>
                     </tbody>
                 </table>
             </div>

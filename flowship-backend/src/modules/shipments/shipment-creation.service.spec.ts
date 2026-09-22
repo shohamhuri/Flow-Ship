@@ -1,6 +1,6 @@
 import { ShipmentCreationService } from './shipment-creation.service';
 import { ShipmentsRepository } from './shipments.repository';
-
+import { DbService } from '../../infrastructure/database/db.service';
 describe('ShipmentCreationService', () => {
     let service: ShipmentCreationService;
 
@@ -155,10 +155,19 @@ describe('ShipmentCreationService', () => {
             createShipmentStops:
                 createShipmentStopsMock,
         } as unknown as ShipmentsRepository;
-
+        const dbMock = {
+            transaction: jest.fn(
+                async (callback) => {
+                    return callback({
+                        query: jest.fn(),
+                    });
+                },
+            ),
+        } as unknown as DbService;
         service =
             new ShipmentCreationService(
                 repositoryMock,
+                dbMock,
             );
     });
 
@@ -332,6 +341,9 @@ describe('ShipmentCreationService', () => {
                 status:
                     'created',
             },
+            expect.objectContaining({
+                query: expect.any(Function),
+            }),
         );
     });
 

@@ -6,6 +6,7 @@ import { CarrierRegistry } from './carrier-registry.service';
 import { CarriersController } from './carriers.controller';
 import { CarriersService } from './carriers.service';
 import { MockYangoAdapter } from './adapters/mock-yango.adapter';
+import { DeliveryCenterAdapter } from './adapters/delivery-center.adapter';
 
 @Module({
   imports: [DatabaseModule, TenantsModule],
@@ -15,6 +16,7 @@ import { MockYangoAdapter } from './adapters/mock-yango.adapter';
     CarrierRegistry,
     MockCarrierAdapter,
     MockYangoAdapter,
+    DeliveryCenterAdapter,
 
   ],
   exports: [CarriersService],

@@ -31,6 +31,7 @@ import { UpdateDecisionCriterionDto } from './dto/update-decision-criterion.dto'
 import { CreateDecisionPriorityCardDto } from './dto/create-decision-priority-card.dto';
 import { UpdateDecisionPriorityCardDto } from './dto/update-decision-priority-card.dto';
 import { ReorderDecisionPriorityCardsDto } from './dto/reorder-decision-priority-cards.dto';
+import { UpdateProviderConfigDto } from './dto/update-provider-config.dto';
 @Controller('admin')
 @UseGuards(SupabaseAuthGuard)
 export class AdminController {
@@ -226,6 +227,42 @@ export class AdminController {
                 schemaName: tenant.schemaName,
             },
             provider,
+        };
+    }
+    @Patch('providers/:id/config')
+    async updateProviderConfig(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+
+        @Param('id')
+        providerId: string,
+
+        @Body()
+        dto: UpdateProviderConfigDto,
+    ) {
+        const tenant = auth.tenant;
+
+        const config =
+            await this.adminService.updateProviderConfig(
+                tenant,
+                providerId,
+                dto,
+            );
+
+        if (!config) {
+            throw new NotFoundException(
+                'Provider config not found',
+            );
+        }
+
+        return {
+            ok: true,
+            tenant: {
+                id: tenant.id,
+                name: tenant.name,
+                schemaName: tenant.schemaName,
+            },
+            config,
         };
     }
     @Get('decision-criteria')

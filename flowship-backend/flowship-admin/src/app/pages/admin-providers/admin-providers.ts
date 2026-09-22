@@ -15,7 +15,8 @@ import {
 export class AdminProvidersComponent implements OnInit {
   loading = false;
   errorMsg = '';
-
+  savingProviderConfig = false;
+  providerConfigError = '';
   tenantName = '';
   schemaName = '';
 
@@ -89,5 +90,105 @@ export class AdminProvidersComponent implements OnInit {
           this.errorMsg = 'שגיאה בעדכון עדיפות ספק';
         },
       });
+  }
+  saveProviderConfig(provider: AdminProvider): void {
+    if (!provider.settings) {
+      return;
+    }
+
+    this.providerConfigError = '';
+    if (
+      provider.configCapabilities['allowedUrgencies'] &&
+      !provider.settings.allowedUrgencies?.length
+    ) {
+      this.providerConfigError =
+        'יש לבחור לפחות סוג משלוח אחד.';
+
+      return;
+    }
+    const vehicleWeightRules =
+      provider.settings.vehicleWeightRules;
+
+    if (
+      provider.configCapabilities['vehicleWeightRules'] &&
+      vehicleWeightRules &&
+      vehicleWeightRules.scooterMaxWeightKg >
+      vehicleWeightRules.carMaxWeightKg
+    ) {
+      this.providerConfigError =
+        'המשקל המקסימלי לקטנוע לא יכול להיות גבוה מהמשקל המקסימלי לרכב.';
+
+      return;
+    }
+
+    this.errorMsg = '';
+    this.savingProviderConfig = true;
+
+    this.adminApi
+      .updateProviderConfig(
+        provider.id,
+        provider.settings,
+      )
+      .subscribe({
+        next: () => {
+          this.savingProviderConfig = false;
+          this.selectedProvider = null;
+          this.providerConfigError = '';
+
+          this.loadProviders();
+        },
+
+        error: (err) => {
+          console.error(
+            'save provider config error:',
+            err,
+          );
+
+          this.savingProviderConfig = false;
+
+          this.providerConfigError =
+            'שגיאה בעדכון הגדרות הספק';
+
+          this.cdr.detectChanges();
+        },
+      });
+  }
+  selectedProvider: AdminProvider | null = null;
+
+  openProviderSettings(
+    provider: AdminProvider,
+  ): void {
+    this.providerConfigError = '';
+
+    this.selectedProvider = structuredClone(provider);
+  }
+  toggleAllowedUrgency(
+    urgency: 'urgent' | 'express' | 'standard',
+    event: Event,
+  ): void {
+    if (!this.selectedProvider?.settings) {
+      return;
+    }
+
+    const checkbox = event.target as HTMLInputElement;
+
+    const current =
+      this.selectedProvider.settings.allowedUrgencies ?? [];
+
+    if (checkbox.checked) {
+      if (!current.includes(urgency)) {
+        this.selectedProvider.settings.allowedUrgencies = [
+          ...current,
+          urgency,
+        ];
+      }
+    } else {
+      this.selectedProvider.settings.allowedUrgencies =
+        current.filter(
+          (item) => item !== urgency,
+        );
+    }
+
+    this.providerConfigError = '';
   }
 }
