@@ -17,6 +17,7 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
       TEST_FLOW_SHIP_A_API_KEY: ${{ secrets.TEST_FLOW_SHIP_A_API_KEY }}
       TEST_FLOW_SHIP_B_API_KEY: ${{ secrets.TEST_FLOW_SHIP_B_API_KEY }}
 
