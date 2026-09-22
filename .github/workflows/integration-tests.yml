@@ -16,6 +16,7 @@ jobs:
         working-directory: flowship-backend
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       TEST_FLOW_SHIP_A_API_KEY: ${{ secrets.TEST_FLOW_SHIP_A_API_KEY }}
       TEST_FLOW_SHIP_B_API_KEY: ${{ secrets.TEST_FLOW_SHIP_B_API_KEY }}
 
