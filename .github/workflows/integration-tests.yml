@@ -31,6 +31,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+      - name: Test database connection
+        run: |
+          node -e "const { Pool } = require('pg'); const p = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 10000 }); p.query('SELECT 1').then(() => { console.log('DATABASE CONNECTION OK'); return p.end(); }).catch(e => { console.error('DATABASE CONNECTION FAILED:', e.message); process.exit(1); });"
 
       - name: Run integration tests
         run: npm run test:integration
