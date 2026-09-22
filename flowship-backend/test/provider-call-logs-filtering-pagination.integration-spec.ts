@@ -134,7 +134,15 @@ describe(
                 qSchema(
                     tenant.schemaName,
                 );
-
+            await db.query(
+                `
+    delete from ${schema}.provider_call_logs
+    where provider_id = $1
+    `,
+                [
+                    providerId,
+                ],
+            );
             await db.query(
                 `
                 delete from ${schema}.providers
