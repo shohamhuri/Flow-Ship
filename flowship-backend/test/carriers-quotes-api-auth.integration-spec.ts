@@ -3,7 +3,7 @@ import {
     UnauthorizedException,
     ValidationPipe,
 } from '@nestjs/common';
-
+import { DeliveryCenterAdapter } from '../src/modules/carriers/adapters/delivery-center.adapter';
 import {
     ConfigModule,
     ConfigService,
@@ -219,7 +219,7 @@ describe(
                                 MockCarrierAdapter,
                                 MockYangoAdapter,
                                 CarrierRegistry,
-
+                                DeliveryCenterAdapter,
                                 CarriersService,
                                 DecisionService,
                                 QuotesService,

@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import { randomUUID } from 'crypto';
 
 import { DbService } from '../src/infrastructure/database/db.service';
-
+import { DeliveryCenterAdapter } from '../src/modules/carriers/adapters/delivery-center.adapter';
 import {
     CurrentTenant,
     TenantsService,
@@ -56,6 +56,7 @@ describe(
 
                         MockCarrierAdapter,
                         MockYangoAdapter,
+                        DeliveryCenterAdapter,
 
                         CarrierRegistry,
                         CarriersService,

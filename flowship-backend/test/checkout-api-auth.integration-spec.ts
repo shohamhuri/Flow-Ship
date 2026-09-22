@@ -28,7 +28,7 @@ import {
 import { CheckoutController } from '../src/modules/checkout/checkout.controller';
 
 import { CheckoutService } from '../src/modules/checkout/checkout.service';
-
+import { SourcingResultsRepository } from '../src/modules/sourcing/sourcing-results.repository';
 import { CheckoutRepository } from '../src/modules/checkout/checkout.repository';
 
 import { CheckoutProcessingRepository } from '../src/modules/checkout/checkout-processing.repository';
@@ -37,7 +37,7 @@ import { SourcingService } from '../src/modules/sourcing/sourcing.service';
 
 import { MockInventoryProvider } from '../src/modules/sourcing/adapters/mock-inventory.provider';
 
-import { INVENTORY_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
+import { INVENTORY_PROVIDER, DISTANCE_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
 
 import { AuditLogsService } from '../src/modules/audit-logs/audit-logs.service';
 
@@ -76,7 +76,7 @@ import { MockYangoAdapter } from '../src/modules/carriers/adapters/mock-yango.ad
 import { SupabaseAuthGuard } from '../src/modules/auth/supabase-auth.guard';
 
 import { AuthService } from '../src/modules/auth/auth.service';
-
+import { DeliveryCenterAdapter } from '../src/modules/carriers/adapters/delivery-center.adapter';
 
 describe(
     'Checkout API + Tenant Authentication Integration',
@@ -208,7 +208,18 @@ describe(
                                         MockInventoryProvider,
                                 },
 
+                                {
+                                    provide:
+                                        DISTANCE_PROVIDER,
+
+                                    useValue: {
+                                        getDistanceKm:
+                                            jest.fn().mockResolvedValue(10),
+                                    },
+                                },
+
                                 SourcingService,
+                                SourcingResultsRepository,
 
                                 /*
                                  * Grouping
@@ -234,6 +245,7 @@ describe(
                                 MockYangoAdapter,
                                 CarrierRegistry,
                                 CarriersService,
+                                DeliveryCenterAdapter,
 
                                 /*
                                  * Decision
@@ -767,7 +779,11 @@ describe(
                         ],
                     );
 
-
+                    await db.query(
+                        `DELETE FROM flow_ship_test_a.checkout_sourcing_results
+     WHERE checkout_id = $1`,
+                        [checkoutId],
+                    );
                     await db.query(
                         `
                         delete from flow_ship_test_a.checkout_items

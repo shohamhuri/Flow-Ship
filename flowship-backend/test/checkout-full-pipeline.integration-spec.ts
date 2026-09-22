@@ -24,12 +24,12 @@ import { CheckoutRepository } from '../src/modules/checkout/checkout.repository'
 import { CheckoutProcessingRepository } from '../src/modules/checkout/checkout-processing.repository';
 
 import { CreateCheckoutDto } from '../src/modules/checkout/dto/create-checkout.dto';
-
+import { DeliveryCenterAdapter } from '../src/modules/carriers/adapters/delivery-center.adapter';
 import { SourcingService } from '../src/modules/sourcing/sourcing.service';
 
 import { MockInventoryProvider } from '../src/modules/sourcing/adapters/mock-inventory.provider';
 
-import { INVENTORY_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
+import { INVENTORY_PROVIDER, DISTANCE_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
 
 import { AuditLogsService } from '../src/modules/audit-logs/audit-logs.service';
 
@@ -42,7 +42,7 @@ import { GroupingStrategySettingsRepository } from '../src/modules/grouping/grou
 import { ShipmentGroupsRepository } from '../src/modules/grouping/shipment-groups.repository';
 
 import { ShipmentPlanGeneratorService } from '../src/modules/planning/shipment-plan-generator.service';
-
+import { SourcingResultsRepository } from '../src/modules/sourcing/sourcing-results.repository';
 import { ShipmentPlanBuilderService } from '../src/modules/planning/shipment-plan-builder.service';
 
 import { ShipmentPlanEvaluatorService } from '../src/modules/planning/shipment-plan-evaluator.service';
@@ -152,6 +152,7 @@ describe(
                                 CheckoutRepository,
                                 CheckoutProcessingRepository,
                                 CheckoutService,
+                                SourcingResultsRepository,
 
                                 /*
                                  * Audit
@@ -166,9 +167,17 @@ describe(
                                 {
                                     provide:
                                         INVENTORY_PROVIDER,
-
                                     useExisting:
                                         MockInventoryProvider,
+                                },
+
+                                {
+                                    provide:
+                                        DISTANCE_PROVIDER,
+                                    useValue: {
+                                        getDistanceKm:
+                                            jest.fn().mockResolvedValue(10),
+                                    },
                                 },
 
                                 SourcingService,
@@ -195,6 +204,7 @@ describe(
                                  */
                                 MockCarrierAdapter,
                                 MockYangoAdapter,
+                                DeliveryCenterAdapter,
                                 CarrierRegistry,
                                 CarriersService,
 
@@ -639,7 +649,15 @@ describe(
                         ],
                     );
 
-
+                    await db.query(
+                        `
+    delete from flow_ship_test_a.checkout_sourcing_results
+    where checkout_id = any($1::uuid[])
+    `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
                     await db.query(
                         `
                         delete from flow_ship_test_a.checkout_items

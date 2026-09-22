@@ -48,7 +48,7 @@ import {
 import {
     ShipmentGroupsRepository,
 } from '../src/modules/grouping/shipment-groups.repository';
-
+import { SourcingResultsRepository } from '../src/modules/sourcing/sourcing-results.repository';
 import {
     ShipmentPlanGeneratorService,
 } from '../src/modules/planning/shipment-plan-generator.service';
@@ -813,7 +813,7 @@ describe(
 
                                 CheckoutRepository,
                                 CheckoutProcessingRepository,
-
+                                SourcingResultsRepository,
                                 CheckoutService,
 
                                 {
@@ -1038,7 +1038,13 @@ describe(
             async () => {
                 const orderId =
                     `FAIL-NO-PLAN-${randomUUID()}`;
+                const dto =
+                    createDto(
+                        orderId,
+                    );
 
+                const sku =
+                    dto.items[0].sku;
 
                 sourcingServiceMock
                     .findSourcesForCheckout
@@ -1049,12 +1055,13 @@ describe(
                                     0,
 
                                 sku:
-                                    'SKU-1',
-
+                                    sku,
                                 requestedQuantity:
                                     1,
+                                possibleSources:
+                                    [],
 
-                                rankedSources:
+                                rejectedSources:
                                     [],
                             },
                         ],
@@ -1104,10 +1111,7 @@ describe(
                     await expect(
                         checkoutService
                             .createCheckout(
-                                createDto(
-                                    orderId,
-                                ) as any,
-
+                                dto as any,
                                 tenant,
                             ),
                     ).rejects.toThrow(
@@ -1146,7 +1150,13 @@ describe(
             async () => {
                 const orderId =
                     `FAIL-QUOTES-${randomUUID()}`;
+                const dto =
+                    createDto(
+                        orderId,
+                    );
 
+                const sku =
+                    dto.items[0].sku;
                 const planId =
                     `PLAN-${randomUUID()}`;
 
@@ -1168,13 +1178,15 @@ describe(
                                 itemIndex:
                                     0,
 
-                                sku:
-                                    'SKU-1',
+                                sku,
 
                                 requestedQuantity:
                                     1,
 
-                                rankedSources:
+                                possibleSources:
+                                    [],
+
+                                rejectedSources:
                                     [],
                             },
                         ],
@@ -1238,10 +1250,7 @@ describe(
                     await expect(
                         checkoutService
                             .createCheckout(
-                                createDto(
-                                    orderId,
-                                ) as any,
-
+                                dto as any,
                                 tenant,
                             ),
                     ).rejects.toThrow(

@@ -20,7 +20,7 @@ import {
     CurrentTenant,
     TenantsService,
 } from '../src/modules/tenants/tenants.service';
-
+import { SourcingResultsRepository } from '../src/modules/sourcing/sourcing-results.repository';
 import {
     CheckoutService,
 } from '../src/modules/checkout/checkout.service';
@@ -538,7 +538,7 @@ describe(
 
                                 CheckoutRepository,
                                 CheckoutProcessingRepository,
-
+                                SourcingResultsRepository,
                                 CheckoutService,
 
                                 {
