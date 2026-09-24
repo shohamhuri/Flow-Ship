@@ -1,0 +1,2341 @@
+import {
+    INestApplication,
+    ValidationPipe,
+} from '@nestjs/common';
+
+import {
+    Test,
+    TestingModule,
+} from '@nestjs/testing';
+
+import { ConfigService } from '@nestjs/config';
+
+import request from 'supertest';
+import { randomUUID } from 'crypto';
+
+import { AppModule } from '../src/app.module';
+
+import {
+    DbService,
+} from '../src/infrastructure/database/db.service';
+
+import {
+    CurrentTenant,
+    TenantsService,
+} from '../src/modules/tenants/tenants.service';
+
+
+describe(
+    'Checkout Full Flow E2E',
+    () => {
+        let app: INestApplication;
+        let moduleRef: TestingModule;
+
+        let db: DbService;
+        let tenantsService: TenantsService;
+        let config: ConfigService;
+
+        let tenantA: CurrentTenant;
+        let tenantB: CurrentTenant;
+
+        let tenantAApiKey: string;
+        let tenantBApiKey: string;
+
+        let providerMockId: string;
+        let providerYangoId: string;
+
+        let priceCardId: string;
+        let speedCardId: string;
+
+        let groupingStrategyId: string;
+
+        let successOrderId: string;
+        let failedOrderId: string;
+
+        let successCheckoutId: string;
+        let failedCheckoutId: string;
+
+        /*
+         * נשמור את המצב שהיה קיים לפני הטסט,
+         * כדי להחזיר את סביבת הבדיקות למצבה המקורי.
+         */
+        let previouslyActiveProviderIdsA: string[] = [];
+
+        let previouslyActiveDecisionCardIdsA: string[] = [];
+
+        let previouslyEnabledGroupingStrategyIdsA: string[] = [];
+
+
+        beforeAll(
+            async () => {
+                /*
+                 * =====================================================
+                 * Real NestJS Application
+                 * =====================================================
+                 */
+
+                moduleRef =
+                    await Test
+                        .createTestingModule({
+                            imports: [
+                                AppModule,
+                            ],
+                        })
+                        .compile();
+
+                app =
+                    moduleRef
+                        .createNestApplication();
+
+                /*
+                 * זהה ל-main.ts.
+                 */
+                app.useGlobalPipes(
+                    new ValidationPipe({
+                        whitelist: true,
+                        transform: true,
+                        forbidNonWhitelisted: true,
+                    }),
+                );
+
+                await app.init();
+
+
+                db =
+                    moduleRef.get(
+                        DbService,
+                    );
+
+                tenantsService =
+                    moduleRef.get(
+                        TenantsService,
+                    );
+
+                config =
+                    moduleRef.get(
+                        ConfigService,
+                    );
+
+
+                const apiKeyA =
+                    config.get<string>(
+                        'TEST_FLOW_SHIP_A_API_KEY',
+                    );
+
+                const apiKeyB =
+                    config.get<string>(
+                        'TEST_FLOW_SHIP_B_API_KEY',
+                    );
+
+
+                if (!apiKeyA) {
+                    throw new Error(
+                        'Missing TEST_FLOW_SHIP_A_API_KEY',
+                    );
+                }
+
+                if (!apiKeyB) {
+                    throw new Error(
+                        'Missing TEST_FLOW_SHIP_B_API_KEY',
+                    );
+                }
+
+
+                tenantAApiKey =
+                    apiKeyA;
+
+                tenantBApiKey =
+                    apiKeyB;
+
+
+                tenantA =
+                    await tenantsService
+                        .findByApiKey(
+                            tenantAApiKey,
+                        );
+
+                tenantB =
+                    await tenantsService
+                        .findByApiKey(
+                            tenantBApiKey,
+                        );
+
+
+                providerMockId =
+                    randomUUID();
+
+                providerYangoId =
+                    randomUUID();
+
+                priceCardId =
+                    randomUUID();
+
+                speedCardId =
+                    randomUUID();
+
+                groupingStrategyId =
+                    randomUUID();
+
+
+                successOrderId =
+                    `E2E-SUCCESS-${Date.now()}-${randomUUID()}`;
+
+                failedOrderId =
+                    `E2E-FAILED-${Date.now()}-${randomUUID()}`;
+
+
+                /*
+                 * =====================================================
+                 * Save existing Tenant A configuration
+                 * =====================================================
+                 */
+
+                const activeProviders =
+                    await db.query<{
+                        id: string;
+                    }>(
+                        `
+                        select id
+                        from flow_ship_test_a.providers
+                        where is_active = true
+                        `,
+                    );
+
+                previouslyActiveProviderIdsA =
+                    activeProviders.map(
+                        (row) =>
+                            row.id,
+                    );
+
+
+                const activeDecisionCards =
+                    await db.query<{
+                        id: string;
+                    }>(
+                        `
+                        select id
+                        from flow_ship_test_a.decision_priority_cards
+                        where is_active = true
+                        `,
+                    );
+
+                previouslyActiveDecisionCardIdsA =
+                    activeDecisionCards.map(
+                        (row) =>
+                            row.id,
+                    );
+
+
+                const enabledGroupingStrategies =
+                    await db.query<{
+                        id: string;
+                    }>(
+                        `
+                        select id
+                        from flow_ship_test_a.grouping_strategy_settings
+                        where is_enabled = true
+                        `,
+                    );
+
+                previouslyEnabledGroupingStrategyIdsA =
+                    enabledGroupingStrategies.map(
+                        (row) =>
+                            row.id,
+                    );
+
+
+                /*
+                 * =====================================================
+                 * Deterministic test configuration
+                 * =====================================================
+                 */
+
+                await db.query(
+                    `
+                    update flow_ship_test_a.providers
+                    set is_active = false
+                    `,
+                );
+
+                await db.query(
+                    `
+                    update flow_ship_test_a.decision_priority_cards
+                    set is_active = false
+                    `,
+                );
+
+                await db.query(
+                    `
+                    update flow_ship_test_a.grouping_strategy_settings
+                    set is_enabled = false
+                    `,
+                );
+
+
+                /*
+                 * =====================================================
+                 * Providers
+                 * =====================================================
+                 */
+
+                await db.query(
+                    `
+                    insert into flow_ship_test_a.providers (
+                        id,
+                        code,
+                        name,
+                        adapter_key,
+                        is_mock,
+                        is_active,
+                        priority_score
+                    )
+                    values
+                        (
+                            $1,
+                            'e2e-mock',
+                            'E2E Mock',
+                            'mock',
+                            true,
+                            true,
+                            0.70
+                        ),
+                        (
+                            $2,
+                            'e2e-yango',
+                            'E2E Yango',
+                            'mock-yango',
+                            true,
+                            true,
+                            0.70
+                        )
+                    `,
+                    [
+                        providerMockId,
+                        providerYangoId,
+                    ],
+                );
+
+
+                /*
+                 * =====================================================
+                 * Decision Priority Cards
+                 * =====================================================
+                 *
+                 * Price = rank 1
+                 * Speed = rank 2
+                 *
+                 * לכן האפשרות הזולה אמורה לנצח.
+                 */
+
+                await db.query(
+                    `
+                    insert into flow_ship_test_a.decision_priority_cards (
+                        id,
+                        provider_id,
+                        criterion_key,
+                        title,
+                        priority_rank,
+                        is_active,
+                        config
+                    )
+                    values
+                        (
+                            $1,
+                            null,
+                            'price',
+                            'E2E Price',
+                            1,
+                            true,
+                            '{}'::jsonb
+                        ),
+                        (
+                            $2,
+                            null,
+                            'speed',
+                            'E2E Speed',
+                            2,
+                            true,
+                            '{}'::jsonb
+                        )
+                    `,
+                    [
+                        priceCardId,
+                        speedCardId,
+                    ],
+                );
+
+
+                /*
+                 * =====================================================
+                 * Grouping Strategy
+                 * =====================================================
+                 */
+
+                await db.query(
+                    `
+                    insert into flow_ship_test_a.grouping_strategy_settings (
+                        id,
+                        strategy_key,
+                        display_name,
+                        is_enabled,
+                        execution_order,
+                        conflict_priority,
+                        config
+                    )
+                    values (
+                        $1,
+                        'group_by_source',
+                        'E2E Group By Source',
+                        true,
+                        1,
+                        100,
+                        '{}'::jsonb
+                    )
+                    `,
+                    [
+                        groupingStrategyId,
+                    ],
+                );
+            },
+            60000,
+        );
+
+
+        afterAll(
+            async () => {
+                if (!db) {
+                    if (app) {
+                        await app.close();
+                    }
+
+                    return;
+                }
+
+
+                const checkoutIds = [
+                    successCheckoutId,
+                    failedCheckoutId,
+                ].filter(
+                    (
+                        id,
+                    ): id is string =>
+                        Boolean(id),
+                );
+
+
+                /*
+                 * =====================================================
+                 * Cleanup checkout data
+                 * =====================================================
+                 */
+
+                if (
+                    checkoutIds.length >
+                    0
+                ) {
+                    await db.query(
+                        `
+                        delete from flow_ship_test_a.shipment_stops
+                        where shipment_id in (
+                            select id
+                            from flow_ship_test_a.shipments
+                            where checkout_id = any($1::uuid[])
+                        )
+                        `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
+
+
+                    await db.query(
+                        `
+                        delete from flow_ship_test_a.shipments
+                        where checkout_id = any($1::uuid[])
+                        `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
+
+
+                    await db.query(
+                        `
+                        delete from flow_ship_test_a.shipment_group_items
+                        where shipment_group_id in (
+                            select id
+                            from flow_ship_test_a.shipment_groups
+                            where checkout_id = any($1::uuid[])
+                        )
+                        `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
+
+
+                    await db.query(
+                        `
+                        delete from flow_ship_test_a.shipment_group_sources
+                        where shipment_group_id in (
+                            select id
+                            from flow_ship_test_a.shipment_groups
+                            where checkout_id = any($1::uuid[])
+                        )
+                        `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
+
+
+                    await db.query(
+                        `
+                        delete from flow_ship_test_a.shipment_groups
+                        where checkout_id = any($1::uuid[])
+                        `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
+
+
+                    await db.query(
+                        `
+                        delete from flow_ship_test_a.shipment_decisions
+                        where checkout_id = any($1::uuid[])
+                        `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
+
+
+                    await db.query(
+                        `
+                        delete from flow_ship_test_a.checkout_processing
+                        where checkout_id = any($1::uuid[])
+                        `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
+
+
+                    await db.query(
+                        `
+                        delete from flow_ship_test_a.checkout_sourcing_results
+                        where checkout_id = any($1::uuid[])
+                        `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
+
+
+                    await db.query(
+                        `
+                        delete from flow_ship_test_a.checkout_items
+                        where checkout_id = any($1::uuid[])
+                        `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
+
+
+                    await db.query(
+                        `
+                        delete from flow_ship_test_a.checkouts
+                        where id = any($1::uuid[])
+                        `,
+                        [
+                            checkoutIds,
+                        ],
+                    );
+                }
+
+
+                /*
+                 * =====================================================
+                 * Audit logs
+                 * =====================================================
+                 */
+
+                await db.query(
+                    `
+                    delete from flow_ship_test_a.audit_logs
+                    where entity_id = any($1::text[])
+                    `,
+                    [[
+                        successOrderId,
+                        failedOrderId,
+                    ]],
+                );
+
+
+                /*
+                 * =====================================================
+                 * Provider logs
+                 * =====================================================
+                 */
+
+                await db.query(
+                    `
+                    delete from flow_ship_test_a.provider_call_logs
+                    where provider_id = any($1::uuid[])
+                    `,
+                    [[
+                        providerMockId,
+                        providerYangoId,
+                    ]],
+                );
+
+
+                /*
+                 * =====================================================
+                 * Test configuration
+                 * =====================================================
+                 */
+
+                await db.query(
+                    `
+                    delete from flow_ship_test_a.decision_priority_cards
+                    where id = any($1::uuid[])
+                    `,
+                    [[
+                        priceCardId,
+                        speedCardId,
+                    ]],
+                );
+
+
+                await db.query(
+                    `
+                    delete from flow_ship_test_a.grouping_strategy_settings
+                    where id = $1
+                    `,
+                    [
+                        groupingStrategyId,
+                    ],
+                );
+
+
+                await db.query(
+                    `
+                    delete from flow_ship_test_a.providers
+                    where id = any($1::uuid[])
+                    `,
+                    [[
+                        providerMockId,
+                        providerYangoId,
+                    ]],
+                );
+
+
+                /*
+                 * =====================================================
+                 * Restore previous Tenant A configuration
+                 * =====================================================
+                 */
+
+                if (
+                    previouslyActiveProviderIdsA.length >
+                    0
+                ) {
+                    await db.query(
+                        `
+                        update flow_ship_test_a.providers
+                        set is_active = true
+                        where id = any($1::uuid[])
+                        `,
+                        [
+                            previouslyActiveProviderIdsA,
+                        ],
+                    );
+                }
+
+
+                if (
+                    previouslyActiveDecisionCardIdsA.length >
+                    0
+                ) {
+                    await db.query(
+                        `
+                        update flow_ship_test_a.decision_priority_cards
+                        set is_active = true
+                        where id = any($1::uuid[])
+                        `,
+                        [
+                            previouslyActiveDecisionCardIdsA,
+                        ],
+                    );
+                }
+
+
+                if (
+                    previouslyEnabledGroupingStrategyIdsA.length >
+                    0
+                ) {
+                    await db.query(
+                        `
+                        update flow_ship_test_a.grouping_strategy_settings
+                        set is_enabled = true
+                        where id = any($1::uuid[])
+                        `,
+                        [
+                            previouslyEnabledGroupingStrategyIdsA,
+                        ],
+                    );
+                }
+
+
+                await app.close();
+            },
+            60000,
+        );
+
+
+        function createSuccessfulCheckoutDto() {
+            return {
+                orderId:
+                    successOrderId,
+
+                storeId:
+                    'E2E-STORE',
+
+                destination: {
+                    country:
+                        'Israel',
+
+                    city:
+                        'Netivot',
+
+                    street:
+                        'HaShalom',
+
+                    houseNumber:
+                        '10',
+
+                    postalCode:
+                        '8770000',
+                },
+
+                items: [
+                    {
+                        sku:
+                            'SHIRT-BLACK-M',
+
+                        name:
+                            'E2E Black Shirt',
+
+                        quantity:
+                            2,
+
+                        weight:
+                            1,
+
+                        price:
+                            100,
+
+                        category:
+                            'standard',
+                    },
+                ],
+            };
+        }
+
+
+        function createFailedCheckoutDto() {
+            return {
+                orderId:
+                    failedOrderId,
+
+                storeId:
+                    'E2E-STORE',
+
+                destination: {
+                    country:
+                        'Israel',
+
+                    city:
+                        'Netivot',
+
+                    street:
+                        'HaShalom',
+
+                    houseNumber:
+                        '20',
+
+                    postalCode:
+                        '8770000',
+                },
+
+                items: [
+                    {
+                        sku:
+                            `NO-INVENTORY-${randomUUID()}`,
+
+                        name:
+                            'Product Without Inventory',
+
+                        quantity:
+                            1,
+
+                        weight:
+                            1,
+
+                        price:
+                            50,
+
+                        category:
+                            'standard',
+                    },
+                ],
+            };
+        }
+
+
+        async function findCheckoutIdByOrderId(
+            orderId: string,
+        ): Promise<string> {
+            const rows =
+                await db.query<{
+                    id: string;
+                }>(
+                    `
+                    select id
+                    from flow_ship_test_a.checkouts
+                    where external_order_id = $1
+                    order by created_at desc
+                    limit 1
+                    `,
+                    [
+                        orderId,
+                    ],
+                );
+
+
+            if (!rows[0]) {
+                throw new Error(
+                    `Checkout not found for order ${orderId}`,
+                );
+            }
+
+
+            return rows[0].id;
+        }
+
+
+        /*
+         * =============================================================
+         * TEST 1
+         * HTTP → Complete Checkout Pipeline
+         * =============================================================
+         */
+
+        it(
+            'should process a valid checkout through POST /checkout and the complete pipeline',
+            async () => {
+                const response =
+                    await request(
+                        app.getHttpServer(),
+                    )
+                        .post(
+                            '/checkout',
+                        )
+                        .set(
+                            'x-api-key',
+                            tenantAApiKey,
+                        )
+                        .send(
+                            createSuccessfulCheckoutDto(),
+                        )
+                        .expect(
+                            201,
+                        );
+
+
+                const result =
+                    response.body;
+
+
+                successCheckoutId =
+                    await findCheckoutIdByOrderId(
+                        successOrderId,
+                    );
+
+
+                expect(
+                    result.checkout,
+                ).toBeDefined();
+
+
+                expect(
+                    result.checkout.orderId,
+                ).toBe(
+                    successOrderId,
+                );
+
+
+                expect(
+                    result.checkout.totalItems,
+                ).toBe(
+                    2,
+                );
+
+
+                expect(
+                    result.checkout.totalPrice,
+                ).toBe(
+                    200,
+                );
+
+
+                /*
+                 * Sourcing
+                 */
+                expect(
+                    result.sourcing,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    result.sourcing[0].sku,
+                ).toBe(
+                    'SHIRT-BLACK-M',
+                );
+
+
+                expect(
+                    result.sourcing[0]
+                        .possibleSources
+                        .length,
+                ).toBeGreaterThan(
+                    0,
+                );
+
+
+                /*
+                 * Generation
+                 */
+                expect(
+                    result.planning
+                        .generation
+                        .statistics
+                        .generatedPlansCount,
+                ).toBeGreaterThan(
+                    0,
+                );
+
+
+                /*
+                 * Valid plans
+                 */
+                expect(
+                    result.planning
+                        .validPlans
+                        .length,
+                ).toBeGreaterThan(
+                    0,
+                );
+
+
+                /*
+                 * Selected plans
+                 */
+                expect(
+                    result.planning
+                        .selectedPlans
+                        .length,
+                ).toBeGreaterThan(
+                    0,
+                );
+
+
+                /*
+                 * Quotes
+                 */
+                expect(
+                    result.planning
+                        .quotedPlans
+                        .length,
+                ).toBeGreaterThan(
+                    0,
+                );
+
+
+                /*
+                 * Delivery options
+                 */
+                expect(
+                    result.planning
+                        .deliveryOptions
+                        .length,
+                ).toBeGreaterThan(
+                    0,
+                );
+
+
+                /*
+                 * Decision
+                 */
+                expect(
+                    result.planning
+                        .decision
+                        .winner,
+                ).not.toBeNull();
+
+
+                expect(
+                    result.planning
+                        .decision
+                        .evaluatedOptionsCount,
+                ).toBeGreaterThan(
+                    0,
+                );
+            },
+            60000,
+        );
+
+
+        /*
+         * =============================================================
+         * TEST 2
+         * Checkout persistence
+         * =============================================================
+         */
+
+        it(
+            'should persist checkout and checkout items in the real database',
+            async () => {
+                const checkoutRows =
+                    await db.query<{
+                        id: string;
+                        external_order_id:
+                        string;
+                        status: string;
+                        raw_payload:
+                        Record<
+                            string,
+                            any
+                        >;
+                    }>(
+                        `
+                        select
+                            id,
+                            external_order_id,
+                            status,
+                            raw_payload
+                        from flow_ship_test_a.checkouts
+                        where id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    checkoutRows,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    checkoutRows[0]
+                        .external_order_id,
+                ).toBe(
+                    successOrderId,
+                );
+
+
+                expect(
+                    checkoutRows[0].status,
+                ).toBe(
+                    'grouped',
+                );
+
+
+                expect(
+                    checkoutRows[0]
+                        .raw_payload,
+                ).toMatchObject({
+                    orderId:
+                        successOrderId,
+
+                    totalItems:
+                        2,
+
+                    totalPrice:
+                        200,
+                });
+
+
+                const items =
+                    await db.query<{
+                        sku: string;
+                        name: string;
+                        quantity: number;
+                        unit_weight:
+                        string | number;
+                        unit_price:
+                        string | number;
+                    }>(
+                        `
+                        select
+                            sku,
+                            name,
+                            quantity,
+                            unit_weight,
+                            unit_price
+                        from flow_ship_test_a.checkout_items
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    items,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    items[0],
+                ).toMatchObject({
+                    sku:
+                        'SHIRT-BLACK-M',
+
+                    name:
+                        'E2E Black Shirt',
+
+                    quantity:
+                        2,
+                });
+
+
+                expect(
+                    Number(
+                        items[0]
+                            .unit_weight,
+                    ),
+                ).toBe(
+                    1,
+                );
+
+
+                expect(
+                    Number(
+                        items[0]
+                            .unit_price,
+                    ),
+                ).toBe(
+                    100,
+                );
+            },
+        );
+
+
+        /*
+         * =============================================================
+         * TEST 3
+         * Checkout Processing
+         * =============================================================
+         */
+
+        it(
+            'should mark sourcing and grouping as completed',
+            async () => {
+                const rows =
+                    await db.query<{
+                        status: string;
+                        current_step:
+                        string;
+                        sourcing_completed:
+                        boolean;
+                        grouping_completed:
+                        boolean;
+                        error_message:
+                        string | null;
+                    }>(
+                        `
+                        select
+                            status,
+                            current_step,
+                            sourcing_completed,
+                            grouping_completed,
+                            error_message
+                        from flow_ship_test_a.checkout_processing
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    rows,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    rows[0],
+                ).toMatchObject({
+                    status:
+                        'processing',
+
+                    current_step:
+                        'awaiting_quotes',
+
+                    sourcing_completed:
+                        true,
+
+                    grouping_completed:
+                        true,
+
+                    error_message:
+                        null,
+                });
+            },
+        );
+
+
+        /*
+         * =============================================================
+         * TEST 4
+         * Shipment Groups
+         * =============================================================
+         */
+
+        it(
+            'should persist shipment group, source and item',
+            async () => {
+                const groups =
+                    await db.query<{
+                        id: string;
+                        handling_group:
+                        string;
+                        total_items:
+                        number;
+                        total_weight:
+                        string | number;
+                        total_price:
+                        string | number;
+                        status:
+                        string;
+                    }>(
+                        `
+                        select
+                            id,
+                            handling_group,
+                            total_items,
+                            total_weight,
+                            total_price,
+                            status
+                        from flow_ship_test_a.shipment_groups
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    groups,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    groups[0]
+                        .handling_group,
+                ).toBe(
+                    'standard',
+                );
+
+
+                expect(
+                    groups[0]
+                        .total_items,
+                ).toBe(
+                    2,
+                );
+
+
+                expect(
+                    Number(
+                        groups[0]
+                            .total_weight,
+                    ),
+                ).toBe(
+                    2,
+                );
+
+
+                expect(
+                    Number(
+                        groups[0]
+                            .total_price,
+                    ),
+                ).toBe(
+                    200,
+                );
+
+
+                expect(
+                    groups[0].status,
+                ).toBe(
+                    'planned',
+                );
+
+
+                const sources =
+                    await db.query<{
+                        source_id:
+                        string;
+                        source_name:
+                        string;
+                        source_type:
+                        string;
+                    }>(
+                        `
+                        select
+                            source_id,
+                            source_name,
+                            source_type
+                        from flow_ship_test_a.shipment_group_sources
+                        where shipment_group_id = $1
+                        `,
+                        [
+                            groups[0].id,
+                        ],
+                    );
+
+
+                expect(
+                    sources,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    sources[0]
+                        .source_id,
+                ).toBeTruthy();
+
+
+                expect(
+                    sources[0]
+                        .source_name,
+                ).toBeTruthy();
+
+
+                const groupItems =
+                    await db.query<{
+                        sku: string;
+                        quantity:
+                        number;
+                        source_id:
+                        string;
+                    }>(
+                        `
+                        select
+                            sku,
+                            quantity,
+                            source_id
+                        from flow_ship_test_a.shipment_group_items
+                        where shipment_group_id = $1
+                        `,
+                        [
+                            groups[0].id,
+                        ],
+                    );
+
+
+                expect(
+                    groupItems,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    groupItems[0],
+                ).toMatchObject({
+                    sku:
+                        'SHIRT-BLACK-M',
+
+                    quantity:
+                        2,
+                });
+
+
+                expect(
+                    groupItems[0]
+                        .source_id,
+                ).toBe(
+                    sources[0]
+                        .source_id,
+                );
+            },
+        );
+
+
+        /*
+         * =============================================================
+         * TEST 5
+         * Decision persistence
+         * =============================================================
+         */
+
+        it(
+            'should persist the winning shipment decision',
+            async () => {
+                const rows =
+                    await db.query<{
+                        checkout_id:
+                        string;
+                        order_id:
+                        string;
+                        selected_plan_id:
+                        string;
+                        selected_delivery_option_id:
+                        string;
+                        score:
+                        string | number;
+                        evaluated_options_count:
+                        number;
+                        priority_cards_snapshot:
+                        unknown[];
+                    }>(
+                        `
+                        select
+                            checkout_id,
+                            order_id,
+                            selected_plan_id,
+                            selected_delivery_option_id,
+                            score,
+                            evaluated_options_count,
+                            priority_cards_snapshot
+                        from flow_ship_test_a.shipment_decisions
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    rows,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    rows[0]
+                        .checkout_id,
+                ).toBe(
+                    successCheckoutId,
+                );
+
+
+                expect(
+                    rows[0]
+                        .order_id,
+                ).toBe(
+                    successOrderId,
+                );
+
+
+                expect(
+                    rows[0]
+                        .selected_plan_id,
+                ).toBeTruthy();
+
+
+                expect(
+                    rows[0]
+                        .selected_delivery_option_id,
+                ).toBeTruthy();
+
+
+                expect(
+                    Number(
+                        rows[0].score,
+                    ),
+                ).toBeGreaterThanOrEqual(
+                    0,
+                );
+
+
+                expect(
+                    rows[0]
+                        .evaluated_options_count,
+                ).toBeGreaterThan(
+                    0,
+                );
+
+
+                expect(
+                    rows[0]
+                        .priority_cards_snapshot,
+                ).toHaveLength(
+                    2,
+                );
+            },
+        );
+
+
+        /*
+         * =============================================================
+         * TEST 6
+         * Shipment + Stops
+         * =============================================================
+         */
+
+        it(
+            'should create a real shipment with pickup and dropoff stops',
+            async () => {
+                const shipments =
+                    await db.query<{
+                        id: string;
+                        shipment_group_id:
+                        string;
+                        selected_plan_id:
+                        string;
+                        selected_delivery_option_key:
+                        string;
+                        provider_id:
+                        string;
+                        provider_code:
+                        string;
+                        adapter_key:
+                        string;
+                        carrier_name:
+                        string;
+                        service_name:
+                        string;
+                        price:
+                        string | number;
+                        currency:
+                        string;
+                        status:
+                        string;
+                    }>(
+                        `
+                        select
+                            id,
+                            shipment_group_id,
+                            selected_plan_id,
+                            selected_delivery_option_key,
+                            provider_id,
+                            provider_code,
+                            adapter_key,
+                            carrier_name,
+                            service_name,
+                            price,
+                            currency,
+                            status
+                        from flow_ship_test_a.shipments
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    shipments,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                /*
+                 * Price היא העדיפות הראשונה,
+                 * לכן Mock הזול אמור לנצח.
+                 */
+                expect(
+                    shipments[0],
+                ).toMatchObject({
+                    provider_id:
+                        providerMockId,
+
+                    provider_code:
+                        'e2e-mock',
+
+                    adapter_key:
+                        'mock',
+
+                    carrier_name:
+                        'Mock Express',
+
+                    service_name:
+                        'Budget Delivery',
+
+                    currency:
+                        'ILS',
+
+                    status:
+                        'created',
+                });
+
+
+                expect(
+                    Number(
+                        shipments[0]
+                            .price,
+                    ),
+                ).toBe(
+                    15,
+                );
+
+
+                const stops =
+                    await db.query<{
+                        stop_order:
+                        number;
+                        stop_type:
+                        string;
+                        address:
+                        Record<
+                            string,
+                            any
+                        >;
+                    }>(
+                        `
+                        select
+                            stop_order,
+                            stop_type,
+                            address
+                        from flow_ship_test_a.shipment_stops
+                        where shipment_id = $1
+                        order by stop_order asc
+                        `,
+                        [
+                            shipments[0].id,
+                        ],
+                    );
+
+
+                expect(
+                    stops,
+                ).toHaveLength(
+                    2,
+                );
+
+
+                expect(
+                    stops[0]
+                        .stop_order,
+                ).toBe(
+                    1,
+                );
+
+
+                expect(
+                    stops[0]
+                        .stop_type,
+                ).toBe(
+                    'pickup',
+                );
+
+
+                expect(
+                    stops[0]
+                        .address
+                        .sourceId,
+                ).toBeTruthy();
+
+
+                expect(
+                    stops[1]
+                        .stop_order,
+                ).toBe(
+                    2,
+                );
+
+
+                expect(
+                    stops[1]
+                        .stop_type,
+                ).toBe(
+                    'dropoff',
+                );
+
+
+                expect(
+                    stops[1]
+                        .address,
+                ).toMatchObject({
+                    country:
+                        'Israel',
+
+                    city:
+                        'Netivot',
+
+                    street:
+                        'HaShalom',
+
+                    houseNumber:
+                        '10',
+
+                    postalCode:
+                        '8770000',
+                });
+            },
+        );
+
+
+        /*
+         * =============================================================
+         * TEST 7
+         * Complete persisted aggregate
+         * =============================================================
+         */
+
+        it(
+            'should persist the complete checkout aggregate',
+            async () => {
+                const checkoutRows =
+                    await db.query<{
+                        id: string;
+                        external_order_id:
+                        string;
+                        status:
+                        string;
+                    }>(
+                        `
+                        select
+                            id,
+                            external_order_id,
+                            status
+                        from flow_ship_test_a.checkouts
+                        where id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    checkoutRows,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    checkoutRows[0],
+                ).toMatchObject({
+                    id:
+                        successCheckoutId,
+
+                    external_order_id:
+                        successOrderId,
+
+                    status:
+                        'grouped',
+                });
+
+
+                const itemCount =
+                    await db.query<{
+                        count:
+                        string | number;
+                    }>(
+                        `
+                        select count(*) as count
+                        from flow_ship_test_a.checkout_items
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                const groupCount =
+                    await db.query<{
+                        count:
+                        string | number;
+                    }>(
+                        `
+                        select count(*) as count
+                        from flow_ship_test_a.shipment_groups
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                const shipmentCount =
+                    await db.query<{
+                        count:
+                        string | number;
+                    }>(
+                        `
+                        select count(*) as count
+                        from flow_ship_test_a.shipments
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                const decisionCount =
+                    await db.query<{
+                        count:
+                        string | number;
+                    }>(
+                        `
+                        select count(*) as count
+                        from flow_ship_test_a.shipment_decisions
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    Number(
+                        itemCount[0].count,
+                    ),
+                ).toBe(
+                    1,
+                );
+
+
+                expect(
+                    Number(
+                        groupCount[0].count,
+                    ),
+                ).toBe(
+                    1,
+                );
+
+
+                expect(
+                    Number(
+                        shipmentCount[0].count,
+                    ),
+                ).toBe(
+                    1,
+                );
+
+
+                expect(
+                    Number(
+                        decisionCount[0].count,
+                    ),
+                ).toBe(
+                    1,
+                );
+            },
+        );
+
+
+        /*
+         * =============================================================
+         * TEST 8
+         * Multi-Tenant isolation
+         * =============================================================
+         */
+
+        it(
+            'should keep the complete checkout flow isolated from Tenant B',
+            async () => {
+                /*
+                 * tenantB נפתר דרך ה-API key האמיתי שלו.
+                 * בנוסף נוודא שהוא באמת schema אחר.
+                 */
+                expect(
+                    tenantB.schemaName,
+                ).not.toBe(
+                    tenantA.schemaName,
+                );
+
+
+                const checkouts =
+                    await db.query(
+                        `
+                        select id
+                        from flow_ship_test_b.checkouts
+                        where id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                const groups =
+                    await db.query(
+                        `
+                        select id
+                        from flow_ship_test_b.shipment_groups
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                const shipments =
+                    await db.query(
+                        `
+                        select id
+                        from flow_ship_test_b.shipments
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                const decisions =
+                    await db.query(
+                        `
+                        select checkout_id
+                        from flow_ship_test_b.shipment_decisions
+                        where checkout_id = $1
+                        `,
+                        [
+                            successCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    checkouts,
+                ).toHaveLength(
+                    0,
+                );
+
+
+                expect(
+                    groups,
+                ).toHaveLength(
+                    0,
+                );
+
+
+                expect(
+                    shipments,
+                ).toHaveLength(
+                    0,
+                );
+
+
+                expect(
+                    decisions,
+                ).toHaveLength(
+                    0,
+                );
+            },
+        );
+
+
+        /*
+         * =============================================================
+         * TEST 9
+         * HTTP Failure Flow
+         * =============================================================
+         */
+
+        it(
+            'should persist a failed checkout and create no downstream records when no valid plan exists',
+            async () => {
+                const response =
+                    await request(
+                        app.getHttpServer(),
+                    )
+                        .post(
+                            '/checkout',
+                        )
+                        .set(
+                            'x-api-key',
+                            tenantAApiKey,
+                        )
+                        .send(
+                            createFailedCheckoutDto(),
+                        );
+
+
+                expect(
+                    response.status,
+                ).toBeGreaterThanOrEqual(
+                    400,
+                );
+
+
+                expect(
+                    response.status,
+                ).toBeLessThan(
+                    600,
+                );
+
+
+                failedCheckoutId =
+                    await findCheckoutIdByOrderId(
+                        failedOrderId,
+                    );
+
+
+                const checkoutRows =
+                    await db.query<{
+                        status:
+                        string;
+                    }>(
+                        `
+                        select status
+                        from flow_ship_test_a.checkouts
+                        where id = $1
+                        `,
+                        [
+                            failedCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    checkoutRows,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    checkoutRows[0]
+                        .status,
+                ).toBe(
+                    'failed',
+                );
+
+
+                const processingRows =
+                    await db.query<{
+                        status:
+                        string;
+                        current_step:
+                        string;
+                        sourcing_completed:
+                        boolean;
+                        grouping_completed:
+                        boolean;
+                        error_message:
+                        string | null;
+                    }>(
+                        `
+                        select
+                            status,
+                            current_step,
+                            sourcing_completed,
+                            grouping_completed,
+                            error_message
+                        from flow_ship_test_a.checkout_processing
+                        where checkout_id = $1
+                        `,
+                        [
+                            failedCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    processingRows,
+                ).toHaveLength(
+                    1,
+                );
+
+
+                expect(
+                    processingRows[0]
+                        .status,
+                ).toBe(
+                    'failed',
+                );
+
+
+                expect(
+                    processingRows[0]
+                        .current_step,
+                ).toBe(
+                    'grouping',
+                );
+
+
+                expect(
+                    processingRows[0]
+                        .sourcing_completed,
+                ).toBe(
+                    true,
+                );
+
+
+                expect(
+                    processingRows[0]
+                        .grouping_completed,
+                ).toBe(
+                    false,
+                );
+
+
+                expect(
+                    processingRows[0]
+                        .error_message,
+                ).toContain(
+                    'No valid shipment plans could be generated',
+                );
+
+
+                const groups =
+                    await db.query(
+                        `
+                        select id
+                        from flow_ship_test_a.shipment_groups
+                        where checkout_id = $1
+                        `,
+                        [
+                            failedCheckoutId,
+                        ],
+                    );
+
+
+                const shipments =
+                    await db.query(
+                        `
+                        select id
+                        from flow_ship_test_a.shipments
+                        where checkout_id = $1
+                        `,
+                        [
+                            failedCheckoutId,
+                        ],
+                    );
+
+
+                const decisions =
+                    await db.query(
+                        `
+                        select checkout_id
+                        from flow_ship_test_a.shipment_decisions
+                        where checkout_id = $1
+                        `,
+                        [
+                            failedCheckoutId,
+                        ],
+                    );
+
+
+                expect(
+                    groups,
+                ).toHaveLength(
+                    0,
+                );
+
+
+                expect(
+                    shipments,
+                ).toHaveLength(
+                    0,
+                );
+
+
+                expect(
+                    decisions,
+                ).toHaveLength(
+                    0,
+                );
+            },
+            60000,
+        );
+
+
+        /*
+         * =============================================================
+         * TEST 10
+         * Audit + Provider logs
+         * =============================================================
+         */
+
+        it(
+            'should create real sourcing audit logs and provider call logs',
+            async () => {
+                const successAuditLogs =
+                    await db.query<{
+                        action:
+                        string;
+                        entity_id:
+                        string;
+                        status:
+                        string;
+                    }>(
+                        `
+                        select
+                            action,
+                            entity_id,
+                            status
+                        from flow_ship_test_a.audit_logs
+                        where entity_id = $1
+                        order by created_at asc
+                        `,
+                        [
+                            successOrderId,
+                        ],
+                    );
+
+
+                expect(
+                    successAuditLogs.some(
+                        (log) =>
+                            log.action ===
+                            'sourcing.completed' &&
+                            log.status ===
+                            'success',
+                    ),
+                ).toBe(
+                    true,
+                );
+
+
+                const failedAuditLogs =
+                    await db.query<{
+                        action:
+                        string;
+                        entity_id:
+                        string;
+                        status:
+                        string;
+                    }>(
+                        `
+                        select
+                            action,
+                            entity_id,
+                            status
+                        from flow_ship_test_a.audit_logs
+                        where entity_id = $1
+                        order by created_at asc
+                        `,
+                        [
+                            failedOrderId,
+                        ],
+                    );
+
+
+                expect(
+                    failedAuditLogs.some(
+                        (log) =>
+                            log.action ===
+                            'sourcing.completed' &&
+                            log.status ===
+                            'failed',
+                    ),
+                ).toBe(
+                    true,
+                );
+
+
+                const providerLogs =
+                    await db.query<{
+                        provider_id:
+                        string;
+                        action:
+                        string;
+                        status:
+                        string;
+                    }>(
+                        `
+                        select
+                            provider_id,
+                            action,
+                            status
+                        from flow_ship_test_a.provider_call_logs
+                        where provider_id = any($1::uuid[])
+                        `,
+                        [[
+                            providerMockId,
+                            providerYangoId,
+                        ]],
+                    );
+
+
+                expect(
+                    providerLogs.length,
+                ).toBeGreaterThan(
+                    0,
+                );
+
+
+                expect(
+                    providerLogs.every(
+                        (log) =>
+                            log.action ===
+                            'get_quote',
+                    ),
+                ).toBe(
+                    true,
+                );
+
+
+                expect(
+                    providerLogs.every(
+                        (log) =>
+                            log.status ===
+                            'success',
+                    ),
+                ).toBe(
+                    true,
+                );
+
+
+                expect(
+                    providerLogs.some(
+                        (log) =>
+                            log.provider_id ===
+                            providerMockId,
+                    ),
+                ).toBe(
+                    true,
+                );
+
+
+                expect(
+                    providerLogs.some(
+                        (log) =>
+                            log.provider_id ===
+                            providerYangoId,
+                    ),
+                ).toBe(
+                    true,
+                );
+            },
+        );
+    },
+);
