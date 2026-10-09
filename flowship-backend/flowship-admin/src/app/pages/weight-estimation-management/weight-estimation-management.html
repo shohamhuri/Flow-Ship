@@ -1,0 +1,56 @@
+<section class="weight-page" dir="rtl">
+
+    <h1>כללי הערכת משקל</h1>
+
+    <p *ngIf="isLoading">
+        טוען כללי הערכת משקל...
+    </p>
+
+    <p *ngIf="errorMessage">
+        {{ errorMessage }}
+    </p>
+
+    <div *ngIf="!isLoading && !errorMessage">
+
+        <p>
+            נמצאו {{ rules.length }} כללים
+        </p>
+
+        <table *ngIf="rules.length > 0">
+            <thead>
+                <tr>
+                    <th>קטגוריה</th>
+                    <th>סוג מוצר</th>
+                    <th>מידה</th>
+                    <th>משקל משוער</th>
+                    <th>עדיפות</th>
+                    <th>סטטוס</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr *ngFor="let rule of rules">
+                    <td>{{ rule.category || 'הכול' }}</td>
+                    <td>{{ rule.productType || 'הכול' }}</td>
+                    <td>{{ rule.size || 'הכול' }}</td>
+
+                    <td>
+                        {{ rule.estimatedWeightKg }} ק״ג
+                    </td>
+
+                    <td>{{ rule.priority }}</td>
+
+                    <td>
+                        {{ rule.isActive ? 'פעיל' : 'לא פעיל' }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p *ngIf="rules.length === 0">
+            עדיין לא הוגדרו כללי הערכת משקל.
+        </p>
+
+    </div>
+
+</section>
