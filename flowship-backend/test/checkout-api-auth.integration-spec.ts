@@ -3,7 +3,11 @@ import {
     UnauthorizedException,
     ValidationPipe,
 } from '@nestjs/common';
+import { SOURCE_CONFIRMATION_PROVIDER } from
+    '../src/modules/sourcing/sourcing.tokens';
 
+import { MockSourceConfirmationProvider } from
+    '../src/modules/sourcing/providers/mock-source-confirmation.provider';
 import {
     ConfigModule,
     ConfigService,
@@ -19,7 +23,8 @@ import request from 'supertest';
 import { randomUUID } from 'crypto';
 
 import { DbService } from '../src/infrastructure/database/db.service';
-
+import { WeightEstimationService } from
+    '../src/modules/checkout/weight-estimation.service';
 import {
     CurrentTenant,
     TenantsService,
@@ -30,13 +35,15 @@ import { CheckoutController } from '../src/modules/checkout/checkout.controller'
 import { CheckoutService } from '../src/modules/checkout/checkout.service';
 import { SourcingResultsRepository } from '../src/modules/sourcing/sourcing-results.repository';
 import { CheckoutRepository } from '../src/modules/checkout/checkout.repository';
-
+import { CapacityPlanningService } from
+    '../src/modules/checkout/capacity-planning.service';
 import { CheckoutProcessingRepository } from '../src/modules/checkout/checkout-processing.repository';
 
 import { SourcingService } from '../src/modules/sourcing/sourcing.service';
 
 import { MockInventoryProvider } from '../src/modules/sourcing/adapters/mock-inventory.provider';
-
+import { ShipmentPlanConfirmationService } from
+    '../src/modules/planning/shipment-plan-confirmation.service';
 import { INVENTORY_PROVIDER, DISTANCE_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
 
 import { AuditLogsService } from '../src/modules/audit-logs/audit-logs.service';
@@ -44,7 +51,8 @@ import { AuditLogsService } from '../src/modules/audit-logs/audit-logs.service';
 import { GroupingService } from '../src/modules/grouping/grouping.service';
 
 import { GroupingRulesService } from '../src/modules/grouping/grouping-rules.service';
-
+import { DeliverySettingsService } from
+    '../src/modules/planning/delivery-settings.service';
 import { GroupingStrategySettingsRepository } from '../src/modules/grouping/grouping-strategy-settings.repository';
 
 import { ShipmentGroupsRepository } from '../src/modules/grouping/shipment-groups.repository';
@@ -180,7 +188,30 @@ describe(
                                             authenticateAccessTokenMock,
                                     },
                                 },
+                                MockSourceConfirmationProvider,
 
+                                {
+                                    provide: SOURCE_CONFIRMATION_PROVIDER,
+                                    useExisting: MockSourceConfirmationProvider,
+                                },
+
+                                ShipmentPlanConfirmationService,
+                                DeliverySettingsService,
+                                CapacityPlanningService,
+                                {
+                                    provide: WeightEstimationService,
+                                    useValue: {
+                                        resolveWeight: jest.fn(async (_tenant, item) => ({
+                                            weight: item.weight ?? 1,
+                                            weightSource:
+                                                item.weight != null
+                                                    ? 'provided'
+                                                    : 'estimated',
+                                            weightEstimationRuleId: null,
+                                            weightEstimationRule: null,
+                                        })),
+                                    },
+                                },
                                 SupabaseAuthGuard,
 
                                 /*
