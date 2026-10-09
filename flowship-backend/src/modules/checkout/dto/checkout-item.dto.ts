@@ -26,16 +26,21 @@ export class CheckoutItemDto {
     @IsPositive()
     weight?: number; // משקל של יחידה אחת 
 
-
+    @IsOptional()
+    @IsString()
+    category?: string;
 
     @IsOptional()
     @IsString()
-    supplierId?: string; // מקור האספקה / המחסן 
+    productType?: string;
 
     @IsOptional()
     @IsString()
-    category?: string; //קטגוריית המוצר 
+    size?: string;
 
+    @IsOptional()
+    @IsString()
+    supplierId?: string; // מקור האספקה / המחסן
     @IsNumber()
     @Min(0)
     price!: number; //מחיר ליחידה
