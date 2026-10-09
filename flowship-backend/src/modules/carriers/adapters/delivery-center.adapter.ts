@@ -56,7 +56,7 @@ export class DeliveryCenterAdapter implements CarrierAdapter {
             | undefined;
 
         const scooterMaxWeightKg =
-            settings?.vehicleWeightRules?.scooterMaxWeightKg ?? 10;
+            settings?.vehicleWeightRules?.scooterMaxWeightKg ?? 5;
 
         const carMaxWeightKg =
             settings?.vehicleWeightRules?.carMaxWeightKg ?? 50;
@@ -70,12 +70,24 @@ export class DeliveryCenterAdapter implements CarrierAdapter {
                         ? 'car'
                         : 'commercial'
             );
-        const allowedUrgencies =
+        const configuredUrgencies:
+            Array<'urgent' | 'express' | 'standard'> =
             request.urgency
                 ? [request.urgency]
                 : settings?.allowedUrgencies?.length
                     ? settings.allowedUrgencies
-                    : ['urgent'] as const;
+                    : ['urgent'];
+
+        const allowedUrgencies =
+            request.allowedUrgencies
+                ? configuredUrgencies.filter(
+                    (urgency) =>
+                        request.allowedUrgencies!.includes(urgency),
+                )
+                : configuredUrgencies;
+        if (allowedUrgencies.length === 0) {
+            return [];
+        }
 
         const quotes = await Promise.all(
             allowedUrgencies.map(async (urgency) => {
@@ -137,6 +149,8 @@ export class DeliveryCenterAdapter implements CarrierAdapter {
                         urgency === 'standard'
                             ? 1
                             : 0,
+
+                    urgency,
                 } satisfies CarrierQuoteOption;
             }),
         );
