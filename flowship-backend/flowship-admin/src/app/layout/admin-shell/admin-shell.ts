@@ -21,6 +21,7 @@ import {
   Package,
   Users,
   LucideIconData,
+  Settings,
 } from 'lucide-angular';
 import { AuthService } from '../../services/auth';
 import { AdminApiService } from '../../services/admin-api';
@@ -100,6 +101,12 @@ export class AdminShellComponent implements OnInit {
       subtitle: 'Shared / Group Buying',
       route: '/admin/group-purchases',
       icon: Users,
+    },
+    {
+      label: 'הגדרות חנות',
+      subtitle: 'הגדרות כלליות ומשלוחים',
+      route: '/admin/store-settings',
+      icon: Settings,
     },
   ];
 
