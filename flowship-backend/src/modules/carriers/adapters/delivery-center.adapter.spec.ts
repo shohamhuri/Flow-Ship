@@ -230,10 +230,12 @@ describe('DeliveryCenterAdapter', () => {
             expect.arrayContaining([
                 expect.objectContaining({
                     serviceName: 'Urgent Delivery',
+                    urgency: 'urgent',
                     price: 120,
                 }),
                 expect.objectContaining({
                     serviceName: 'Express Delivery',
+                    urgency: 'express',
                     price: 90,
                 }),
             ]),
@@ -272,4 +274,5 @@ describe('DeliveryCenterAdapter', () => {
             }),
         );
     });
+
 });

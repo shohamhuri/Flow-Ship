@@ -360,5 +360,68 @@ describe('CarriersService', () => {
             expect(dbQueryMock).not.toHaveBeenCalled();
             expect(getAdapterMock).not.toHaveBeenCalled();
         });
+        it('should request quotes only from the selected provider', async () => {
+            const providerA = {
+                id: 'provider-1',
+                code: 'provider-a',
+                name: 'Provider A',
+                adapter_key: 'mock',
+                is_mock: true,
+                is_active: true,
+                priority_score: 1,
+                settings: {},
+            };
+
+            const providerB = {
+                id: 'provider-2',
+                code: 'provider-b',
+                name: 'Provider B',
+                adapter_key: 'mock_gett',
+                is_mock: true,
+                is_active: true,
+                priority_score: 1,
+                settings: {},
+            };
+
+            jest.spyOn(
+                service,
+                'getActiveProviders',
+            ).mockResolvedValue([
+                providerA,
+                providerB,
+            ]);
+
+            const adapterA = {
+                getQuote: jest.fn().mockResolvedValue([]),
+            };
+
+            const adapterB = {
+                getQuote: jest.fn().mockResolvedValue([]),
+            };
+            getAdapterMock.mockImplementation(
+                (adapterKey) => {
+                    if (adapterKey === 'mock') {
+                        return adapterA;
+                    }
+
+                    if (adapterKey === 'mock_gett') {
+                        return adapterB;
+                    }
+
+                    throw new Error(
+                        `Unexpected adapter: ${adapterKey}`,
+                    );
+                });
+
+            await service.getQuotes(
+                request,
+                tenant,
+                'provider-2',
+            );
+
+            expect(adapterA.getQuote).not.toHaveBeenCalled();
+
+            expect(adapterB.getQuote).toHaveBeenCalledTimes(1);
+        });
     });
 });
