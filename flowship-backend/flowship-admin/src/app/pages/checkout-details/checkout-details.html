@@ -67,6 +67,1556 @@
                 </strong>
             </article>
         </section>
+        <section *ngIf="checkout.decision as decision" class="content-card">
+            <div class="section-header">
+                <div>
+                    <h2>החלטת מנוע המשלוחים</h2>
+
+                    <p>
+                        סיכום התוכנית שנבחרה על ידי מנוע ההחלטות.
+                    </p>
+                </div>
+
+                <span class="small-badge">
+                    ציון:
+                    {{ decision.score | number:'1.3-4' }}
+                </span>
+            </div>
+
+            <div class="details-grid">
+
+                <div>
+                    <span>אפשרויות שנבדקו</span>
+                    <strong>
+                        {{ decision.evaluatedOptionsCount }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>תוכנית שנבחרה</span>
+                    <strong>
+                        {{ decision.selectedPlanId }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>מחיר משלוח</span>
+                    <strong>
+                        {{
+                        decision.winner.metrics.totalShippingPrice
+                        | currency:'ILS':'symbol':'1.2-2'
+                        }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>זמן אספקה</span>
+                    <strong>
+                        {{
+                        decision.winner.metrics.estimatedDeliveryDays
+                        }}
+                        ימים
+                    </strong>
+                </div>
+
+                <div>
+                    <span>מספר משלוחים</span>
+                    <strong>
+                        {{ decision.winner.metrics.shipmentCount }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>עדיפות ספק ממוצעת</span>
+                    <strong>
+                        {{
+                        decision.winner.metrics.averageProviderPriority
+                        | number:'1.2-2'
+                        }}
+                    </strong>
+                </div>
+
+            </div>
+            <div class="decision-visual">
+                <div class="decision-donut-wrapper">
+                    <div class="decision-donut" [style.background]="
+                getDecisionDonutStyle()
+            ">
+                        <div class="decision-donut-center">
+                            <strong>
+                                {{
+                                decision.score
+                                | number:'1.4-4'
+                                }}
+                            </strong>
+
+                            <span>
+                                ציון סופי
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="decision-donut-legend">
+                    <div *ngFor="
+                let card of
+                    decision.winner
+                        .scoreBreakdown
+                        .cardScores;
+                let cardIndex = index
+            " class="decision-donut-legend-item" [class.decision-donut-legend-disabled]="
+                !card.applied
+            "><span class="decision-donut-dot" [class.decision-donut-dot-disabled]="!card.applied"
+                            [style.background]="getDecisionCardColor(cardIndex, card.applied)"></span>
+
+                        <div class="decision-donut-legend-content">
+                            <div class="decision-donut-legend-title">
+                                <strong>
+                                    {{
+                                    getDecisionCriterionLabel(
+                                    card.criterionKey
+                                    )
+                                    }}
+                                </strong>
+
+                                <strong>
+                                    {{
+                                    card.weight * 100
+                                    | number:'1.0-2'
+                                    }}%
+                                </strong>
+                            </div>
+
+                            <div class="decision-donut-legend-details">
+                                <ng-container *ngIf="card.applied">
+                                    ציון:
+                                    {{
+                                    card.rawScore
+                                    | number:'1.3-3'
+                                    }}
+
+                                    · תרומה:
+                                    {{
+                                    card.weightedScore
+                                    | number:'1.4-4'
+                                    }}
+                                </ng-container>
+
+                                <ng-container *ngIf="!card.applied">
+                                    לא הוחל
+
+                                    <ng-container *ngIf="card.providerId">
+                                        · מוגבל לספק
+                                        {{ card.providerId }}
+                                    </ng-container>
+                                </ng-container>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div *ngFor="
+          let selectedGroup of decision.winner.selectedGroupQuotes;
+          let groupIndex = index
+               " class="sourcing-details">
+                <div class="sourcing-title">
+                    תכנון קיבולת ורכבים — קבוצה {{ groupIndex + 1 }}
+                </div>
+
+                <ng-container *ngIf="selectedGroup.vehiclePlan as vehiclePlan">
+
+                    <div class="sourcing-source-data">
+                        <span>
+                            חברת משלוחים: <strong>
+                                {{ vehiclePlan.providerCode }}
+                            </strong>
+                        </span>
+
+                        <span>
+                            משקל הקבוצה:
+                            <strong>
+                                {{ selectedGroup.weightKg | number:'1.0-3' }}
+                                ק״ג
+                            </strong>
+                        </span>
+
+                        <span>
+                            מספר רכבים:
+                            <strong>
+                                {{ vehiclePlan.plan.vehicles.length }}
+                            </strong>
+                        </span>
+                    </div>
+
+                    <div class="sourcing-sources">
+
+                        <div *ngFor="
+                    let vehicle of vehiclePlan.plan.vehicles;
+                    let vehicleIndex = index
+                " class="sourcing-source">
+                            <div class="sourcing-source-header">
+                                <strong>
+                                    רכב {{ vehicleIndex + 1 }}
+                                    —
+                                    {{ getVehicleTypeLabel(vehicle.vehicleType) }} </strong>
+                            </div>
+
+                            <div class="sourcing-source-data">
+
+                                <span>
+                                    קיבולת מקסימלית:
+                                    <strong>
+                                        <ng-container *ngIf="
+                                    vehicle.maxWeightKg !== null;
+                                    else unlimitedCapacity
+                                ">
+                                            {{ vehicle.maxWeightKg | number:'1.0-3' }}
+                                            ק״ג
+                                        </ng-container>
+
+                                        <ng-template #unlimitedCapacity>
+                                            ללא הגבלה
+                                        </ng-template>
+                                    </strong>
+                                </span>
+
+                                <span>
+                                    משקל שהוקצה:
+                                    <strong>
+                                        {{ vehicle.assignedWeightKg | number:'1.0-3' }}
+                                        ק״ג
+                                    </strong>
+                                </span>
+
+                            </div>
+
+                            <div class="group-items">
+
+                                <div *ngFor="let item of groupVehicleItems(vehicle.items)">
+                                    <strong>
+                                        {{ item.sku }}
+                                    </strong>
+
+                                    <span>
+                                        {{ item.quantity }} יחידות
+                                        ×
+                                        {{ item.unitWeightKg | number:'1.0-3' }} ק״ג
+                                        |
+                                        סה״כ:
+                                        {{ item.totalWeightKg | number:'1.0-3' }} ק״ג
+                                    </span>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </ng-container>
+
+                <div *ngIf="!selectedGroup.vehiclePlan">
+                    לא נשמר תכנון רכב עבור בחירה זו.
+                </div>
+
+            </div>
+            <div *ngIf="decision.evaluatedOptions.length > 0" class="sourcing-details">
+                <div class="decision-options-header">
+                    <div>
+                        <strong>כל האפשרויות שנבדקו</strong>
+
+                        <span class="decision-options-count">
+                            {{ decision.evaluatedOptionsCount }}
+                        </span>
+                    </div>
+
+                    <button type="button" class="decision-options-toggle" (click)="toggleAllDecisionOptions()">
+                        <span>
+                            {{
+                            showAllDecisionOptions
+                            ? 'הסתר אפשרויות'
+                            : 'הצג את כל האפשרויות'
+                            }}
+                        </span>
+
+                        <span class="decision-options-toggle-arrow">
+                            {{ showAllDecisionOptions ? '▲' : '▼' }}
+                        </span>
+                    </button>
+                </div>
+
+                <div class="table-wrapper">
+                    <div *ngIf="showAllDecisionOptions">
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>אפשרות</th>
+                                    <th>תוכנית</th>
+                                    <th>חברת משלוחים</th>
+                                    <th>שירות</th>
+                                    <th>מחיר</th>
+                                    <th>זמן אספקה</th>
+                                    <th>משלוחים</th>
+                                    <th>ציון</th>
+                                    <th>פירוט</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                            <tbody>
+                                <ng-container *ngFor="
+            let option of decision.evaluatedOptions;
+            let optionIndex = index
+         ">
+
+                                    <tr>
+                                        <td>
+                                            {{ optionIndex + 1 }}
+                                        </td>
+
+                                        <td>
+                                            <strong>
+                                                {{ option.id }}
+                                            </strong>
+
+                                            <div *ngIf="
+                                option.id ===
+                                decision.selectedDeliveryOptionId
+                            ">
+                                                <small>
+                                                    ✓ נבחרה
+                                                </small>
+                                            </div>
+                                        </td>
+
+                                        <td>
+                                            {{ option.planId }}
+                                        </td>
+
+                                        <td>
+                                            {{ getDecisionOptionProviders(option) }}
+                                        </td>
+
+                                        <td>
+                                            {{ getDecisionOptionServices(option) }}
+                                        </td>
+
+                                        <td>
+                                            ₪{{
+                                            option.metrics.totalShippingPrice
+                                            | number:'1.2-2'
+                                            }}
+                                        </td>
+
+                                        <td>
+                                            {{
+                                            option.metrics.estimatedDeliveryDays
+                                            }}
+                                            ימים
+                                        </td>
+
+                                        <td>
+                                            {{ option.metrics.shipmentCount }}
+                                        </td>
+
+                                        <td>
+                                            <strong>
+                                                {{ option.score | number:'1.4-4' }}
+                                            </strong>
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-secondary"
+                                                (click)="toggleDecisionOption(option.id)">
+                                                {{
+                                                expandedDecisionOptionId === option.id
+                                                ? 'סגור'
+                                                : 'פתח'
+                                                }}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr *ngIf="expandedDecisionOptionId === option.id">
+                                        <td colspan="10">
+
+                                            <div class="sourcing-details">
+
+                                                <div class="sourcing-title">
+                                                    פירוט ציון — {{ option.id }}
+                                                </div>
+
+
+
+                                                <div class="sourcing-sources">
+
+                                                    <div *ngFor="
+                        let card of option.scoreBreakdown.cardScores
+                    " class="sourcing-source">
+
+                                                        <div class="sourcing-source-header">
+                                                            <strong>
+                                                                {{
+                                                                getDecisionCriterionLabel(
+                                                                card.criterionKey
+                                                                )
+                                                                }}
+                                                            </strong>
+
+                                                            <span>
+                                                                {{ card.applied ? 'הופעל' : 'לא הופעל' }}
+                                                            </span>
+                                                        </div>
+
+                                                        <div class="sourcing-source-data">
+
+                                                            <span>
+                                                                ציון:
+                                                                <strong>
+                                                                    {{ card.rawScore | number:'1.4-4' }}
+                                                                </strong>
+                                                            </span>
+
+                                                            <span>
+                                                                משקל:
+                                                                <strong>
+                                                                    {{ card.weight * 100 | number:'1.0-2' }}%
+                                                                </strong>
+                                                            </span>
+
+                                                            <span>
+                                                                תרומה לציון:
+                                                                <strong>
+                                                                    {{ card.weightedScore | number:'1.4-4' }}
+                                                                </strong>
+                                                            </span>
+
+                                                            <span *ngIf="card.providerId">
+                                                                חברת משלוחים ספציפית:
+                                                                <strong>
+                                                                    {{ card.providerId }}
+                                                                </strong>
+                                                            </span>
+
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                                <div class="sourcing-source-data">
+                                                    <span>
+                                                        <strong>ציון סופי:</strong>
+                                                        {{ option.score | number:'1.4-4' }}
+                                                    </span>
+                                                </div>
+                                                <div *ngFor="
+         let selectedGroup of option.selectedGroupQuotes;
+         let groupIndex = index
+             " class="sourcing-details">
+                                                    <div class="sourcing-title">
+                                                        תכנון קיבולת ורכבים — קבוצה {{ groupIndex + 1 }}
+                                                    </div>
+
+                                                    <ng-container *ngIf="selectedGroup.vehiclePlan as vehiclePlan">
+
+                                                        <div class="sourcing-source-data">
+
+                                                            <span>
+                                                                חברת משלוח: <strong>
+                                                                    {{ vehiclePlan.providerCode }}
+                                                                </strong>
+                                                            </span>
+
+                                                            <span>
+                                                                משקל הקבוצה:
+                                                                <strong>
+                                                                    {{ selectedGroup.weightKg | number:'1.0-3' }}
+                                                                    ק״ג
+                                                                </strong>
+                                                            </span>
+
+                                                            <span>
+                                                                מספר רכבים:
+                                                                <strong>
+                                                                    {{ vehiclePlan.plan.vehicles.length }}
+                                                                </strong>
+                                                            </span>
+
+                                                        </div>
+
+                                                        <div class="sourcing-sources">
+
+                                                            <div *ngFor="
+                    let vehicle of vehiclePlan.plan.vehicles;
+                    let vehicleIndex = index
+                " class="sourcing-source">
+
+                                                                <div class="sourcing-source-header">
+                                                                    <strong>
+                                                                        רכב {{ vehicleIndex + 1 }}
+                                                                        —
+                                                                        {{ getVehicleTypeLabel(vehicle.vehicleType) }}
+                                                                    </strong>
+                                                                </div>
+
+                                                                <div class="sourcing-source-data">
+
+                                                                    <span>
+                                                                        קיבולת:
+                                                                        <strong>
+                                                                            <ng-container *ngIf="
+                                    vehicle.maxWeightKg !== null;
+                                    else unlimitedOptionCapacity
+                                ">
+                                                                                {{
+                                                                                vehicle.maxWeightKg
+                                                                                | number:'1.0-3'
+                                                                                }}
+                                                                                ק״ג
+                                                                            </ng-container>
+
+                                                                            <ng-template #unlimitedOptionCapacity>
+                                                                                ללא הגבלה
+                                                                            </ng-template>
+                                                                        </strong>
+                                                                    </span>
+
+                                                                    <span>
+                                                                        משקל שהוקצה:
+                                                                        <strong>
+                                                                            {{
+                                                                            vehicle.assignedWeightKg
+                                                                            | number:'1.0-3'
+                                                                            }}
+                                                                            ק״ג
+                                                                        </strong>
+                                                                    </span>
+
+                                                                </div>
+
+                                                                <div class="group-items">
+
+                                                                    <div
+                                                                        *ngFor="let item of groupVehicleItems(vehicle.items)">
+                                                                        <strong>
+                                                                            {{ item.sku }}
+                                                                        </strong>
+
+                                                                        <span>
+                                                                            {{ item.quantity }} יחידות
+                                                                            ×
+                                                                            {{ item.unitWeightKg | number:'1.0-3' }} ק״ג
+                                                                            |
+                                                                            סה״כ:
+                                                                            {{ item.totalWeightKg | number:'1.0-3' }}
+                                                                            ק״ג
+                                                                        </span>
+                                                                    </div>
+
+                                                                </div>
+
+                                                            </div>
+
+                                                        </div>
+
+                                                    </ng-container>
+
+                                                </div>
+                                            </div>
+
+                                        </td>
+                                    </tr>
+
+                                </ng-container>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+            <ng-container *ngIf="decision.planning as planning">
+                <div *ngIf="planning.allPlans.length > 0" class="planning-section">
+                    <h3>
+                        תוכניות משלוח שנוצרו
+                        ({{ planning.allPlans.length }})
+                    </h3>
+                    <div class="planning-section">
+                        <h3>יצירת תוכניות משלוח</h3>
+
+                        <div>
+                            <strong>פריטים שנבדקו:</strong>
+                            {{ planning.generation.statistics.inputItemsCount }}
+                        </div>
+
+                        <div>
+                            <strong>קומבינציות אפשריות:</strong>
+                            {{ planning.generation.statistics.theoreticalCombinations }}
+                        </div>
+
+                        <div>
+                            <strong>תוכניות שנוצרו:</strong>
+                            {{ planning.generation.statistics.generatedPlansCount }}
+                        </div>
+
+                        <div>
+                            <strong>האם הגענו למגבלת יצירה:</strong>
+                            {{
+                            planning.generation.statistics.generationLimitReached
+                            ? 'כן'
+                            : 'לא'
+                            }}
+                        </div>
+
+                        <div *ngIf="
+            planning.generation.unresolvedItems.length > 0
+        ">
+                            <strong>פריטים ללא מקור אספקה:</strong>
+
+                            <div *ngFor="
+                let item of planning.generation.unresolvedItems
+            ">
+                                {{ item.sku }}
+                                — כמות נדרשת: {{ item.requestedQuantity }}
+                            </div>
+                        </div>
+                    </div>
+                    <div *ngFor="let plan of planning.allPlans" class="planning-plan-card">
+                        <div class="planning-plan-toggle-header">
+                            <div>
+                                <strong>{{ plan.id }}</strong>
+
+                                <span *ngIf="isPlanningWinningPlan(plan.id)">
+                                    🏆 התוכנית הזוכה
+                                </span>
+
+                                <span *ngIf="!isPlanningWinningPlan(plan.id)">
+                                    {{ isPlanningPlanValid(plan.id) ? '✓ תקינה' : '✕ נפסלה' }}
+                                </span>
+                            </div>
+
+                            <button type="button" class="planning-plan-toggle-button"
+                                (click)="togglePlanningPlan(plan.id)">
+                                {{ isPlanningPlanExpanded(plan.id) ? 'הסתר פירוט ▲' : 'הצג פירוט ▼' }}
+                            </button>
+                        </div>
+
+                        <div *ngIf="isPlanningPlanExpanded(plan.id)">
+                            <div class="planning-plan-summary">
+                                <div>
+                                    <strong>{{ plan.id }}</strong>
+                                    <span>
+                                        — {{ plan.status }}
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <strong>תוצאת בדיקה:</strong>
+
+                                    <span *ngIf="isPlanningPlanValid(plan.id)">
+                                        ✓ עברה
+                                    </span>
+
+                                    <span *ngIf="isPlanningPlanRejected(plan.id)">
+                                        ✕ נפסלה
+                                    </span>
+                                </div>
+                                <div *ngIf="
+        isPlanningPlanRejected(plan.id) &&
+        plan.grouping.ungroupedItems.length > 0
+    ">
+                                    <strong>סיבת הפסילה:</strong>
+
+                                    <div *ngFor="let item of plan.grouping.ungroupedItems">
+                                        <div>
+                                            {{ item.sku }}
+                                            — {{ item.name }}
+                                            (כמות: {{ item.quantity }})
+                                        </div>
+
+                                        <div *ngFor="let reason of item.reasons">
+                                            {{ getPlanningRejectionReasonLabel(reason) }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <strong>המשך תכנון:</strong>
+
+                                    <span *ngIf="isPlanningPlanSelected(plan.id)">
+                                        ✓ נבחרה להמשך
+                                    </span>
+
+                                    <span *ngIf="!isPlanningPlanSelected(plan.id)">
+                                        — לא נבחרה
+                                    </span>
+                                </div>
+                            </div> <!-- planning-plan-summary -->
+                            <ng-container *ngIf="
+    getPlanningConfirmationAttempt(plan.id) as confirmationAttempt
+">
+                                <div class="planning-confirmation-section">
+
+                                    <div class="planning-confirmation-title">
+                                        <strong>אימות מקורות אספקה</strong>
+
+                                        <span class="planning-confirmation-status"
+                                            [class.confirmation-failed]="!confirmationAttempt.confirmed">
+                                            {{
+                                            confirmationAttempt.confirmed
+                                            ? '✓ עבר בהצלחה'
+                                            : '✕ נכשל'
+                                            }}
+                                        </span>
+                                    </div>
+
+                                    <div *ngIf="
+                !confirmationAttempt.confirmed &&
+                confirmationAttempt.failure
+            " class="planning-confirmation-error">
+                                        <strong>סיבת הכישלון:</strong>
+
+                                        {{
+                                        getConfirmationFailureReasonLabel(
+                                        confirmationAttempt.failure.reason
+                                        )
+                                        }}
+
+                                        <div>
+                                            מקור:
+                                            {{ confirmationAttempt.failure.sourceId }}
+                                        </div>
+                                    </div>
+
+                                    <div class="planning-confirmation-sources">
+
+                                        <div *ngFor="let confirmation of confirmationAttempt.confirmations"
+                                            class="planning-confirmation-source">
+                                            <div class="planning-confirmation-source-header">
+                                                <strong>{{ confirmation.sourceId }}</strong>
+
+                                                <span [class.confirmation-failed]="!confirmation.available">
+                                                    {{ confirmation.available ? '✓ זמין' : '✕ לא זמין' }}
+                                                </span>
+                                            </div>
+
+                                            <div class="planning-confirmation-preparation">
+                                                <span>זמן הכנה</span>
+
+                                                <strong>
+                                                    {{
+                                                    confirmation.preparationMinutes !== null
+                                                    ? confirmation.preparationMinutes + ' דקות'
+                                                    : 'לא ידוע'
+                                                    }}
+                                                </strong>
+                                            </div>
+
+                                            <div class="planning-confirmation-items">
+                                                <div *ngFor="let item of confirmation.items"
+                                                    class="planning-confirmation-item">
+                                                    <strong>{{ item.sku }}</strong>
+
+                                                    <span>
+                                                        נדרש: {{ item.requestedQuantity }}
+                                                        |
+                                                        זמין: {{ item.availableQuantity }}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+                            </ng-container>
+
+                            <div *ngIf="getPlanningQuotedPlan(plan.id) as quotedPlan" class="planning-capacity-trace">
+
+                                <div class="planning-capacity-title">
+                                    <strong>
+                                        תכנון קיבולת ורכבים
+                                        ({{ quotedPlan.groupQuotes.length }} קבוצות)
+                                    </strong>
+
+                                    <button type="button" class="planning-plan-toggle-button"
+                                        (click)="togglePlanningSection(plan.id, 'capacity')">
+                                        {{
+                                        isPlanningSectionExpanded(plan.id, 'capacity')
+                                        ? '▲ הסתר פירוט'
+                                        : '▼ הצג פירוט'
+                                        }}
+                                    </button>
+                                </div>
+
+                                <ng-container *ngIf="isPlanningSectionExpanded(plan.id, 'capacity')">
+
+                                    <div *ngFor="let groupQuote of quotedPlan.groupQuotes"
+                                        class="planning-capacity-group">
+                                        <div class="planning-capacity-group-header">
+                                            <strong>
+                                                קבוצה {{ groupQuote.groupId }}
+                                            </strong>
+
+                                            <span>
+                                                {{ groupQuote.weightKg | number:'1.0-3' }}
+                                                ק״ג
+                                            </span>
+                                        </div>
+
+                                        <div *ngFor="
+                let providerTrace of
+                    groupQuote.capacityPlanningTrace
+            " class="planning-capacity-provider">
+                                            <ng-container *ngIf="providerTrace.capacities.length > 0">
+                                                <div class="planning-capacity-provider-header">
+                                                    <strong>
+                                                        {{ providerTrace.providerCode }}
+                                                    </strong>
+
+                                                    <span *ngIf="
+                        providerTrace.capacities.length === 0
+                    ">
+                                                        ללא תכנון קיבולת
+                                                    </span>
+                                                </div>
+
+                                                <ng-container *ngIf="
+                    providerTrace.capacities.length > 0
+                ">
+                                                    <div class="planning-capacity-capacities">
+                                                        <strong>קיבולות:</strong>
+
+                                                        <span *ngFor="
+                            let capacity of
+                                providerTrace.capacities;
+                            let last = last
+                        ">
+                                                            {{
+                                                            getVehicleTypeLabel(
+                                                            capacity.vehicleType
+                                                            )
+                                                            }}
+                                                            —
+                                                            {{
+                                                            capacity.maxWeightKg === null
+                                                            ? 'ללא מגבלה'
+                                                            : (
+                                                            capacity.maxWeightKg
+                                                            | number:'1.0-3'
+                                                            ) + ' ק״ג'
+                                                            }}{{ last ? '' : ' · ' }}
+                                                        </span>
+                                                    </div>
+
+                                                    <div class="planning-capacity-candidates">
+                                                        <div *ngFor="
+                            let candidate of
+                                providerTrace.candidates;
+                            let candidateIndex = index
+                        " class="planning-capacity-candidate" [class.planning-capacity-candidate-rejected]="
+                            candidate.status === 'rejected'
+                        ">
+                                                            <div class="planning-capacity-candidate-header">
+                                                                <strong>
+                                                                    {{
+                                                                    candidate.status === 'accepted'
+                                                                    ? '✓'
+                                                                    : '✕'
+                                                                    }}
+                                                                    חלופה
+                                                                    {{ candidateIndex + 1 }}
+                                                                </strong>
+
+                                                                <span>
+                                                                    <ng-container *ngFor="
+                                        let part of
+                                            candidate.plan.parts;
+                                        let last = last
+                                    ">
+                                                                        {{
+                                                                        getVehicleTypeLabel(
+                                                                        part.vehicleType
+                                                                        )
+                                                                        }}
+                                                                        × {{ part.vehicleCount
+                                                                        }}{{ last ? '' : ' + ' }}
+                                                                    </ng-container>
+                                                                </span>
+                                                            </div>
+
+                                                            <div *ngIf="
+                                candidate.status ===
+                                'rejected'
+                            " class="planning-capacity-rejection">
+                                                                {{
+                                                                getCapacityRejectionReasonLabel(
+                                                                candidate.rejectionReason
+                                                                )
+                                                                }}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </ng-container>
+
+                                            </ng-container>
+                                            <div *ngIf="
+        getProvidersWithoutCapacity(
+            groupQuote.capacityPlanningTrace
+        ) as providersWithoutCapacity
+    " class="planning-capacity-no-capacity">
+                                                <span *ngIf="providersWithoutCapacity">
+                                                    ספקים שנבדקו ללא תכנון קיבולת:
+                                                    <strong>
+                                                        {{ providersWithoutCapacity }}
+                                                    </strong>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </ng-container>
+
+                            </div>
+                            <div *ngIf="getPlanningQuotedPlan(plan.id) as quotedPlan" class="planning-quotes-trace">
+
+                                <div class="planning-quotes-title">
+
+                                    <strong>
+                                        הצעות מחיר
+                                        ({{ quotedPlan.groupQuotes.length }} קבוצות)
+                                    </strong>
+
+                                    <button type="button" class="planning-plan-toggle-button"
+                                        (click)="togglePlanningSection(plan.id, 'quotes')">
+                                        {{
+                                        isPlanningSectionExpanded(plan.id, 'quotes')
+                                        ? '▲ הסתר פירוט'
+                                        : '▼ הצג פירוט'
+                                        }}
+                                    </button>
+
+                                </div>
+
+                                <ng-container *ngIf="isPlanningSectionExpanded(plan.id, 'quotes')">
+
+                                    <div *ngFor="let groupQuote of quotedPlan.groupQuotes"
+                                        class="planning-quotes-group">
+                                        <div class="planning-quotes-group-header">
+                                            <strong>
+                                                קבוצה {{ groupQuote.groupId }}
+                                            </strong>
+
+                                            <span>
+                                                {{ groupQuote.pickupCities.join(', ') }}
+                                                ←
+                                                {{ groupQuote.destinationCity }}
+                                            </span>
+                                        </div>
+
+                                        <ng-container *ngIf="
+                groupQuote.vehiclePlans &&
+                groupQuote.vehiclePlans.length > 0
+            ">
+                                            <div *ngFor="
+                    let vehiclePlan of
+                        groupQuote.vehiclePlans
+                " class="planning-quotes-provider">
+                                                <div class="planning-quotes-provider-header">
+                                                    <strong>
+                                                        {{ vehiclePlan.providerCode }}
+                                                    </strong>
+
+                                                    <span>
+                                                        תוכנית רכב —
+                                                        {{ vehiclePlan.vehicleQuotes.length }}
+                                                        רכב לתמחור
+                                                    </span>
+                                                </div>
+
+                                                <div *ngFor="
+                        let vehicleQuote of
+                            vehiclePlan.vehicleQuotes
+                    " class="planning-quotes-vehicle">
+                                                    <div class="planning-quotes-vehicle-header">
+                                                        <strong>
+                                                            {{
+                                                            getVehicleTypeLabel(
+                                                            vehicleQuote.vehicleType
+                                                            )
+                                                            }}
+                                                        </strong>
+
+                                                        <span>
+                                                            משקל:
+                                                            {{
+                                                            vehicleQuote.assignedWeightKg
+                                                            | number:'1.0-3'
+                                                            }}
+                                                            ק״ג
+                                                        </span>
+                                                    </div>
+
+                                                    <div *ngIf="
+                            vehicleQuote.quotes.length > 0
+                        " class="planning-quotes-list">
+                                                        <div *ngFor="
+                                let quote of
+                                    vehicleQuote.quotes
+                            " class="planning-quote-item">
+                                                            <div class="planning-quote-main">
+                                                                <strong>
+                                                                    {{ quote.serviceName }}
+                                                                </strong>
+
+                                                                <span>
+                                                                    {{ quote.price | number:'1.2-2' }}
+                                                                    ₪
+                                                                </span>
+                                                            </div>
+
+                                                            <div class="planning-quote-details">
+                                                                <span>
+                                                                    מוביל:
+                                                                    <strong>
+                                                                        {{ quote.carrierName }}
+                                                                    </strong>
+                                                                </span>
+
+                                                                <span *ngIf="quote.urgency">
+                                                                    סוג:
+                                                                    <strong>
+                                                                        {{ quote.urgency }}
+                                                                    </strong>
+                                                                </span>
+
+                                                                <span>
+                                                                    זמן אספקה:
+                                                                    <strong>
+                                                                        {{ quote.estimatedDays }}
+                                                                        ימים
+                                                                    </strong>
+                                                                </span>
+
+                                                                <span *ngIf="
+                                        quote.providerPriority !==
+                                        undefined
+                                    ">
+                                                                    עדיפות ספק:
+                                                                    <strong>
+                                                                        {{
+                                                                        quote.providerPriority
+                                                                        | number:'1.0-3'
+                                                                        }}
+                                                                    </strong>
+                                                                </span>
+
+                                                                <span *ngIf="quote.adapterKey">
+                                                                    Adapter:
+                                                                    <strong>
+                                                                        {{ quote.adapterKey }}
+                                                                    </strong>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div *ngIf="
+                            vehicleQuote.quotes.length === 0
+                        " class="planning-quotes-empty">
+                                                        לא התקבלו הצעות מחיר לרכב זה
+                                                    </div>
+
+                                                    <div *ngIf="
+                            vehicleQuote.failedProviders.length > 0
+                        " class="planning-quotes-failures">
+                                                        <strong>
+                                                            כשלונות בקבלת הצעה:
+                                                        </strong>
+
+                                                        <div *ngFor="
+                                let failure of
+                                    vehicleQuote.failedProviders
+                            " class="planning-quote-failure">
+                                                            <span>
+                                                                ✕
+                                                                {{ failure.providerName }}
+                                                                ({{ failure.providerCode }})
+                                                            </span>
+
+                                                            <span>
+                                                                {{ failure.error }}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div *ngIf="
+                        vehiclePlan.alternatives &&
+                        vehiclePlan.alternatives.length > 0
+                    " class="planning-quote-alternatives">
+                                                    <strong>
+                                                        חלופות מחיר שנוצרו:
+                                                    </strong>
+
+                                                    <div *ngFor="
+                            let alternative of
+                                vehiclePlan.alternatives
+                        " class="planning-quote-alternative">
+                                                        <span>
+                                                            {{ alternative.urgency }}
+                                                        </span>
+
+                                                        <span>
+                                                            {{
+                                                            alternative.totalPrice
+                                                            | number:'1.2-2'
+                                                            }}
+                                                            ₪
+                                                        </span>
+
+                                                        <span>
+                                                            {{
+                                                            alternative.estimatedDays
+                                                            }}
+                                                            ימים
+                                                        </span>
+
+                                                        <span>
+                                                            {{
+                                                            alternative.vehicleCount
+                                                            }}
+                                                            רכבים
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </ng-container>
+
+                                        <div *ngIf="
+                !groupQuote.vehiclePlans ||
+                groupQuote.vehiclePlans.length === 0
+            " class="planning-quotes-empty">
+                                            לא נוצרו תוכניות רכב לתמחור
+                                        </div>
+                                    </div>
+                                </ng-container>
+
+                            </div>
+                            <div *ngIf="
+        getPlanningDeliveryOptions(plan.id)
+            as deliveryResult
+    " class="planning-delivery-options">
+                                <div class="planning-delivery-options-title">
+
+                                    <strong>
+                                        אפשרויות משלוח
+                                        ({{ deliveryResult.deliveryOptions.length }})
+                                    </strong>
+
+                                    <button type="button" class="planning-plan-toggle-button"
+                                        (click)="togglePlanningSection(plan.id, 'delivery-options')">
+                                        {{
+                                        isPlanningSectionExpanded(plan.id, 'delivery-options')
+                                        ? '▲ הסתר פירוט'
+                                        : '▼ הצג פירוט'
+                                        }}
+                                    </button>
+
+                                </div>
+                                <ng-container *ngIf="isPlanningSectionExpanded(plan.id, 'delivery-options')">
+                                    <div *ngFor="
+            let option of
+                deliveryResult.deliveryOptions;
+            let optionIndex = index
+        " class="planning-delivery-option">
+                                        <ng-container *ngIf="
+        getEvaluatedDecisionOption(option.id)
+            as evaluatedOption
+    ">
+                                            <div class="planning-delivery-option-header"
+                                                [class.planning-delivery-option-header-winner]="
+            decision.selectedDeliveryOptionId === option.id
+        ">
+                                                <div>
+                                                    <strong>
+                                                        <span *ngIf="
+                        decision.selectedDeliveryOptionId ===
+                        option.id
+                    ">
+                                                            🏆
+                                                        </span>
+
+                                                        אפשרות {{ optionIndex + 1 }}
+                                                    </strong>
+
+                                                    <span class="planning-delivery-option-id">
+                                                        {{ option.id }}
+                                                    </span>
+                                                </div>
+
+                                                <div class="planning-delivery-option-result">
+                                                    <span>
+                                                        ציון מנוע:
+                                                        <strong>
+                                                            {{
+                                                            evaluatedOption.score
+                                                            | number:'1.4-4'
+                                                            }}
+                                                        </strong>
+                                                    </span>
+
+                                                    <strong class="planning-delivery-option-price">
+                                                        {{
+                                                        option.metrics.totalShippingPrice
+                                                        | number:'1.2-2'
+                                                        }}
+                                                        ₪
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </ng-container>
+
+                                        <div class="planning-delivery-option-metrics">
+                                            <span>
+                                                זמן אספקה:
+                                                <strong>
+                                                    {{
+                                                    option.metrics.estimatedDeliveryDays
+                                                    }}
+                                                    ימים
+                                                </strong>
+                                            </span>
+
+                                            <span>
+                                                משלוחים:
+                                                <strong>
+                                                    {{ option.metrics.shipmentCount }}
+                                                </strong>
+                                            </span>
+
+                                            <span>
+                                                עדיפות ספק:
+                                                <strong>
+                                                    {{
+                                                    option.metrics.averageProviderPriority
+                                                    | number:'1.0-3'
+                                                    }}
+                                                </strong>
+                                            </span>
+                                        </div>
+
+                                        <div *ngFor="
+                let selectedGroup of
+                    option.selectedGroupQuotes
+            " class="planning-delivery-group">
+                                            <div class="planning-delivery-group-header">
+                                                <strong>
+                                                    {{ selectedGroup.quote.providerCode }}
+                                                </strong>
+
+                                                <span>
+                                                    {{
+                                                    selectedGroup.weightKg
+                                                    | number:'1.0-3'
+                                                    }}
+                                                    ק״ג
+                                                </span>
+                                            </div>
+
+                                            <div class="planning-delivery-service">
+                                                <div>
+                                                    <strong>
+                                                        <ng-container
+                                                            *ngIf="selectedGroup.vehiclePlan; else regularQuote">
+                                                            תוכנית רכב
+                                                            {{
+                                                            selectedGroup.quote.urgency === 'express'
+                                                            ? 'אקספרס'
+                                                            : selectedGroup.quote.urgency === 'urgent'
+                                                            ? 'דחופה'
+                                                            : 'רגילה'
+                                                            }}
+                                                        </ng-container>
+
+                                                        <ng-template #regularQuote>
+                                                            {{ selectedGroup.quote.serviceName }}
+                                                        </ng-template>
+                                                    </strong>
+
+                                                    <span *ngIf="selectedGroup.quote.urgency">
+                                                        {{ selectedGroup.quote.urgency }}
+                                                    </span>
+                                                </div>
+
+                                                <strong>
+                                                    {{
+                                                    selectedGroup.quote.price
+                                                    | number:'1.2-2'
+                                                    }}
+                                                    ₪
+                                                </strong>
+                                            </div>
+
+                                            <div class="planning-delivery-details">
+                                                <span>
+                                                    {{ selectedGroup.pickupCities.join(', ') }}
+                                                    ←
+                                                    {{ selectedGroup.destinationCity }}
+                                                </span>
+
+                                                <span>
+                                                    אספקה:
+                                                    <strong>
+                                                        {{
+                                                        selectedGroup.quote.estimatedDays
+                                                        }}
+                                                        ימים
+                                                    </strong>
+                                                </span>
+
+                                                <span *ngIf="
+                        selectedGroup.vehiclePlan
+                            as vehiclePlan
+                    ">
+                                                    רכב:
+
+                                                    <strong>
+                                                        <ng-container *ngFor="
+                                let part of
+                                    vehiclePlan.plan.parts;
+                                let last = last
+                            ">
+                                                            {{
+                                                            getVehicleTypeLabel(
+                                                            part.vehicleType
+                                                            )
+                                                            }}
+                                                            × {{ part.vehicleCount
+                                                            }}{{ last ? '' : ' + ' }}
+                                                        </ng-container>
+                                                    </strong>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="planning-delivery-option-flow">
+                                            Quote
+                                            <span>←</span>
+                                            Delivery Option
+                                            <span>←</span>
+                                            מנוע החלטות
+                                        </div>
+                                        <ng-container *ngIf="
+        getEvaluatedDecisionOption(option.id)
+            as evaluatedOption
+    ">
+                                            <button type="button" class="planning-decision-details-button"
+                                                (click)="toggleDecisionOption(option.id)">
+                                                {{
+                                                expandedDecisionOptionId === option.id
+                                                ? 'הסתר פירוט ציון'
+                                                : 'פירוט ציון'
+                                                }}
+                                            </button>
+
+                                            <div *ngIf="
+            expandedDecisionOptionId === option.id
+        " class="planning-decision-breakdown">
+                                                <div class="planning-decision-breakdown-title">
+                                                    פירוט מנוע ההחלטות
+                                                </div>
+
+                                                <div class="planning-decision-base-scores">
+                                                    <div>
+                                                        <span>מחיר</span>
+
+                                                        <strong>
+                                                            {{
+                                                            evaluatedOption
+                                                            .scoreBreakdown
+                                                            .priceScore
+                                                            | number:'1.4-4'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>מהירות אספקה</span>
+
+                                                        <strong>
+                                                            {{
+                                                            evaluatedOption
+                                                            .scoreBreakdown
+                                                            .speedScore
+                                                            | number:'1.4-4'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>עדיפות ספק</span>
+
+                                                        <strong>
+                                                            {{
+                                                            evaluatedOption
+                                                            .scoreBreakdown
+                                                            .providerPriorityScore
+                                                            | number:'1.4-4'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>מספר משלוחים</span>
+
+                                                        <strong>
+                                                            {{
+                                                            evaluatedOption
+                                                            .scoreBreakdown
+                                                            .shipmentCountScore
+                                                            | number:'1.4-4'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+                                                </div>
+
+                                                <div *ngIf="
+                evaluatedOption
+                    .scoreBreakdown
+                    .cardScores.length > 0
+            " class="planning-decision-cards">
+                                                    <strong>
+                                                        כרטיסי החלטה
+                                                    </strong>
+
+                                                    <div *ngFor="
+                    let card of
+                        evaluatedOption
+                            .scoreBreakdown
+                            .cardScores
+                " class="planning-decision-card" [class.planning-decision-card-not-applied]="
+                    !card.applied
+                ">
+                                                        <div>
+                                                            <strong>
+                                                                {{
+                                                                getDecisionCriterionLabel(
+                                                                card.criterionKey
+                                                                )
+                                                                }}
+                                                            </strong>
+
+                                                            <span *ngIf="card.providerId">
+                                                                חברת משלוחים: {{ card.providerId }}
+                                                            </span>
+                                                        </div>
+
+                                                        <div class="planning-decision-card-values">
+                                                            <span>
+                                                                ציון:
+                                                                <strong>
+                                                                    {{
+                                                                    card.rawScore
+                                                                    | number:'1.4-4'
+                                                                    }}
+                                                                </strong>
+                                                            </span>
+
+                                                            <span>
+                                                                משקל:
+                                                                <strong>
+                                                                    {{
+                                                                    card.weight * 100
+                                                                    | number:'1.0-2'
+                                                                    }}%
+                                                                </strong>
+                                                            </span>
+
+                                                            <span>
+                                                                תרומה:
+                                                                <strong>
+                                                                    {{
+                                                                    card.weightedScore
+                                                                    | number:'1.4-4'
+                                                                    }}
+                                                                </strong>
+                                                            </span>
+
+                                                            <span>
+                                                                {{
+                                                                card.applied
+                                                                ? '✓ הוחל'
+                                                                : '— לא הוחל'
+                                                                }}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="planning-decision-final-score">
+                                                    <span>
+                                                        ציון סופי
+                                                    </span>
+
+                                                    <strong>
+                                                        {{
+                                                        evaluatedOption.score
+                                                        | number:'1.4-4'
+                                                        }}
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </ng-container>
+                                    </div>
+                                </ng-container>
+
+                            </div>
+
+                            <div *ngIf="!getPlanningDeliveryOptions(plan.id)" class="planning-delivery-options-empty">
+                                לא נוצרו אפשרויות משלוח
+                            </div>
+                            <div>
+                                <strong>מנוע החלטות:</strong>
+
+                                ✓ נבדקו
+                                {{ getPlanningEvaluatedOptionsCount(plan.id) }}
+                                אפשרויות
+                            </div>
+
+                            <div>
+                                <strong>תוצאה סופית:</strong>
+
+                                <span *ngIf="isPlanningWinningPlan(plan.id)">
+                                    🏆 התוכנית הזוכה
+                                </span>
+
+                                <span *ngIf="!isPlanningWinningPlan(plan.id)">
+                                    — לא נבחרה
+                                </span>
+                            </div>
+                            <div>
+                                מספר קבוצות:
+                                <strong>
+                                    {{ plan.grouping.totalGroups }}
+                                </strong>
+                            </div>
+
+                            <div>
+                                שיוכי פריטים:
+                                <strong>
+                                    {{ plan.assignments.length }}
+                                </strong>
+                            </div>
+
+                            <div *ngFor="let assignment of plan.assignments">
+                                {{ assignment.sku }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </ng-container>
+        </section>
 
         <section class="content-card">
             <div class="section-header">
@@ -154,9 +1704,40 @@
                                 </td>
 
                                 <td>
-                                    {{ item.unitWeight }} ק״ג
-                                </td>
+                                    <div>
+                                        {{ item.unitWeight }} ק״ג
+                                    </div>
 
+                                    <small *ngIf="item.weightSource === 'actual'">
+                                        משקל בפועל
+                                    </small>
+
+                                    <ng-container *ngIf="
+            item.weightSource === 'estimated' &&
+            item.weightEstimationRule
+        ">
+                                        <div>
+                                            <small>
+                                                משקל מוערך
+                                            </small>
+                                        </div>
+
+                                        <div>
+                                            <small>
+                                                כלל:
+                                                {{ item.weightEstimationRule.category || 'הכול' }}
+                                                /
+                                                {{ item.weightEstimationRule.productType || 'הכול' }}
+                                                /
+                                                {{ item.weightEstimationRule.size || 'הכול' }}
+                                            </small>
+                                        </div>
+                                    </ng-container>
+
+                                    <small *ngIf="!item.weightSource">
+                                        מקור משקל לא זמין
+                                    </small>
+                                </td>
                                 <td>
                                     {{ item.supplierId || '—' }}
                                 </td>

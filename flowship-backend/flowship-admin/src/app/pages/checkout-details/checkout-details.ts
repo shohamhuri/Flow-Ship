@@ -7,7 +7,11 @@ import {
 
 import {
   AdminApiService,
+  CapacityPlanRejectionReason,
+  CheckoutCapacityPlanningTrace,
   CheckoutDetails,
+  CheckoutPlanningDeliveryOptionsResult,
+  CheckoutPlanningQuotedPlan,
   CheckoutShipmentStop,
 } from '../../services/admin-api';
 
@@ -23,7 +27,56 @@ export class CheckoutDetailsComponent implements OnInit {
 
   isLoading = true;
   errorMessage = '';
+  expandedDecisionOptionId: string | null = null;
+  expandedPlanningPlanIds: string[] = [];
 
+  togglePlanningPlan(planId: string): void {
+    if (this.expandedPlanningPlanIds.includes(planId)) {
+      this.expandedPlanningPlanIds =
+        this.expandedPlanningPlanIds.filter(id => id !== planId);
+    } else {
+      this.expandedPlanningPlanIds = [
+        ...this.expandedPlanningPlanIds,
+        planId
+      ];
+    }
+  }
+  expandedPlanningSections = new Set<string>();
+
+  togglePlanningSection(
+    planId: string,
+    section: string
+  ): void {
+    const key = `${planId}:${section}`;
+
+    const next = new Set(this.expandedPlanningSections);
+
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+
+    this.expandedPlanningSections = next;
+  }
+
+  isPlanningSectionExpanded(
+    planId: string,
+    section: string
+  ): boolean {
+    return this.expandedPlanningSections.has(
+      `${planId}:${section}`
+    );
+  }
+  isPlanningPlanExpanded(planId: string): boolean {
+    return this.expandedPlanningPlanIds.includes(planId);
+  }
+  toggleDecisionOption(optionId: string): void {
+    this.expandedDecisionOptionId =
+      this.expandedDecisionOptionId === optionId
+        ? null
+        : optionId;
+  }
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
@@ -276,5 +329,384 @@ export class CheckoutDetailsComponent implements OnInit {
       default:
         return sourceType;
     }
+  }
+  getDecisionCriterionLabel(
+    criterionKey: string
+  ): string {
+    switch (criterionKey) {
+      case 'price':
+        return 'מחיר';
+
+      case 'speed':
+        return 'מהירות אספקה';
+
+      case 'provider_priority':
+        return 'עדיפות חברת משלוחים';
+
+      case 'shipment_count':
+        return 'מספר משלוחים';
+
+      default:
+        return criterionKey;
+    }
+  }
+  groupVehicleItems(
+    items: Array<{
+      sku: string;
+      quantity: number;
+      unitWeightKg: number;
+    }>
+  ): Array<{
+    sku: string;
+    quantity: number;
+    unitWeightKg: number;
+    totalWeightKg: number;
+  }> {
+    const grouped = new Map<
+      string,
+      {
+        sku: string;
+        quantity: number;
+        unitWeightKg: number;
+        totalWeightKg: number;
+      }
+    >();
+
+    for (const item of items) {
+      const existing = grouped.get(item.sku);
+
+      if (existing) {
+        existing.quantity += item.quantity;
+        existing.totalWeightKg +=
+          item.quantity * item.unitWeightKg;
+      } else {
+        grouped.set(item.sku, {
+          sku: item.sku,
+          quantity: item.quantity,
+          unitWeightKg: item.unitWeightKg,
+          totalWeightKg:
+            item.quantity * item.unitWeightKg
+        });
+      }
+    }
+
+    return Array.from(grouped.values());
+  }
+  showAllDecisionOptions = false;
+
+  toggleAllDecisionOptions(): void {
+    this.showAllDecisionOptions =
+      !this.showAllDecisionOptions;
+  }
+  getDecisionOptionProviders(
+    option: NonNullable<
+      NonNullable<typeof this.checkout>['decision']
+    >['evaluatedOptions'][number]
+  ): string {
+    const providers = option.selectedGroupQuotes.map(
+      group =>
+        group.quote.providerCode ||
+        group.quote.carrierName
+    );
+
+    return [...new Set(providers)].join(', ');
+  }
+
+  getDecisionOptionServices(
+    option: NonNullable<
+      NonNullable<typeof this.checkout>['decision']
+    >['evaluatedOptions'][number]
+  ): string {
+    const services = option.selectedGroupQuotes.map(
+      group => {
+        if (group.vehiclePlan) {
+          switch (group.quote.urgency) {
+            case 'urgent':
+              return 'תוכנית רכב דחופה';
+
+            case 'express':
+              return 'תוכנית רכב אקספרס';
+
+            case 'standard':
+              return 'תוכנית רכב רגילה';
+
+            default:
+              return 'תוכנית רכב';
+          }
+        }
+
+        return group.quote.serviceName;
+      }
+    );
+
+    const counts = new Map<string, number>();
+
+    for (const service of services) {
+      counts.set(
+        service,
+        (counts.get(service) ?? 0) + 1
+      );
+    }
+
+    return Array.from(counts.entries())
+      .map(([service, count]) =>
+        count > 1
+          ? `${service} × ${count}`
+          : service
+      )
+      .join(', ');
+  }
+
+  isPlanningPlanValid(
+    planId: string
+  ): boolean {
+    return (
+      this.checkout?.decision?.planning?.validPlans
+        ?.some((plan) => plan.id === planId) ??
+      false
+    );
+  }
+
+  isPlanningPlanRejected(
+    planId: string
+  ): boolean {
+    return (
+      this.checkout?.decision?.planning?.rejectedPlans
+        ?.some((plan) => plan.id === planId) ??
+      false
+    );
+  }
+  isPlanningPlanSelected(
+    planId: string
+  ): boolean {
+    return (
+      this.checkout?.decision?.planning?.selectedPlans
+        ?.some((plan) => plan.id === planId) ??
+      false
+    );
+  }
+  getPlanningQuotedPlan(
+    planId: string
+  ): CheckoutPlanningQuotedPlan | null {
+    return (
+      this.checkout?.decision?.planning?.quotedPlans
+        ?.find((quotedPlan) => quotedPlan.plan.id === planId) ??
+      null
+    );
+  }
+  getPlanningDeliveryOptions(
+    planId: string
+  ): CheckoutPlanningDeliveryOptionsResult | null {
+    return (
+      this.checkout?.decision?.planning?.deliveryOptions
+        ?.find(
+          (result) =>
+            result.quotedPlan.plan.id === planId
+        ) ??
+      null
+    );
+  }
+  getPlanningEvaluatedOptionsCount(
+    planId: string
+  ): number {
+    return (
+      this.checkout?.decision?.evaluatedOptions
+        ?.filter((option) => option.planId === planId)
+        .length ?? 0
+    );
+  }
+
+  isPlanningWinningPlan(
+    planId: string
+  ): boolean {
+    return (
+      this.checkout?.decision?.selectedPlanId === planId
+    );
+  }
+  getPlanningRejectionReasonLabel(
+    reason: string
+  ): string {
+    switch (reason) {
+      case 'SOURCE_ASSIGNMENT_NOT_FOUND':
+        return 'לא נמצא שיוך למקור אספקה';
+
+      case 'NO_SUPPLY_SOURCE_SELECTED':
+        return 'לא נבחר מקור אספקה';
+
+      default:
+        return reason;
+    }
+  }
+  getPlanningConfirmationAttempt(
+    planId: string
+  ) {
+    return (
+      this.checkout?.decision?.planning
+        ?.confirmationAttempts
+        ?.find(
+          (attempt) =>
+            attempt.plan.id === planId
+        ) ?? null
+    );
+  }
+  getConfirmationFailureReasonLabel(
+    reason: string
+  ): string {
+    switch (reason) {
+      case 'SOURCE_NOT_AVAILABLE':
+        return 'מקור האספקה אינו זמין';
+
+      case 'INVALID_PREPARATION_TIME':
+        return 'זמן ההכנה שהתקבל אינו תקין';
+
+      case 'INSUFFICIENT_QUANTITY':
+        return 'אין כמות מספקת במקור האספקה';
+
+      case 'INVALID_SOURCE_RESPONSE':
+        return 'התקבלה תגובה לא תקינה ממקור האספקה';
+
+      case 'CONFIRMATION_PROVIDER_ERROR':
+        return 'אירעה שגיאה בעת אימות מקור האספקה';
+
+      default:
+        return reason;
+    }
+  }
+  getCapacityRejectionReasonLabel(
+    reason: CapacityPlanRejectionReason | null
+  ): string {
+    switch (reason) {
+      case 'INSUFFICIENT_TOTAL_CAPACITY':
+        return 'אין קיבולת כוללת מספקת';
+
+      case 'NON_MINIMAL_COMMERCIAL_PLAN':
+        return 'תוכנית מסחרית כוללת רכב נוסף שאינו נדרש';
+
+      case 'ITEMS_DO_NOT_FIT_VEHICLES':
+        return 'לא ניתן לשבץ את כל הפריטים ברכבים';
+
+      case 'UNUSED_VEHICLE':
+        return 'התוכנית כוללת רכב שלא נעשה בו שימוש';
+
+      default:
+        return '';
+    }
+  }
+  getVehicleTypeLabel(
+    vehicleType:
+      | 'scooter'
+      | 'car'
+      | 'commercial'
+  ): string {
+    switch (vehicleType) {
+      case 'scooter':
+        return 'קטנוע';
+
+      case 'car':
+        return 'רכב';
+
+      case 'commercial':
+        return 'רכב מסחרי';
+
+      default:
+        return vehicleType;
+    }
+  }
+  getProvidersWithoutCapacity(
+    traces: CheckoutCapacityPlanningTrace[] | undefined
+  ): string {
+    return (
+      traces
+        ?.filter(
+          (trace) =>
+            trace.capacities.length === 0
+        )
+        .map(
+          (trace) =>
+            trace.providerCode
+        )
+        .join(', ') ?? ''
+    );
+  }
+  getEvaluatedDecisionOption(
+    optionId: string
+  ) {
+    return (
+      this.checkout?.decision
+        ?.evaluatedOptions
+        ?.find(
+          (option) =>
+            option.id === optionId
+        ) ?? null
+    );
+  }
+  getDecisionDonutStyle(): string {
+    const cards =
+      this.checkout?.decision?.winner
+        ?.scoreBreakdown?.cardScores ?? [];
+
+    if (cards.length === 0) {
+      return 'conic-gradient(#e5e7eb 0% 100%)';
+    }
+
+    const totalWeight = cards.reduce(
+      (sum, card) => sum + card.weight,
+      0
+    );
+
+    if (totalWeight <= 0) {
+      return 'conic-gradient(#e5e7eb 0% 100%)';
+    }
+
+    const colors = [
+      '#2563eb',
+      '#10b981',
+      '#f59e0b',
+      '#8b5cf6',
+      '#06b6d4',
+      '#ec4899'
+    ];
+
+    let currentPercent = 0;
+
+    const segments = cards.map(
+      (card, index) => {
+        const percent =
+          (card.weight / totalWeight) * 100;
+
+        const start = currentPercent;
+        const end =
+          currentPercent + percent;
+
+        currentPercent = end;
+
+        const color = card.applied
+          ? colors[index % colors.length]
+          : '#d1d5db';
+
+        return `${color} ${start}% ${end}%`;
+      }
+    );
+
+    return `conic-gradient(${segments.join(', ')})`;
+  }
+  getDecisionCardColor(
+    index: number,
+    applied: boolean
+  ): string {
+    if (!applied) {
+      return '#d1d5db';
+    }
+
+    const colors = [
+      '#2563eb',
+      '#10b981',
+      '#f59e0b',
+      '#8b5cf6',
+      '#06b6d4',
+      '#ec4899'
+    ];
+
+    return colors[index % colors.length];
   }
 }
