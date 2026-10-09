@@ -16,7 +16,9 @@ import {
 import {
     CurrentFlowShipAuth,
 } from '../auth/current-auth.decorator';
-
+import {
+    CreateWeightEstimationRuleDto,
+} from './dto/create-weight-estimation-rule.dto';
 import type {
     FlowShipAuthContext,
 } from '../auth/auth.types';
@@ -32,11 +34,20 @@ import { CreateDecisionPriorityCardDto } from './dto/create-decision-priority-ca
 import { UpdateDecisionPriorityCardDto } from './dto/update-decision-priority-card.dto';
 import { ReorderDecisionPriorityCardsDto } from './dto/reorder-decision-priority-cards.dto';
 import { UpdateProviderConfigDto } from './dto/update-provider-config.dto';
+import {
+    UpdateWeightEstimationRuleDto,
+} from './dto/update-weight-estimation-rule.dto';
+import { DeliverySettingsService } from
+    '../planning/delivery-settings.service';
+import { UpdateStoreSettingsDto } from
+    './dto/update-store-settings.dto';
 @Controller('admin')
 @UseGuards(SupabaseAuthGuard)
 export class AdminController {
     constructor(
         private readonly adminService: AdminService,
+        private readonly deliverySettingsService:
+            DeliverySettingsService,
     ) { }
 
     @Get('providers')
@@ -462,6 +473,142 @@ export class AdminController {
         return {
             ok: true,
             deletedId: deleted.id,
+        };
+    }
+    @Post('weight-estimation-rules')
+    async createWeightEstimationRule(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+
+        @Body()
+        dto: CreateWeightEstimationRuleDto,
+    ) {
+        const tenant = auth.tenant;
+
+        const rule =
+            await this.adminService
+                .createWeightEstimationRule(
+                    tenant,
+                    dto,
+                );
+
+        return {
+            ok: true,
+            tenant: {
+                id: tenant.id,
+                name: tenant.name,
+                schemaName: tenant.schemaName,
+            },
+            rule,
+        };
+    }
+    @Get('weight-estimation-rules')
+    async getWeightEstimationRules(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+    ) {
+        const tenant = auth.tenant;
+
+        const rules =
+            await this.adminService
+                .getWeightEstimationRules(tenant);
+
+        return {
+            ok: true,
+            tenant: {
+                id: tenant.id,
+                name: tenant.name,
+                schemaName: tenant.schemaName,
+            },
+            rules,
+        };
+    }
+    @Patch('weight-estimation-rules/:id')
+    async updateWeightEstimationRule(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+
+        @Param('id')
+        ruleId: string,
+
+        @Body()
+        dto: UpdateWeightEstimationRuleDto,
+    ) {
+
+
+        const tenant = auth.tenant;
+
+        const rule =
+            await this.adminService
+                .updateWeightEstimationRule(
+                    tenant,
+                    ruleId,
+                    dto,
+                );
+
+        if (!rule) {
+            throw new NotFoundException(
+                'Weight estimation rule not found',
+            );
+        }
+
+        return {
+            ok: true,
+            tenant: {
+                id: tenant.id,
+                name: tenant.name,
+                schemaName: tenant.schemaName,
+            },
+            rule,
+        };
+    }
+    @Get('store-settings')
+    async getStoreSettings(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+    ) {
+        const tenant = auth.tenant;
+
+        const settings =
+            await this.deliverySettingsService.getSettings(
+                tenant,
+            );
+
+        return {
+            ok: true,
+            tenant: {
+                id: tenant.id,
+                name: tenant.name,
+                schemaName: tenant.schemaName,
+            },
+            settings,
+        };
+    }
+    @Patch('store-settings')
+    async updateStoreSettings(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+
+        @Body()
+        dto: UpdateStoreSettingsDto,
+    ) {
+        const tenant = auth.tenant;
+
+        const settings =
+            await this.deliverySettingsService.updateSettings(
+                tenant,
+                dto.expressMaxMinutes,
+                dto.sameDayMaxMinutes,
+            );
+
+        return {
+            ok: true,
+            tenant: {
+                id: tenant.id,
+                name: tenant.name,
+                schemaName: tenant.schemaName,
+            },
+            settings,
         };
     }
 }

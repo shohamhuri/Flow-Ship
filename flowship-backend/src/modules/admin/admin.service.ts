@@ -1,10 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import {
+    Injectable
+} from '@nestjs/common';
 import { DbService } from '../../infrastructure/database/db.service';
 import { UpdateDecisionCriterionDto } from './dto/update-decision-criterion.dto';
 import { CreateDecisionPriorityCardDto } from './dto/create-decision-priority-card.dto';
 import { UpdateDecisionPriorityCardDto } from './dto/update-decision-priority-card.dto';
 import { ReorderDecisionPriorityCardsDto } from './dto/reorder-decision-priority-cards.dto';
 import { ConflictException } from '@nestjs/common';
+import {
+    UpdateWeightEstimationRuleDto,
+} from './dto/update-weight-estimation-rule.dto';
+import {
+    CreateWeightEstimationRuleDto,
+} from './dto/create-weight-estimation-rule.dto';
 type TenantContext = {
     id: string;
     name: string;
@@ -291,6 +299,306 @@ export class AdminService {
             isActive: settings.is_active,
             createdAt: settings.created_at,
             updatedAt: settings.updated_at,
+        };
+    }
+    async getWeightEstimationRules(
+        tenant: TenantContext,
+    ) {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        const rows = await this.db.query<{
+            id: string;
+            category: string | null;
+            product_type: string | null;
+            size: string | null;
+            estimated_weight_kg: string | number;
+            priority: number;
+            is_active: boolean;
+            created_at: Date;
+            updated_at: Date;
+        }>(
+            `
+        select
+            id,
+            category,
+            product_type,
+            size,
+            estimated_weight_kg,
+            priority,
+            is_active,
+            created_at,
+            updated_at
+        from ${schemaName}.weight_estimation_rules
+        order by priority asc, created_at asc
+        `,
+        );
+
+        return rows.map((row) => ({
+            id: row.id,
+            category: row.category,
+            productType: row.product_type,
+            size: row.size,
+            estimatedWeightKg:
+                Number(row.estimated_weight_kg),
+            priority: row.priority,
+            isActive: row.is_active,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+        }));
+    }
+    async updateWeightEstimationRule(
+        tenant: TenantContext,
+        ruleId: string,
+        dto: UpdateWeightEstimationRuleDto,
+    ) {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+        const duplicateRules =
+            await this.db.query<{ id: string }>(
+                `
+        select other.id
+        from ${schemaName}.weight_estimation_rules current
+        join ${schemaName}.weight_estimation_rules other
+            on other.id <> current.id
+        where current.id = $1
+
+   and lower(trim(other.category)) is not distinct from
+    lower(
+        trim(
+            case
+                when $2::boolean
+                    then $3::text
+                else current.category
+            end
+        )
+    )
+
+and lower(trim(other.product_type)) is not distinct from
+    lower(
+        trim(
+            case
+                when $4::boolean
+                    then $5::text
+                else current.product_type
+            end
+        )
+    )
+
+and lower(trim(other.size)) is not distinct from
+    lower(
+        trim(
+            case
+                when $6::boolean
+                    then $7::text
+                else current.size
+            end
+        )
+    )
+        limit 1
+        `,
+                [
+                    ruleId,
+
+                    dto.category !== undefined,
+                    dto.category ?? null,
+
+                    dto.productType !== undefined,
+                    dto.productType ?? null,
+
+                    dto.size !== undefined,
+                    dto.size ?? null,
+                ],
+            );
+
+        if (duplicateRules.length > 0) {
+            throw new ConflictException(
+                'A weight estimation rule with the same category, product type and size already exists.',
+            );
+        }
+        const rows = await this.db.query<{
+            id: string;
+            category: string | null;
+            product_type: string | null;
+            size: string | null;
+            estimated_weight_kg: string | number;
+            priority: number;
+            is_active: boolean;
+            created_at: Date;
+            updated_at: Date;
+        }>(
+            `
+        update ${schemaName}.weight_estimation_rules
+        set
+          category =
+    case
+        when $1::boolean
+            then $2::text
+        else category
+    end,
+
+product_type =
+    case
+        when $3::boolean
+            then $4::text
+        else product_type
+    end,
+
+size =
+    case
+        when $5::boolean
+            then $6::text
+        else size
+    end,
+            estimated_weight_kg =
+                coalesce($7, estimated_weight_kg),
+            priority =
+                coalesce($8, priority),
+            is_active =
+                coalesce($9, is_active),
+            updated_at = now()
+        where id = $10
+        returning
+            id,
+            category,
+            product_type,
+            size,
+            estimated_weight_kg,
+            priority,
+            is_active,
+            created_at,
+            updated_at
+        `,
+            [
+                dto.category !== undefined,
+                dto.category ?? null,
+
+                dto.productType !== undefined,
+                dto.productType ?? null,
+
+                dto.size !== undefined,
+                dto.size ?? null,
+
+                dto.estimatedWeightKg ?? null,
+                dto.priority ?? null,
+                dto.isActive ?? null,
+
+                ruleId,
+            ],
+        );
+
+        const row = rows[0];
+
+        if (!row) {
+            return null;
+        }
+
+        return {
+            id: row.id,
+            category: row.category,
+            productType: row.product_type,
+            size: row.size,
+            estimatedWeightKg:
+                Number(row.estimated_weight_kg),
+            priority: row.priority,
+            isActive: row.is_active,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+        };
+    }
+    async createWeightEstimationRule(
+        tenant: TenantContext,
+        dto: CreateWeightEstimationRuleDto,
+    ) {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+        const existingRules =
+            await this.db.query<{ id: string }>(
+                `
+        select id
+        from ${schemaName}.weight_estimation_rules
+    where lower(trim(category))
+        is not distinct from lower(trim($1::text))
+  and lower(trim(product_type))
+        is not distinct from lower(trim($2::text))
+  and lower(trim(size))
+        is not distinct from lower(trim($3::text))
+        limit 1
+        `,
+                [
+                    dto.category ?? null,
+                    dto.productType ?? null,
+                    dto.size ?? null,
+                ],
+            );
+
+        if (existingRules.length > 0) {
+            throw new ConflictException(
+                'A weight estimation rule with the same category, product type and size already exists.',
+            );
+        }
+        const rows = await this.db.query<{
+            id: string;
+            category: string | null;
+            product_type: string | null;
+            size: string | null;
+            estimated_weight_kg: string | number;
+            priority: number;
+            is_active: boolean;
+            created_at: Date;
+            updated_at: Date;
+        }>(
+            `
+        insert into ${schemaName}.weight_estimation_rules (
+            category,
+            product_type,
+            size,
+            estimated_weight_kg,
+            priority,
+            is_active
+        )
+        values (
+            $1,
+            $2,
+            $3,
+            $4,
+            coalesce($5, 100),
+            coalesce($6, true)
+        )
+        returning
+            id,
+            category,
+            product_type,
+            size,
+            estimated_weight_kg,
+            priority,
+            is_active,
+            created_at,
+            updated_at
+        `,
+            [
+                dto.category ?? null,
+                dto.productType ?? null,
+                dto.size ?? null,
+                dto.estimatedWeightKg,
+                dto.priority ?? null,
+                dto.isActive ?? null,
+            ],
+        );
+
+        const row = rows[0];
+
+        return {
+            id: row.id,
+            category: row.category,
+            productType: row.product_type,
+            size: row.size,
+            estimatedWeightKg:
+                Number(row.estimated_weight_kg),
+            priority: row.priority,
+            isActive: row.is_active,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
         };
     }
     private safeSchemaName(schemaName: string): string {
