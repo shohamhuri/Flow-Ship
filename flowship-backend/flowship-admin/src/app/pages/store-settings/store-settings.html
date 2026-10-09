@@ -1,0 +1,466 @@
+<div class="settings-page" dir="rtl">
+
+    <section class="hero-card">
+        <div class="hero-content">
+            <span class="eyebrow">Store Configuration</span>
+            <h1>הגדרות חנות</h1>
+            <p>
+                ניהול הגדרות החנות, זמני משלוחים והעדפות
+                תפעוליות במקום אחד.
+            </p>
+        </div>
+    </section>
+
+    <!-- Tabs -->
+    <div class="settings-tabs">
+        <button type="button" class="settings-tab" [class.active]="activeTab === 'delivery'"
+            (click)="setActiveTab('delivery')">
+            הגדרות משלוחים
+        </button>
+
+        <button type="button" class="settings-tab" [class.active]="activeTab === 'weight'"
+            (click)="setActiveTab('weight')">
+            כללי הערכת משקל
+        </button>
+    </div>
+
+    <div *ngIf="errorMessage" class="error-card" role="alert">
+        {{ errorMessage }}
+    </div>
+
+    <div *ngIf="successMessage" class="success-card" role="status">
+        {{ successMessage }}
+    </div>
+
+    <!-- Delivery Settings -->
+    <ng-container *ngIf="activeTab === 'delivery'">
+
+        <div *ngIf="isLoading" class="state-card">
+            טוען את הגדרות החנות...
+        </div>
+
+        <form *ngIf="!isLoading" (ngSubmit)="saveSettings()">
+
+            <section class="settings-section">
+
+                <div class="section-header">
+                    <div>
+                        <span class="section-label">
+                            DELIVERY SETTINGS
+                        </span>
+
+                        <h2>הגדרות משלוחים</h2>
+
+                        <p>
+                            הגדרת התנאים שלפיהם המערכת מציעה
+                            אפשרויות משלוח ללקוחות.
+                        </p>
+                    </div>
+
+                    <span class="section-badge">
+                        פעיל
+                    </span>
+                </div>
+
+                <div class="setting-row">
+
+                    <div class="setting-info">
+                        <h3>
+                            זמן מקסימלי למשלוח מהיר
+                        </h3>
+
+                        <p>
+                            הזמן המרבי מרגע יצירת ההזמנה ועד
+                            למסירה ללקוח, כולל הכנת ההזמנה
+                            וזמן הנסיעה המשוער.
+                        </p>
+                    </div>
+
+                    <div class="setting-control">
+
+                        <label for="expressMaxMinutes">
+                            משך זמן
+                        </label>
+
+                        <div class="input-wrapper">
+                            <input id="expressMaxMinutes" name="expressMaxMinutes" type="number" min="1" step="1"
+                                required [(ngModel)]="expressMaxMinutes" [disabled]="isSaving" />
+
+                            <span>דקות</span>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="setting-row
+                           setting-row-separated">
+
+                    <div class="setting-info">
+
+                        <h3>
+                            זמן מקסימלי למשלוח
+                            מהיום להיום
+                        </h3>
+
+                        <p>
+                            הזמן המרבי מרגע יצירת ההזמנה ועד
+                            למסירה ללקוח, כולל זמן הכנת
+                            ההזמנה וזמן הנסיעה המשוער.
+                        </p>
+
+                    </div>
+
+                    <div class="setting-control">
+
+                        <label for="sameDayMaxHours">
+                            משך זמן
+                        </label>
+
+                        <div class="input-wrapper">
+
+                            <input id="sameDayMaxHours" name="sameDayMaxHours" type="number" min="1" step="1" required
+                                [(ngModel)]="sameDayMaxHours" [disabled]="isSaving" />
+
+                            <span>שעות</span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="section-footer">
+
+                    <span class="footer-note">
+                        השינויים יחולו על בקשות
+                        משלוח חדשות.
+                    </span>
+
+                    <button type="submit" class="primary-btn" [disabled]="
+                            isSaving ||
+                            expressMaxMinutes === null
+                        ">
+
+                        {{
+                        isSaving
+                        ? 'שומר שינויים...'
+                        : 'שמירת שינויים'
+                        }}
+
+                    </button>
+
+                </div>
+
+            </section>
+
+        </form>
+
+    </ng-container>
+
+    <!-- Weight Estimation -->
+    <ng-container *ngIf="activeTab === 'weight'">
+
+        <section class="settings-section">
+
+            <div class="section-header">
+
+                <div>
+                    <span class="section-label">
+                        WEIGHT ESTIMATION
+                    </span>
+
+                    <h2>כללי הערכת משקל</h2>
+
+                    <p>
+                        ניהול המשקל המשוער של מוצרים
+                        כאשר לא התקבל משקל בפועל.
+                    </p>
+                </div>
+
+            </div>
+            <button type="button" class="add-weight-rule-btn" [disabled]="isCreatingWeightRule"
+                (click)="startCreatingWeightRule()">
+
+                + הוספת כלל
+
+            </button>
+            <div *ngIf="isLoadingWeightRules" class="state-card">
+                טוען את כללי הערכת המשקל...
+            </div>
+
+            <div *ngIf="
+        !isLoadingWeightRules &&
+        weightRules.length === 0
+    " class="state-card">
+                עדיין לא הוגדרו כללי הערכת משקל.
+            </div>
+
+            <div *ngIf="
+        !isLoadingWeightRules &&
+        weightRules.length > 0
+    " class="weight-rules-table">
+
+                <div class="weight-table-header">
+                    <span class="header-with-help">
+                        סדר
+
+                        <span class="help-tooltip">
+                            <span class="help-icon" tabindex="0">
+                                !
+                            </span>
+
+                            <span class="help-text">
+                                סדר הכללים קובע את העדיפות.
+                                כאשר יותר מכלל אחד מתאים למוצר,
+                                המערכת תשתמש בכלל שמופיע גבוה יותר ברשימה.
+                            </span>
+                        </span>
+                    </span>
+                    <span class="header-with-help">
+                        קטגוריה
+
+                        <span class="help-tooltip">
+                            <span class="help-icon" tabindex="0">
+                                !
+                            </span>
+
+                            <span class="help-text">
+                                יש להזין את הקטגוריה בדיוק כפי שהיא
+                                נשלחת מהחנות בפרטי המוצר.
+                                לדוגמה: clothing.
+                                השאירי ריק כדי שהכלל יתאים לכל הקטגוריות.
+                            </span>
+                        </span>
+                    </span>
+                    <span class="header-with-help">
+                        סוג מוצר
+
+                        <span class="help-tooltip">
+                            <span class="help-icon" tabindex="0">
+                                !
+                            </span>
+
+                            <span class="help-text">
+                                יש להזין את סוג המוצר בדיוק כפי שהוא
+                                נשלח מהחנות בפרטי המוצר.
+                                לדוגמה: shirt.
+                                השאירי ריק כדי שהכלל יתאים לכל סוגי המוצרים.
+                            </span>
+                        </span>
+                    </span>
+                    <span class="header-with-help">
+                        מידה
+
+                        <span class="help-tooltip">
+                            <span class="help-icon" tabindex="0">
+                                !
+                            </span>
+
+                            <span class="help-text">
+                                יש להזין את המידה בדיוק כפי שהיא
+                                נשלחת מהחנות בפרטי המוצר.
+                                לדוגמה: M.
+                                השאירי ריק כדי שהכלל יתאים לכל המידות.
+                            </span>
+                        </span>
+                    </span> <span>משקל משוער</span>
+
+                    <span>סטטוס</span>
+                    <span>פעולות</span>
+                </div>
+
+                <div cdkDropList [cdkDropListData]="weightRules" (cdkDropListDropped)="dropWeightRule($event)"
+                    class="weight-rules-list">
+                    <div *ngIf="isCreatingWeightRule" class="weight-table-row new-weight-rule-row">
+
+                        <!-- במקום ידית גרירה -->
+                        <span class="new-rule-indicator">
+                            חדש
+                        </span>
+
+                        <!-- קטגוריה -->
+                        <span>
+                            <input type="text" class="rule-edit-input" [(ngModel)]="newWeightRule.category"
+                                [disabled]="isCreatingWeightRuleSaving" placeholder="הכול" />
+                        </span>
+
+                        <!-- סוג מוצר -->
+                        <span>
+                            <input type="text" class="rule-edit-input" [disabled]="isCreatingWeightRuleSaving"
+                                [(ngModel)]="newWeightRule.productType" placeholder="הכול" />
+                        </span>
+
+                        <!-- מידה -->
+                        <span>
+                            <input type="text" class="rule-edit-input" [disabled]="isCreatingWeightRuleSaving"
+                                [(ngModel)]="newWeightRule.size" placeholder="הכול" />
+                        </span>
+
+                        <!-- משקל -->
+                        <span class="weight-edit-input">
+                            <input type="number" min="0.001" step="0.001" inputmode="decimal"
+                                [(ngModel)]="newWeightRule.estimatedWeightKg" [disabled]="isCreatingWeightRuleSaving" />
+
+                            <span>ק״ג</span>
+                        </span>
+
+                        <!-- סטטוס -->
+                        <label class="status-toggle">
+                            <input type="checkbox" [(ngModel)]="newWeightRule.isActive"
+                                [disabled]="isCreatingWeightRuleSaving" />
+
+                            <span class="toggle-track">
+                                <span class="toggle-thumb"></span>
+                            </span>
+
+                            <span class="toggle-label">
+                                {{
+                                newWeightRule.isActive
+                                ? 'פעיל'
+                                : 'לא פעיל'
+                                }}
+                            </span>
+                        </label>
+
+                        <!-- פעולות -->
+                        <span class="weight-actions">
+
+                            <button type="button" class="secondary-btn" [disabled]="isCreatingWeightRuleSaving"
+                                (click)="cancelCreatingWeightRule()">
+                                ביטול
+                            </button>
+                            <button type="button" class="save-weight-btn" [disabled]="isCreatingWeightRuleSaving"
+                                (click)="createWeightRule()">
+
+                                {{
+                                isCreatingWeightRuleSaving
+                                ? 'שומר...'
+                                : 'שמירה'
+                                }}
+
+                            </button>
+
+                        </span>
+
+                    </div>
+                    <div *ngFor="let rule of weightRules" class="weight-table-row" cdkDrag>
+                        <span>
+                            <span class="drag-handle" cdkDragHandle title="גררי לשינוי סדר העדיפות">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </span>
+                            <!-- <input *ngIf="editingWeightRuleId === rule.id" type="number" min="1" step="1"
+                                class="priority-edit-input" [(ngModel)]="rule.priority" /> -->
+                        </span>
+                        <span>
+                            <ng-container *ngIf="editingWeightRuleId !== rule.id">
+                                {{ rule.category || 'הכול' }}
+                            </ng-container>
+
+                            <input *ngIf="editingWeightRuleId === rule.id" type="text" class="rule-edit-input"
+                                [(ngModel)]="rule.category" [disabled]="isSavingWeightRule" placeholder="הכול" />
+                        </span>
+                        <span>
+                            <ng-container *ngIf="editingWeightRuleId !== rule.id">
+                                {{ rule.productType || 'הכול' }}
+                            </ng-container>
+
+                            <input *ngIf="editingWeightRuleId === rule.id" type="text" class="rule-edit-input"
+                                [(ngModel)]="rule.productType" [disabled]="isSavingWeightRule" placeholder="הכול" />
+                        </span>
+                        <span>
+                            <ng-container *ngIf="editingWeightRuleId !== rule.id">
+                                {{ rule.size || 'הכול' }}
+                            </ng-container>
+
+                            <input *ngIf="editingWeightRuleId === rule.id" type="text" class="rule-edit-input"
+                                [(ngModel)]="rule.size" [disabled]="isSavingWeightRule" placeholder="הכול" />
+                        </span>
+                        <span class="weight-value">
+
+                            <ng-container *ngIf="editingWeightRuleId !== rule.id">
+                                {{ rule.estimatedWeightKg }} ק״ג
+                            </ng-container>
+
+                            <div *ngIf="editingWeightRuleId === rule.id" class="weight-edit-input">
+
+                                <input type="number" min="0.001" step="0.001" inputmode="decimal"
+                                    [(ngModel)]="rule.estimatedWeightKg" [disabled]="isSavingWeightRule" />
+                                <span>ק״ג</span>
+
+                            </div>
+
+                        </span>
+
+
+                        <span>
+                            <!-- מצב רגיל -->
+                            <span *ngIf="editingWeightRuleId !== rule.id" class="status-pill"
+                                [class.inactive]="!rule.isActive">
+
+                                {{
+                                rule.isActive
+                                ? 'פעיל'
+                                : 'לא פעיל'
+                                }}
+
+                            </span>
+
+                            <!-- מצב עריכה -->
+                            <label *ngIf="editingWeightRuleId === rule.id" class="status-toggle">
+
+                                <input type="checkbox" [(ngModel)]="rule.isActive" [disabled]="isSavingWeightRule" />
+
+                                <span class="toggle-track">
+                                    <span class="toggle-thumb"></span>
+                                </span>
+
+                                <span class="toggle-label">
+                                    {{
+                                    rule.isActive
+                                    ? 'פעיל'
+                                    : 'לא פעיל'
+                                    }}
+                                </span>
+
+                            </label>
+                        </span>
+                        <span class="weight-actions">
+
+                            <button *ngIf="editingWeightRuleId !== rule.id" type="button" class="secondary-btn"
+                                (click)="startEditingWeightRule(rule)">
+                                עריכה
+                            </button>
+
+                            <ng-container *ngIf="editingWeightRuleId === rule.id">
+
+                                <button type="button" class="secondary-btn" [disabled]="isSavingWeightRule"
+                                    (click)="cancelEditingWeightRule()">
+                                    ביטול
+                                </button>
+
+                                <button type="button" class="save-weight-btn" [disabled]="isSavingWeightRule"
+                                    (click)="saveWeightRule(rule)">
+                                    {{
+                                    isSavingWeightRule
+                                    ? 'שומר...'
+                                    : 'שמירה'
+                                    }}
+                                </button>
+
+                            </ng-container>
+
+                        </span>
+
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+    </ng-container>
+
+</div>
