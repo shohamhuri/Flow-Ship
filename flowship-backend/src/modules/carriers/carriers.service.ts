@@ -13,7 +13,7 @@ type TenantContext = {
     schemaName: string;
     status: string;
 };
-type ProviderRow = {
+export type ProviderRow = {
     id: string;
     code: string;
     name: string;
@@ -33,30 +33,50 @@ export class CarriersService {
         private readonly carrierRegistry: CarrierRegistry,
         private readonly db: DbService,
     ) { }
+    async getActiveProviders(
+        tenant: TenantContext,
+    ): Promise<ProviderRow[]> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
 
-    async getQuotes(request: CarrierQuoteRequest, tenant: TenantContext) {
-        const schemaName = this.safeSchemaName(tenant.schemaName);
-
-        const providers = await this.db.query<ProviderRow>(
+        return this.db.query<ProviderRow>(
             `
-    select
-        p.id,
-        p.code,
-        p.name,
-        p.adapter_key,
-        p.is_mock,
-        p.is_active,
-        p.priority_score,
-        pc.settings
-    from ${schemaName}.providers p
-    left join ${schemaName}.provider_configs pc
-        on pc.provider_id = p.id
-        and pc.is_enabled = true
-    where p.is_active = true
-    `,
+        select
+            p.id,
+            p.code,
+            p.name,
+            p.adapter_key,
+            p.is_mock,
+            p.is_active,
+            p.priority_score,
+            pc.settings
+        from ${schemaName}.providers p
+        left join ${schemaName}.provider_configs pc
+            on pc.provider_id = p.id
+            and pc.is_enabled = true
+        where p.is_active = true
+        `,
         );
+    }
+    async getQuotes(
+        request: CarrierQuoteRequest,
+        tenant: TenantContext,
+        providerId?: string,
+    ) {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        const providers =
+            await this.getActiveProviders(tenant);
+        const selectedProviders =
+            providerId
+                ? providers.filter(
+                    (provider) =>
+                        provider.id === providerId,
+                )
+                : providers;
         const results = await Promise.allSettled(
-            providers.map(async (provider) => {
+            selectedProviders.map(async (provider) => {
                 const startedAt = Date.now();
 
                 try {
