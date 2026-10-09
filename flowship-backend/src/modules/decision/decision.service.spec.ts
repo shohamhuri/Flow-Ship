@@ -177,7 +177,108 @@ describe('DecisionService', () => {
             });
         });
     });
+    describe('selectBestDeliveryOption', () => {
+        it('should use shipment count when scoring delivery options', () => {
+            const optionWithOneShipment = {
+                id: 'option-1',
+                planId: 'plan-1',
+                selectedGroupQuotes: [],
+                metrics: {
+                    totalShippingPrice: 50,
+                    estimatedDeliveryDays: 1,
+                    averageProviderPriority: 0.9,
+                    shipmentCount: 1,
+                },
+            };
 
+            const optionWithTwoShipments = {
+                id: 'option-2',
+                planId: 'plan-1',
+                selectedGroupQuotes: [],
+                metrics: {
+                    totalShippingPrice: 50,
+                    estimatedDeliveryDays: 1,
+                    averageProviderPriority: 0.9,
+                    shipmentCount: 2,
+                },
+            };
+
+            const result =
+                service.selectBestDeliveryOption(
+                    [
+                        optionWithOneShipment,
+                        optionWithTwoShipments,
+                    ],
+                    [
+                        {
+                            id: 'shipment-count-card',
+                            criterionKey: 'shipment_count',
+                            providerId: null,
+                            weight: 1,
+                        },
+                    ] as any,
+                );
+
+            expect(result?.id).toBe(
+                'option-1',
+            );
+
+            expect(
+                result?.scoreBreakdown
+                    .shipmentCountScore,
+            ).toBe(1);
+        });
+        it('should use provider priority when scoring delivery options', () => {
+            const lowPriorityOption = {
+                id: 'option-low-priority',
+                planId: 'plan-1',
+                selectedGroupQuotes: [],
+                metrics: {
+                    totalShippingPrice: 50,
+                    estimatedDeliveryDays: 1,
+                    averageProviderPriority: 0.2,
+                    shipmentCount: 2,
+                },
+            };
+
+            const highPriorityOption = {
+                id: 'option-high-priority',
+                planId: 'plan-1',
+                selectedGroupQuotes: [],
+                metrics: {
+                    totalShippingPrice: 50,
+                    estimatedDeliveryDays: 1,
+                    averageProviderPriority: 0.9,
+                    shipmentCount: 2,
+                },
+            };
+
+            const result =
+                service.selectBestDeliveryOption(
+                    [
+                        lowPriorityOption,
+                        highPriorityOption,
+                    ],
+                    [
+                        {
+                            id: 'provider-priority-card',
+                            criterionKey: 'provider_priority',
+                            providerId: null,
+                            weight: 1,
+                        },
+                    ] as any,
+                );
+
+            expect(result?.id).toBe(
+                'option-high-priority',
+            );
+
+            expect(
+                result?.scoreBreakdown
+                    .providerPriorityScore,
+            ).toBe(0.9);
+        });
+    });
     describe('getDecisionSettings', () => {
         it('should return default settings when the database has no active settings', async () => {
             dbQueryMock.mockResolvedValue([]);
