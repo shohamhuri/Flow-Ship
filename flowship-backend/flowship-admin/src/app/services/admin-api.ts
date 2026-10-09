@@ -51,6 +51,21 @@ export type ProviderSettings = {
     'urgent' | 'express' | 'standard'
   >;
 };
+export interface StoreSettings {
+  expressMaxMinutes: number;
+  sameDayMaxMinutes: number;
+}
+
+export interface StoreSettingsResponse {
+  ok: boolean;
+  tenant: AdminTenantInfo;
+  settings: StoreSettings;
+}
+
+export interface UpdateStoreSettingsPayload {
+  expressMaxMinutes: number;
+  sameDayMaxMinutes: number;
+}
 export type AdminProvider = {
   id: string;
   code: string;
@@ -242,6 +257,16 @@ export interface CheckoutDetailsItem {
   name: string;
   quantity: number;
   unitWeight: string | number | null;
+  weightSource: 'actual' | 'estimated' | null;
+  weightEstimationRuleId: string | null;
+  weightEstimationRule: {
+    id: string;
+    category: string | null;
+    productType: string | null;
+    size: string | null;
+    estimatedWeightKg: number;
+    priority: number;
+  } | null;
   unitPrice: string | number | null;
   supplierId: string | null;
   category: string | null;
@@ -298,7 +323,226 @@ export interface CheckoutShipment {
   updatedAt: string | null;
   stops: CheckoutShipmentStop[];
 }
+export interface CheckoutPlanningPlan {
+  id: string;
+  status: string;
 
+  assignments: Array<{
+    sku: string;
+    itemIndex: number;
+    [key: string]: unknown;
+  }>;
+
+  grouping: {
+    orderId: string;
+    totalGroups: number;
+    splitReasons: unknown[];
+
+    hasUngroupedItems: boolean;
+
+    ungroupedItems: Array<{
+      sku: string;
+      name: string;
+      quantity: number;
+      reasons: string[];
+    }>;
+
+    [key: string]: unknown;
+  };
+}
+export interface CheckoutPlanningDeliveryOptionsResult {
+  quotedPlan: CheckoutPlanningQuotedPlan;
+
+  deliveryOptions: Array<{
+    id: string;
+    planId: string;
+
+    selectedGroupQuotes: Array<{
+      groupId: string;
+      pickupCities: string[];
+      destinationCity: string;
+      weightKg: number;
+
+      quote: CheckoutPlanningCarrierQuote;
+
+      vehiclePlan?: {
+        providerId: string;
+        providerCode: string;
+        plan: CheckoutCapacityVehiclePlan;
+      };
+    }>;
+
+    metrics: {
+      totalShippingPrice: number;
+      estimatedDeliveryDays: number;
+      averageProviderPriority: number;
+      shipmentCount: number;
+    };
+  }>;
+
+  [key: string]: unknown;
+}
+export type CapacityPlanRejectionReason =
+  | 'INSUFFICIENT_TOTAL_CAPACITY'
+  | 'NON_MINIMAL_COMMERCIAL_PLAN'
+  | 'ITEMS_DO_NOT_FIT_VEHICLES'
+  | 'UNUSED_VEHICLE';
+
+export interface CheckoutCapacityVehiclePlan {
+  parts: Array<{
+    vehicleType:
+    | 'scooter'
+    | 'car'
+    | 'commercial';
+
+    vehicleCount: number;
+    maxWeightPerVehicleKg: number | null;
+    assignedWeightKg: number;
+
+    items: Array<{
+      sku: string;
+      quantity: number;
+      unitWeightKg: number;
+    }>;
+  }>;
+
+  vehicles: Array<{
+    vehicleType:
+    | 'scooter'
+    | 'car'
+    | 'commercial';
+
+    maxWeightKg: number | null;
+    assignedWeightKg: number;
+
+    items: Array<{
+      sku: string;
+      quantity: number;
+      unitWeightKg: number;
+    }>;
+  }>;
+}
+
+export interface CheckoutCapacityPlanningTrace {
+  providerId: string;
+  providerCode: string;
+  weightKg: number;
+
+  capacities: Array<{
+    vehicleType:
+    | 'scooter'
+    | 'car'
+    | 'commercial';
+
+    maxWeightKg: number | null;
+  }>;
+
+  candidates: Array<{
+    plan: CheckoutCapacityVehiclePlan;
+
+    status:
+    | 'accepted'
+    | 'rejected';
+
+    rejectionReason:
+    CapacityPlanRejectionReason | null;
+  }>;
+
+  acceptedPlans:
+  CheckoutCapacityVehiclePlan[];
+}
+
+export interface CheckoutPlanningFailedProvider {
+  providerCode: string;
+  providerName: string;
+  adapterKey: string;
+  error: string;
+}
+
+export interface CheckoutPlanningCarrierQuote {
+  carrierName: string;
+  serviceName: string;
+  price: number;
+  currency: 'ILS';
+  estimatedDays: number;
+
+  providerPriority?: number;
+  providerId?: string;
+  providerCode?: string;
+  adapterKey?: string;
+
+  urgency?:
+  | 'urgent'
+  | 'express'
+  | 'standard';
+}
+
+export interface CheckoutPlanningGroupQuote {
+  groupId: string;
+  pickupCities: string[];
+  destinationCity: string;
+  weightKg: number;
+
+  capacityPlanningTrace?:
+  CheckoutCapacityPlanningTrace[];
+
+  quotes: CheckoutPlanningCarrierQuote[];
+
+  failedProviders:
+  CheckoutPlanningFailedProvider[];
+
+  vehiclePlans?: Array<{
+    providerId: string;
+    providerCode: string;
+
+    plan: CheckoutCapacityVehiclePlan;
+
+    vehicleQuotes: Array<{
+      vehicleType:
+      | 'scooter'
+      | 'car'
+      | 'commercial';
+
+      assignedWeightKg: number;
+
+      quotes:
+      CheckoutPlanningCarrierQuote[];
+
+      failedProviders:
+      CheckoutPlanningFailedProvider[];
+    }>;
+
+    alternatives?: Array<{
+      urgency:
+      | 'urgent'
+      | 'express'
+      | 'standard';
+
+      totalPrice: number;
+      currency: 'ILS';
+      vehicleCount: number;
+      estimatedDays: number;
+      providerPriority?: number;
+    }>;
+  }>;
+
+  [key: string]: unknown;
+}
+export interface CheckoutPlanningQuotedPlan {
+  plan: CheckoutPlanningPlan;
+  status: string;
+
+  quoteMetrics: {
+    totalQuotesCount: number;
+    quotedGroupsCount: number;
+    groupsWithoutQuotesCount: number;
+  };
+
+  groupQuotes:
+  CheckoutPlanningGroupQuote[];
+
+  [key: string]: unknown;
+}
 export interface CheckoutDetails {
   id: string;
   orderId: string;
@@ -321,6 +565,242 @@ export interface CheckoutDetails {
   shipmentGroups: CheckoutShipmentGroup[];
   shipments: CheckoutShipment[];
   groupingSplitReasons: string[];
+  decision: {
+    selectedPlanId: string;
+    selectedDeliveryOptionId: string;
+    score: number;
+    evaluatedOptionsCount: number;
+
+    winner: {
+      id: string;
+      planId: string;
+      score: number;
+
+      metrics: {
+        totalShippingPrice: number;
+        estimatedDeliveryDays: number;
+        averageProviderPriority: number;
+        shipmentCount: number;
+      };
+
+      scoreBreakdown: {
+        priceScore: number;
+        speedScore: number;
+        providerPriorityScore: number;
+        shipmentCountScore: number;
+
+        cardScores: Array<{
+          cardId: string;
+          criterionKey: string;
+          providerId: string | null;
+          rawScore: number;
+          weight: number;
+          weightedScore: number;
+          applied: boolean;
+        }>;
+      };
+
+      selectedGroupQuotes: Array<{
+        groupId: string;
+        pickupCities: string[];
+        destinationCity: string;
+        weightKg: number;
+
+        quote: {
+          carrierName: string;
+          serviceName: string;
+          price: number;
+          currency: 'ILS';
+          estimatedDays: number;
+          providerPriority?: number;
+          providerId?: string;
+          providerCode?: string;
+          urgency?: 'urgent' | 'express' | 'standard';
+        };
+
+        vehiclePlan?: {
+          providerId: string;
+          providerCode: string;
+
+          plan: {
+            parts: Array<{
+              vehicleType:
+              | 'scooter'
+              | 'car'
+              | 'commercial';
+              vehicleCount: number;
+              maxWeightPerVehicleKg: number | null;
+              assignedWeightKg: number;
+              items: Array<{
+                sku: string;
+                quantity: number;
+                unitWeightKg: number;
+              }>;
+            }>;
+
+            vehicles: Array<{
+              vehicleType:
+              | 'scooter'
+              | 'car'
+              | 'commercial';
+              maxWeightKg: number | null;
+              assignedWeightKg: number;
+
+              items: Array<{
+                sku: string;
+                quantity: number;
+                unitWeightKg: number;
+              }>;
+            }>;
+          };
+        };
+      }>;
+    };
+    evaluatedOptions: Array<{
+      id: string;
+      planId: string;
+      score: number;
+
+      metrics: {
+        totalShippingPrice: number;
+        estimatedDeliveryDays: number;
+        averageProviderPriority: number;
+        shipmentCount: number;
+      };
+
+      scoreBreakdown: {
+        priceScore: number;
+        speedScore: number;
+        providerPriorityScore: number;
+        shipmentCountScore: number;
+
+        cardScores: Array<{
+          cardId: string;
+          criterionKey: string;
+          providerId: string | null;
+          rawScore: number;
+          weight: number;
+          weightedScore: number;
+          applied: boolean;
+        }>;
+      };
+
+      selectedGroupQuotes: Array<{
+        groupId: string;
+        pickupCities: string[];
+        destinationCity: string;
+        weightKg: number;
+
+        quote: {
+          carrierName: string;
+          serviceName: string;
+          price: number;
+          currency: 'ILS';
+          estimatedDays: number;
+          providerPriority?: number;
+          providerId?: string;
+          providerCode?: string;
+          urgency?: 'urgent' | 'express' | 'standard';
+        };
+
+        vehiclePlan?: {
+          providerId: string;
+          providerCode: string;
+
+          plan: {
+            parts: Array<{
+              vehicleType:
+              | 'scooter'
+              | 'car'
+              | 'commercial';
+              vehicleCount: number;
+              maxWeightPerVehicleKg: number | null;
+              assignedWeightKg: number;
+              items: Array<{
+                sku: string;
+                quantity: number;
+                unitWeightKg: number;
+              }>;
+            }>;
+
+            vehicles: Array<{
+              vehicleType:
+              | 'scooter'
+              | 'car'
+              | 'commercial';
+              maxWeightKg: number | null;
+              assignedWeightKg: number;
+
+              items: Array<{
+                sku: string;
+                quantity: number;
+                unitWeightKg: number;
+              }>;
+            }>;
+          };
+        };
+      }>;
+    }>;
+    priorityCards: unknown[];
+
+    createdAt: string;
+    updatedAt: string;
+    planning: {
+      generation: {
+        plans: CheckoutPlanningPlan[];
+
+        unresolvedItems: Array<{
+          itemIndex: number;
+          sku: string;
+          requestedQuantity: number;
+        }>;
+
+        statistics: {
+          inputItemsCount: number;
+          theoreticalCombinations: number;
+          generatedPlansCount: number;
+          generationLimitReached: boolean;
+        };
+      };
+      allPlans: CheckoutPlanningPlan[];
+      validPlans: CheckoutPlanningPlan[];
+      rejectedPlans: CheckoutPlanningPlan[];
+
+      confirmationAttempts: Array<{
+        plan: CheckoutPlanningPlan;
+        confirmed: boolean;
+        failure?: {
+          sourceId: string;
+
+          reason:
+          | 'SOURCE_NOT_AVAILABLE'
+          | 'INVALID_PREPARATION_TIME'
+          | 'INSUFFICIENT_QUANTITY'
+          | 'INVALID_SOURCE_RESPONSE'
+          | 'CONFIRMATION_PROVIDER_ERROR';
+        };
+        confirmations: Array<{
+          sourceId: string;
+          available: boolean;
+          preparationMinutes: number | null;
+
+          items: Array<{
+            sku: string;
+            requestedQuantity: number;
+            availableQuantity: number;
+          }>;
+
+          confirmedAt: string;
+        }>;
+
+        confirmedAt?: string;
+      }>;
+
+      selectedPlans: CheckoutPlanningPlan[];
+      quotedPlans: CheckoutPlanningQuotedPlan[];
+      deliveryOptions: CheckoutPlanningDeliveryOptionsResult[];
+    } | null;
+  } | null;
 }
 export interface AuthMeResponse {
   user: {
@@ -475,7 +955,47 @@ export type ShipmentHistorySortBy =
 export type ShipmentHistorySortDirection =
   | 'asc'
   | 'desc';
+export interface WeightEstimationRule {
+  id: string;
+  category: string | null;
+  productType: string | null;
+  size: string | null;
+  estimatedWeightKg: number;
+  priority: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
+export interface WeightEstimationRulesResponse {
+  ok: boolean;
+  tenant: AdminTenantInfo;
+  rules: WeightEstimationRule[];
+}
+
+export interface WeightEstimationRuleResponse {
+  ok: boolean;
+  tenant: AdminTenantInfo;
+  rule: WeightEstimationRule;
+}
+
+export interface CreateWeightEstimationRulePayload {
+  category?: string;
+  productType?: string;
+  size?: string;
+  estimatedWeightKg: number;
+  priority?: number;
+  isActive?: boolean;
+}
+
+export interface UpdateWeightEstimationRulePayload {
+  category?: string | null;
+  productType?: string | null;
+  size?: string | null;
+  estimatedWeightKg?: number;
+  priority?: number;
+  isActive?: boolean;
+}
 export interface ShipmentHistoryFilters {
   resultStatus?: ShipmentHistoryResultStatus;
   carrierName?: string;
@@ -764,6 +1284,42 @@ export class AdminApiService {
       {
         params,
       },
+    );
+  }
+  getStoreSettings() {
+    return this.http.get<StoreSettingsResponse>(
+      `${this.baseUrl}/admin/store-settings`,
+    );
+  }
+
+  updateStoreSettings(body: UpdateStoreSettingsPayload) {
+    return this.http.patch<StoreSettingsResponse>(
+      `${this.baseUrl}/admin/store-settings`,
+      body,
+    );
+  }
+  getWeightEstimationRules() {
+    return this.http.get<WeightEstimationRulesResponse>(
+      `${this.baseUrl}/admin/weight-estimation-rules`,
+    );
+  }
+
+  createWeightEstimationRule(
+    body: CreateWeightEstimationRulePayload,
+  ) {
+    return this.http.post<WeightEstimationRuleResponse>(
+      `${this.baseUrl}/admin/weight-estimation-rules`,
+      body,
+    );
+  }
+
+  updateWeightEstimationRule(
+    ruleId: string,
+    body: UpdateWeightEstimationRulePayload,
+  ) {
+    return this.http.patch<WeightEstimationRuleResponse>(
+      `${this.baseUrl}/admin/weight-estimation-rules/${ruleId}`,
+      body,
     );
   }
 }

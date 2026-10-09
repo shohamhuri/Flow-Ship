@@ -29,6 +29,19 @@ export interface CheckoutDetailsItem {
     name: string;
     quantity: number;
     unitWeight: number | null;
+
+    weightSource: 'actual' | 'estimated' | null;
+    weightEstimationRuleId: string | null;
+
+    weightEstimationRule: {
+        id: string;
+        category: string | null;
+        productType: string | null;
+        size: string | null;
+        estimatedWeightKg: number;
+        priority: number;
+    } | null;
+
     unitPrice: number | null;
     supplierId: string | null;
     category: string | null;
@@ -116,7 +129,20 @@ export interface CheckoutDetails {
     totalPrice: number;
     createdAt: Date;
     updatedAt: Date | null;
+    decision: {
+        selectedPlanId: string;
+        selectedDeliveryOptionId: string;
+        score: number;
+        evaluatedOptionsCount: number;
 
+        winner: unknown;
+
+        priorityCards: unknown;
+        evaluatedOptions: unknown;
+        planning: unknown;
+        createdAt: Date;
+        updatedAt: Date;
+    } | null;
     items: CheckoutDetailsItem[];
     shipmentGroups: CheckoutShipmentGroup[];
     shipments: CheckoutShipment[];
@@ -136,31 +162,31 @@ export class CheckoutRepository {
 
         await this.databaseService.query(
             `
-            insert into ${tenant.schemaName}.checkouts (
-                id,
-                store_id,
-                platform,
-                external_checkout_id,
-                external_order_id,
-                customer,
-                cart,
-                destination,
-                raw_payload,
-                status
-            )
-            values (
-                $1,
-                $2,
-                $3,
-                $4,
-                $5,
-                $6::jsonb,
-                $7::jsonb,
-                $8::jsonb,
-                $9::jsonb,
-                $10
-            )
-            `,
+                insert into ${tenant.schemaName}.checkouts (
+                    id,
+                    store_id,
+                    platform,
+                    external_checkout_id,
+                    external_order_id,
+                    customer,
+                    cart,
+                    destination,
+                    raw_payload,
+                    status
+                )
+                values (
+                    $1,
+                    $2,
+                    $3,
+                    $4,
+                    $5,
+                    $6::jsonb,
+                    $7::jsonb,
+                    $8::jsonb,
+                    $9::jsonb,
+                    $10
+                )
+                `,
             [
                 checkoutId,
                 null, platform,
@@ -189,31 +215,36 @@ export class CheckoutRepository {
 
             await this.databaseService.query(
                 `
-                insert into ${tenant.schemaName}.checkout_items (
-                    id,
-                    checkout_id,
-                    sku,
-                    name,
-                    quantity,
-                    unit_weight,
-                    unit_price,
-                    supplier_id,
-                    category,
-                    raw_payload
-                )
-                values (
-                    $1,
-                    $2,
-                    $3,
-                    $4,
-                    $5,
-                    $6,
-                    $7,
-                    $8,
-                    $9,
-                    $10::jsonb
-                )
-                `,
+                   insert into ${tenant.schemaName}.checkout_items (
+    id,
+    checkout_id,
+    sku,
+    name,
+    quantity,
+    unit_weight,
+    unit_price,
+    supplier_id,
+    category,
+    weight_source,
+    weight_estimation_rule_id,
+    raw_payload
+)
+values (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12::jsonb
+)
+                    `,
+
                 [
                     itemId,
                     checkoutId,
@@ -224,8 +255,13 @@ export class CheckoutRepository {
                     item.unitPrice ?? null,
                     item.supplierId ?? null,
                     item.category ?? null,
+
+                    item.weightSource ?? null,
+                    item.weightEstimationRuleId ?? null,
+
                     JSON.stringify(item),
                 ],
+
             );
 
             itemIdsBySku.set(item.sku, itemId);
@@ -238,19 +274,19 @@ export class CheckoutRepository {
     ): Promise<CheckoutListRow[]> {
         const result = await this.databaseService.query(
             `
-        select
-            id,
-            external_order_id,
-            store_id,
-            platform,
-            status,
-            destination,
-            raw_payload,
-            created_at,
-            updated_at
-        from ${tenant.schemaName}.checkouts
-        order by created_at desc
-        `,
+            select
+                id,
+                external_order_id,
+                store_id,
+                platform,
+                status,
+                destination,
+                raw_payload,
+                created_at,
+                updated_at
+            from ${tenant.schemaName}.checkouts
+            order by created_at desc
+            `,
         );
 
         return result.map((row) => {
@@ -334,22 +370,22 @@ export class CheckoutRepository {
             grouping_split_reasons: string[];
         }>(
             `
-        select
-            id,
-            external_order_id,
-            store_id,
-            platform,
-            status,
-            customer,
-            destination,
-            raw_payload,
-            created_at,
-            updated_at,
-            grouping_split_reasons
-        from "${schemaName}".checkouts
-        where id = $1
-        limit 1
-        `,
+            select
+                id,
+                external_order_id,
+                store_id,
+                platform,
+                status,
+                customer,
+                destination,
+                raw_payload,
+                created_at,
+                updated_at,
+                grouping_split_reasons
+            from "${schemaName}".checkouts
+            where id = $1
+            limit 1
+            `,
             [checkoutId],
         );
 
@@ -365,24 +401,73 @@ export class CheckoutRepository {
             name: string;
             quantity: number;
             unit_weight: number | null;
+
+            weight_source:
+            | 'actual'
+            | 'estimated'
+            | null;
+
+            weight_estimation_rule_id:
+            string | null;
+
+            weight_rule_category:
+            string | null;
+
+            weight_rule_product_type:
+            string | null;
+
+            weight_rule_size:
+            string | null;
+
+            weight_rule_estimated_weight_kg:
+            number | null;
+
+            weight_rule_priority:
+            number | null;
+
             unit_price: number | null;
             supplier_id: string | null;
             category: string | null;
         }>(
             `
-        select
-            id,
-            sku,
-            name,
-            quantity,
-            unit_weight,
-            unit_price,
-            supplier_id,
-            category
-        from "${schemaName}".checkout_items
-        where checkout_id = $1
-        order by sku asc
-        `,
+    select
+        ci.id,
+        ci.sku,
+        ci.name,
+        ci.quantity,
+        ci.unit_weight,
+        ci.weight_source,
+        ci.weight_estimation_rule_id,
+
+        wer.category
+            as weight_rule_category,
+
+        wer.product_type
+            as weight_rule_product_type,
+
+        wer.size
+            as weight_rule_size,
+
+        wer.estimated_weight_kg
+            as weight_rule_estimated_weight_kg,
+
+        wer.priority
+            as weight_rule_priority,
+
+        ci.unit_price,
+        ci.supplier_id,
+        ci.category
+
+    from "${schemaName}".checkout_items ci
+
+    left join "${schemaName}".weight_estimation_rules wer
+        on wer.id =
+            ci.weight_estimation_rule_id
+
+    where ci.checkout_id = $1
+
+    order by ci.sku asc
+    `,
             [checkoutId],
         );
         const sourcingRows =
@@ -402,27 +487,27 @@ export class CheckoutRepository {
                 rejection_reasons: string[];
             }>(
                 `
-        select
-            checkout_item_id,
-            source_id,
-            source_name,
-            source_type,
-            available_quantity,
-            requested_quantity,
-            has_enough_stock,
-            priority_score,
-            distance_km,
-            distance_score,
-            total_score,
-            is_selected,
-            rejection_reasons
-        from "${schemaName}".checkout_sourcing_results
-        where checkout_id = $1
-        order by
-            checkout_item_id asc,
-            is_selected desc,
-            total_score desc
-        `,
+            select
+                checkout_item_id,
+                source_id,
+                source_name,
+                source_type,
+                available_quantity,
+                requested_quantity,
+                has_enough_stock,
+                priority_score,
+                distance_km,
+                distance_score,
+                total_score,
+                is_selected,
+                rejection_reasons
+            from "${schemaName}".checkout_sourcing_results
+            where checkout_id = $1
+            order by
+                checkout_item_id asc,
+                is_selected desc,
+                total_score desc
+            `,
                 [checkoutId],
             );
         const shipmentGroupRows =
@@ -440,22 +525,22 @@ export class CheckoutRepository {
                 status: string;
             }>(
                 `
-            select
-                id,
-                source_id,
-                source_name,
-                source_type,
-                supplier_id,
-                handling_group,
-                total_items,
-                total_weight,
-                total_price,
-                grouping_reasons,
-                status
-            from "${schemaName}".shipment_groups
-            where checkout_id = $1
-            order by id asc
-            `,
+                select
+                    id,
+                    source_id,
+                    source_name,
+                    source_type,
+                    supplier_id,
+                    handling_group,
+                    total_items,
+                    total_weight,
+                    total_price,
+                    grouping_reasons,
+                    status
+                from "${schemaName}".shipment_groups
+                where checkout_id = $1
+                order by id asc
+                `,
                 [checkoutId],
             );
 
@@ -470,22 +555,22 @@ export class CheckoutRepository {
                 category: string | null;
             }>(
                 `
-            select
-                sgi.shipment_group_id,
-                sgi.checkout_item_id,
-                sgi.sku,
-                sgi.quantity,
-                sgi.unit_weight,
-                sgi.unit_price,
-                sgi.category
-            from "${schemaName}".shipment_group_items sgi
-            inner join "${schemaName}".shipment_groups sg
-                on sg.id = sgi.shipment_group_id
-            where sg.checkout_id = $1
-            order by
-                sgi.shipment_group_id asc,
-                sgi.sku asc
-            `,
+                select
+                    sgi.shipment_group_id,
+                    sgi.checkout_item_id,
+                    sgi.sku,
+                    sgi.quantity,
+                    sgi.unit_weight,
+                    sgi.unit_price,
+                    sgi.category
+                from "${schemaName}".shipment_group_items sgi
+                inner join "${schemaName}".shipment_groups sg
+                    on sg.id = sgi.shipment_group_id
+                where sg.checkout_id = $1
+                order by
+                    sgi.shipment_group_id asc,
+                    sgi.sku asc
+                `,
                 [checkoutId],
             );
 
@@ -509,27 +594,27 @@ export class CheckoutRepository {
                 updated_at: Date | null;
             }>(
                 `
-            select
-                id,
-                shipment_group_id,
-                order_id,
-                selected_plan_id,
-                selected_delivery_option_key,
-                provider_id,
-                provider_code,
-                adapter_key,
-                carrier_name,
-                service_name,
-                price,
-                currency,
-                estimated_delivery_days,
-                status,
-                created_at,
-                updated_at
-            from "${schemaName}".shipments
-            where checkout_id = $1
-            order by created_at asc
-            `,
+                select
+                    id,
+                    shipment_group_id,
+                    order_id,
+                    selected_plan_id,
+                    selected_delivery_option_key,
+                    provider_id,
+                    provider_code,
+                    adapter_key,
+                    carrier_name,
+                    service_name,
+                    price,
+                    currency,
+                    estimated_delivery_days,
+                    status,
+                    created_at,
+                    updated_at
+                from "${schemaName}".shipments
+                where checkout_id = $1
+                order by created_at asc
+                `,
                 [checkoutId],
             );
 
@@ -542,20 +627,20 @@ export class CheckoutRepository {
                 address: Record<string, unknown>;
             }>(
                 `
-            select
-                ss.id,
-                ss.shipment_id,
-                ss.stop_order,
-                ss.stop_type,
-                ss.address
-            from "${schemaName}".shipment_stops ss
-            inner join "${schemaName}".shipments s
-                on s.id = ss.shipment_id
-            where s.checkout_id = $1
-            order by
-                ss.shipment_id asc,
-                ss.stop_order asc
-            `,
+                select
+                    ss.id,
+                    ss.shipment_id,
+                    ss.stop_order,
+                    ss.stop_type,
+                    ss.address
+                from "${schemaName}".shipment_stops ss
+                inner join "${schemaName}".shipments s
+                    on s.id = ss.shipment_id
+                where s.checkout_id = $1
+                order by
+                    ss.shipment_id asc,
+                    ss.stop_order asc
+                `,
                 [checkoutId],
             );
 
@@ -581,7 +666,40 @@ export class CheckoutRepository {
                 0,
             ) ??
             0;
+        const decisionRows =
+            await this.databaseService.query<{
+                selected_plan_id: string;
+                selected_delivery_option_id: string;
+                score: number;
+                evaluated_options_count: number;
+                winner_snapshot: unknown;
+                priority_cards_snapshot: unknown;
+                planning_snapshot: unknown;
+                evaluated_options_snapshot: unknown;
+                created_at: Date;
+                updated_at: Date;
+            }>(
+                `
+        select
+            selected_plan_id,
+            selected_delivery_option_id,
+            score,
+            evaluated_options_count,
+            winner_snapshot,
+            priority_cards_snapshot,
+            evaluated_options_snapshot,
+            planning_snapshot,
+            created_at,
+            updated_at
+        from "${schemaName}".shipment_decisions
+        where checkout_id = $1
+        limit 1
+        `,
+                [checkoutId],
+            );
 
+        const decisionRow =
+            decisionRows[0] ?? null;
         return {
             id: checkoutRow.id,
             orderId: checkoutRow.external_order_id,
@@ -596,13 +714,70 @@ export class CheckoutRepository {
             totalPrice,
             createdAt: checkoutRow.created_at,
             updatedAt: checkoutRow.updated_at,
+            decision: decisionRow
+                ? {
+                    selectedPlanId:
+                        decisionRow.selected_plan_id,
 
+                    selectedDeliveryOptionId:
+                        decisionRow.selected_delivery_option_id,
+
+                    score:
+                        Number(decisionRow.score),
+
+                    evaluatedOptionsCount:
+                        decisionRow.evaluated_options_count,
+
+                    winner:
+                        decisionRow.winner_snapshot,
+
+                    priorityCards:
+                        decisionRow.priority_cards_snapshot,
+                    evaluatedOptions:
+                        decisionRow.evaluated_options_snapshot,
+                    planning:
+                        decisionRow.planning_snapshot,
+                    createdAt:
+                        decisionRow.created_at,
+
+                    updatedAt:
+                        decisionRow.updated_at,
+                }
+                : null,
             items: itemRows.map((item) => ({
                 id: item.id,
                 sku: item.sku,
                 name: item.name,
                 quantity: item.quantity,
                 unitWeight: item.unit_weight,
+                weightSource: item.weight_source,
+                weightEstimationRuleId:
+                    item.weight_estimation_rule_id,
+                weightEstimationRule:
+                    item.weight_estimation_rule_id &&
+                        item.weight_rule_estimated_weight_kg !== null
+                        ? {
+                            id:
+                                item.weight_estimation_rule_id,
+
+                            category:
+                                item.weight_rule_category,
+
+                            productType:
+                                item.weight_rule_product_type,
+
+                            size:
+                                item.weight_rule_size,
+
+                            estimatedWeightKg:
+                                Number(
+                                    item.weight_rule_estimated_weight_kg,
+                                ),
+
+                            priority:
+                                item.weight_rule_priority ?? 100,
+                        }
+                        : null,
                 unitPrice: item.unit_price,
                 supplierId: item.supplier_id,
                 category: item.category,
@@ -725,12 +900,12 @@ export class CheckoutRepository {
     ): Promise<void> {
         await this.databaseService.query(
             `
-            update ${tenant.schemaName}.checkouts
-            set
-                status = $1,
-                updated_at = now()
-            where id = $2
-            `,
+                update ${tenant.schemaName}.checkouts
+                set
+                    status = $1,
+                    updated_at = now()
+                where id = $2
+                `,
             [status, checkoutId],
         );
     }
@@ -757,13 +932,13 @@ export class CheckoutRepository {
             id: string;
         }>(
             `
-    update "${schemaName}".checkouts
-    set
-      grouping_split_reasons = $1::jsonb,
-      updated_at = now()
-    where id = $2
-    returning id
-    `,
+        update "${schemaName}".checkouts
+        set
+        grouping_split_reasons = $1::jsonb,
+        updated_at = now()
+        where id = $2
+        returning id
+        `,
             [
                 JSON.stringify(splitReasons),
                 checkoutId,
