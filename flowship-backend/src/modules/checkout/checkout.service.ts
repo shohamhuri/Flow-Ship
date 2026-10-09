@@ -1,16 +1,18 @@
 import { Injectable } from '@nestjs/common';
-
+import { WeightEstimationService } from './weight-estimation.service';
 import { GroupingResult } from '../grouping/interfaces/grouping-result.interface';
 import { GroupingService } from '../grouping/grouping.service';
 import { ShipmentGroupsRepository } from '../grouping/shipment-groups.repository';
 import { ShipmentPlanEvaluatorService } from '../planning/shipment-plan-evaluator.service';
+import { CapacityPlanningService } from './capacity-planning.service';
 import {
     ShipmentPlanCandidate,
     ShipmentPlanGenerationResult,
 } from '../planning/interfaces/shipment-plan.interface';
 import { ShipmentPlanBuilderService } from '../planning/shipment-plan-builder.service';
 import { ShipmentPlanGeneratorService } from '../planning/shipment-plan-generator.service';
-
+import { ShipmentPlanConfirmationService }
+    from '../planning/shipment-plan-confirmation.service';
 import { ItemSourcingResult } from '../sourcing/interfaces/source-ranking.interface';
 import { SourcingService } from '../sourcing/sourcing.service';
 
@@ -26,7 +28,8 @@ import { Checkout } from './interfaces/checkout.interface';
 import { ShipmentPlanQuoteService } from '../planning/shipment-plan-quote.service';
 import { QuotedShipmentPlan } from '../planning/interfaces/shipment-plan-quote.interface';
 import { ShipmentPlanDeliveryOptionsService } from '../planning/shipment-plan-delivery-options.service';
-
+import { ConfirmedShipmentPlan } from
+    '../planning/shipment-plan-confirmation.service';
 import { ShipmentPlanDeliveryOptionsResult } from '../planning/interfaces/shipment-plan-delivery-option.interface';
 import {
     DecisionService,
@@ -106,6 +109,12 @@ export class CheckoutService {
         private readonly groupingRulesService:
             GroupingRulesService,
         private readonly shipmentCreationService: ShipmentCreationService,
+        private readonly shipmentPlanConfirmationService:
+            ShipmentPlanConfirmationService,
+        private readonly weightEstimationService:
+            WeightEstimationService,
+        private readonly capacityPlanningService:
+            CapacityPlanningService,
 
     ) { }
 
@@ -129,8 +138,10 @@ export class CheckoutService {
         tenant: CurrentTenant,
     ): Promise<CheckoutProcessingResult> {
         const checkout =
-            this.mapToInternalCheckout(createCheckoutDto);
-
+            await this.mapToInternalCheckout(
+                createCheckoutDto,
+                tenant,
+            );
         const checkoutId =
             await this.checkoutRepository.saveCheckout(
                 tenant,
@@ -174,6 +185,10 @@ export class CheckoutService {
             const activeGroupingStrategies =
                 await this.groupingRulesService
                     .getActiveStrategies(tenant);
+            console.log(
+                'GROUPING_STRATEGIES_CHECK:',
+                JSON.stringify(activeGroupingStrategies),
+            );
 
             console.dir(
                 {
@@ -213,6 +228,9 @@ export class CheckoutService {
             const validPlans = allPlans.filter(
                 (plan) => plan.status === 'grouped',
             );
+            const rejectedPlans = allPlans.filter(
+                (plan) => plan.status === 'rejected',
+            );
 
             if (validPlans.length === 0) {
                 const unresolvedSummary =
@@ -230,18 +248,62 @@ export class CheckoutService {
                 );
             }
 
-            const selectedPlans =
+
+
+            const rankedPlans =
                 this.shipmentPlanEvaluatorService
-                    .evaluateAndSelect(validPlans);
-            currentStage =
-                'awaiting_quotes';
+                    .evaluateAndSelect(
+                        validPlans,
+                        validPlans.length,
+                    );
+
+            currentStage = 'source_confirmation';
+
+            const confirmedPlans: ShipmentPlanCandidate[] = [];
+            const planConfirmations: ConfirmedShipmentPlan[] = [];
+            const confirmationAttempts: ConfirmedShipmentPlan[] = []; const maxConfirmedPlans =
+                this.shipmentPlanEvaluatorService
+                    .getMaxEvaluatedPlans();
+
+            for (const plan of rankedPlans) {
+                const result =
+                    await this.shipmentPlanConfirmationService
+                        .confirmPlan(
+                            plan,
+                            checkout.storeId,
+                        );
+                confirmationAttempts.push(result);
+                if (result.confirmed) {
+                    confirmedPlans.push(plan);
+                    planConfirmations.push(result);
+                }
+
+                if (confirmedPlans.length >= maxConfirmedPlans) {
+                    break;
+                }
+            }
+
+            if (confirmedPlans.length === 0) {
+                throw new Error(
+                    'No shipment plans passed source confirmation',
+                );
+            }
+
+            const selectedPlans = confirmedPlans;
+
+            currentStage = 'awaiting_quotes';
+
             const quotedPlans =
                 await this.shipmentPlanQuoteService
                     .getQuotesForPlans(
                         selectedPlans,
                         checkout.destination,
                         tenant,
+                        planConfirmations,
+                        checkout.createdAt,
+
                     );
+
             const deliveryOptions =
                 this.shipmentPlanDeliveryOptionsService
                     .generateForPlans(quotedPlans);
@@ -256,12 +318,15 @@ export class CheckoutService {
                         result.deliveryOptions,
                 );
 
-            const selectedDeliveryOption =
+            const scoredDeliveryOptions =
                 this.decisionService
-                    .selectBestDeliveryOption(
+                    .scoreDeliveryOptions(
                         allDeliveryOptions,
                         priorityCards,
                     );
+
+            const selectedDeliveryOption =
+                scoredDeliveryOptions[0] ?? null;
             if (!selectedDeliveryOption) {
                 throw new Error(
                     'No delivery option could be selected',
@@ -296,8 +361,18 @@ export class CheckoutService {
                 selectedDeliveryOption,
                 priorityCards,
                 allDeliveryOptions.length,
+                scoredDeliveryOptions,
+                {
+                    generation,
+                    allPlans,
+                    validPlans,
+                    rejectedPlans,
+                    confirmationAttempts,
+                    selectedPlans,
+                    quotedPlans,
+                    deliveryOptions,
+                },
             );
-
             console.dir(
                 {
                     deliveryOptions:
@@ -400,9 +475,6 @@ export class CheckoutService {
                 {
                     depth: null,
                 },
-            );
-            const rejectedPlans = allPlans.filter(
-                (plan) => plan.status === 'rejected',
             );
 
 
@@ -610,7 +682,10 @@ export class CheckoutService {
                     ? 'partially_grouped'
                     : 'grouped',
             );
-
+            console.log(
+                'FINAL_GROUPING_STRATEGIES:',
+                JSON.stringify(activeGroupingStrategies, null, 2),
+            );
             return {
                 checkout,
                 sourcing,
@@ -656,9 +731,10 @@ export class CheckoutService {
         }
     }
 
-    private mapToInternalCheckout(
+    private async mapToInternalCheckout(
         createCheckoutDto: CreateCheckoutDto,
-    ): Checkout {
+        tenant: CurrentTenant,
+    ): Promise<Checkout> {
         const totalItems =
             createCheckoutDto.items.reduce(
                 (sum, item) =>
@@ -673,7 +749,42 @@ export class CheckoutService {
                     item.price * item.quantity,
                 0,
             );
+        const resolvedItems = await Promise.all(
+            createCheckoutDto.items.map(
+                async (item) => {
+                    const weightResolution =
+                        await this.weightEstimationService.resolveWeight(
+                            tenant,
+                            {
+                                weight: item.weight,
+                                category: item.category,
+                                productType: item.productType,
+                                size: item.size,
+                            },
+                        );
+                    if (!weightResolution) {
+                        throw new Error(
+                            `Unable to resolve weight for item: ${item.sku}`,
+                        );
+                    }
+                    return {
+                        sku: item.sku,
+                        name: item.name,
+                        quantity: item.quantity,
 
+                        unitWeight: weightResolution.weightKg,
+                        weightSource: weightResolution.source,
+                        weightEstimationRuleId: weightResolution.ruleId,
+
+                        supplierId: item.supplierId,
+                        category: item.category,
+                        productType: item.productType,
+                        size: item.size,
+                        unitPrice: item.price,
+                    };
+                },
+            ),
+        );
         return {
             orderId:
                 createCheckoutDto.orderId,
@@ -698,18 +809,7 @@ export class CheckoutService {
                     createCheckoutDto.destination.postalCode,
             },
 
-            items:
-                createCheckoutDto.items.map(
-                    (item) => ({
-                        sku: item.sku,
-                        name: item.name,
-                        quantity: item.quantity,
-                        unitWeight: item.weight,
-                        supplierId: item.supplierId,
-                        category: item.category,
-                        unitPrice: item.price,
-                    }),
-                ),
+            items: resolvedItems,
 
             totalItems,
             totalPrice,
