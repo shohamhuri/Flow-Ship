@@ -1493,4 +1493,140 @@ describe('AdminService', () => {
             expect(result).toBeNull();
         });
     });
+    describe('updateWeightEstimationRule', () => {
+        it('should update weight estimation rule and map returned row', async () => {
+            const row = {
+                id: 'weight-rule-1',
+                category: 'clothing',
+                product_type: 'shirt',
+                size: 'M',
+                estimated_weight_kg: '0.35',
+                priority: 10,
+                is_active: true,
+                created_at: new Date(
+                    '2026-10-01T08:00:00.000Z',
+                ),
+                updated_at: new Date(
+                    '2026-10-01T09:00:00.000Z',
+                ),
+            };
+
+            dbMock.query
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([row]);
+            const result =
+                await service.updateWeightEstimationRule(
+                    tenant,
+                    'weight-rule-1',
+                    {
+                        category: 'clothing',
+                        productType: 'shirt',
+                        size: 'M',
+                        estimatedWeightKg: 0.35,
+                        priority: 10,
+                        isActive: true,
+                    },
+                );
+
+            expect(
+                dbMock.query,
+            ).toHaveBeenNthCalledWith(
+                2,
+                expect.stringContaining(
+                    'update "queen".weight_estimation_rules',
+                ),
+                [
+                    true,
+                    'clothing',
+                    true,
+                    'shirt',
+                    true,
+                    'M',
+                    0.35,
+                    10,
+                    true,
+                    'weight-rule-1',
+                ],
+            );
+            expect(result).toEqual({
+                id: 'weight-rule-1',
+                category: 'clothing',
+                productType: 'shirt',
+                size: 'M',
+                estimatedWeightKg: 0.35,
+                priority: 10,
+                isActive: true,
+                createdAt: row.created_at,
+                updatedAt: row.updated_at,
+            });
+
+            expect(
+                typeof result?.estimatedWeightKg,
+            ).toBe('number');
+        });
+    });
+    describe('createWeightEstimationRule', () => {
+        it('should create weight estimation rule and map returned row', async () => {
+            const row = {
+                id: 'weight-rule-new',
+                category: 'clothing',
+                product_type: 'shirt',
+                size: 'M',
+                estimated_weight_kg: '0.25',
+                priority: 20,
+                is_active: true,
+                created_at: new Date(
+                    '2026-10-01T10:00:00.000Z',
+                ),
+                updated_at: new Date(
+                    '2026-10-01T10:00:00.000Z',
+                ),
+            };
+
+            dbMock.query
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([row]);
+            const result =
+                await service.createWeightEstimationRule(
+                    tenant,
+                    {
+                        category: 'clothing',
+                        productType: 'shirt',
+                        size: 'M',
+                        estimatedWeightKg: 0.25,
+                        priority: 20,
+                        isActive: true,
+                    },
+                );
+
+            expect(
+                dbMock.query,
+            ).toHaveBeenNthCalledWith(
+                2,
+                expect.stringContaining(
+                    'insert into "queen".weight_estimation_rules',
+                ),
+                [
+                    'clothing',
+                    'shirt',
+                    'M',
+                    0.25,
+                    20,
+                    true,
+                ],
+            );
+
+            expect(result).toEqual({
+                id: 'weight-rule-new',
+                category: 'clothing',
+                productType: 'shirt',
+                size: 'M',
+                estimatedWeightKg: 0.25,
+                priority: 20,
+                isActive: true,
+                createdAt: row.created_at,
+                updatedAt: row.updated_at,
+            });
+        });
+    });
 });

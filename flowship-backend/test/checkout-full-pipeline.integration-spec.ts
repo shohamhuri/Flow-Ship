@@ -2,12 +2,14 @@ import {
     ConfigModule,
     ConfigService,
 } from '@nestjs/config';
-
+import { DeliverySettingsService } from
+    '../src/modules/planning/delivery-settings.service';
 import {
     Test,
     TestingModule,
 } from '@nestjs/testing';
-
+import { CapacityPlanningService } from
+    '../src/modules/checkout/capacity-planning.service';
 import { randomUUID } from 'crypto';
 
 import { DbService } from '../src/infrastructure/database/db.service';
@@ -29,14 +31,26 @@ import { SourcingService } from '../src/modules/sourcing/sourcing.service';
 
 import { MockInventoryProvider } from '../src/modules/sourcing/adapters/mock-inventory.provider';
 
-import { INVENTORY_PROVIDER, DISTANCE_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
+import {
+    INVENTORY_PROVIDER,
+    DISTANCE_PROVIDER,
+    SOURCE_CONFIRMATION_PROVIDER,
+} from '../src/modules/sourcing/sourcing.tokens';
+import { MockSourceConfirmationProvider } from
+    '../src/modules/sourcing/providers/mock-source-confirmation.provider';
 
+import { ShipmentPlanConfirmationService } from
+    '../src/modules/planning/shipment-plan-confirmation.service';
 import { AuditLogsService } from '../src/modules/audit-logs/audit-logs.service';
 
 import { GroupingService } from '../src/modules/grouping/grouping.service';
 
 import { GroupingRulesService } from '../src/modules/grouping/grouping-rules.service';
+import { WeightEstimationService } from
+    '../src/modules/checkout/weight-estimation.service';
 
+import { WeightEstimationRepository } from
+    '../src/modules/checkout/weight-estimation.repository';
 import { GroupingStrategySettingsRepository } from '../src/modules/grouping/grouping-strategy-settings.repository';
 
 import { ShipmentGroupsRepository } from '../src/modules/grouping/shipment-groups.repository';
@@ -140,7 +154,8 @@ describe(
                                  * Infrastructure
                                  */
                                 DbService,
-
+                                CapacityPlanningService,
+                                DeliverySettingsService,
                                 /*
                                  * Tenant
                                  */
@@ -153,7 +168,8 @@ describe(
                                 CheckoutProcessingRepository,
                                 CheckoutService,
                                 SourcingResultsRepository,
-
+                                WeightEstimationRepository,
+                                WeightEstimationService,
                                 /*
                                  * Audit
                                  */
@@ -163,12 +179,17 @@ describe(
                                  * Sourcing
                                  */
                                 MockInventoryProvider,
+                                MockSourceConfirmationProvider,
 
                                 {
                                     provide:
                                         INVENTORY_PROVIDER,
                                     useExisting:
                                         MockInventoryProvider,
+                                },
+                                {
+                                    provide: SOURCE_CONFIRMATION_PROVIDER,
+                                    useExisting: MockSourceConfirmationProvider,
                                 },
 
                                 {
@@ -196,6 +217,7 @@ describe(
                                 ShipmentPlanGeneratorService,
                                 ShipmentPlanBuilderService,
                                 ShipmentPlanEvaluatorService,
+                                ShipmentPlanConfirmationService,
                                 ShipmentPlanQuoteService,
                                 ShipmentPlanDeliveryOptionsService,
 

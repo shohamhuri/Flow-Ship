@@ -5,7 +5,8 @@ import {
 import {
     CheckoutRepository,
 } from './checkout.repository';
-
+import { ShipmentPlanConfirmationService }
+    from '../planning/shipment-plan-confirmation.service';
 import {
     CheckoutProcessingRepository,
 } from './checkout-processing.repository';
@@ -97,6 +98,8 @@ describe('CheckoutService', () => {
 
     let shipmentPlanEvaluatorServiceMock: {
         evaluateAndSelect: jest.Mock;
+        getMaxEvaluatedPlans: jest.Mock;
+
     };
 
     let shipmentPlanQuoteServiceMock: {
@@ -109,6 +112,7 @@ describe('CheckoutService', () => {
 
     let decisionServiceMock: {
         getActivePriorityCards: jest.Mock;
+        scoreDeliveryOptions: jest.Mock;
         selectBestDeliveryOption: jest.Mock;
         saveShipmentDecision: jest.Mock;
     };
@@ -120,7 +124,16 @@ describe('CheckoutService', () => {
     let shipmentCreationServiceMock: {
         createShipments: jest.Mock;
     };
-
+    let shipmentPlanConfirmationServiceMock: {
+        confirmPlan: jest.Mock;
+    };
+    let weightEstimationServiceMock: {
+        resolveWeight: jest.Mock;
+    };
+    let capacityPlanningServiceMock: Record<
+        string,
+        jest.Mock
+    >;
     const tenant: CurrentTenant = {
         id: 'tenant-1',
         name: 'QUEEN',
@@ -482,6 +495,8 @@ describe('CheckoutService', () => {
         shipmentPlanEvaluatorServiceMock = {
             evaluateAndSelect:
                 jest.fn(),
+            getMaxEvaluatedPlans: jest.fn().mockReturnValue(30),
+
         };
 
         shipmentPlanQuoteServiceMock = {
@@ -497,6 +512,9 @@ describe('CheckoutService', () => {
         decisionServiceMock = {
             getActivePriorityCards:
                 jest.fn(),
+
+            scoreDeliveryOptions:
+                jest.fn((options) => options),
 
             selectBestDeliveryOption:
                 jest.fn(),
@@ -514,7 +532,18 @@ describe('CheckoutService', () => {
             createShipments:
                 jest.fn(),
         };
-
+        shipmentPlanConfirmationServiceMock = {
+            confirmPlan: jest.fn(),
+        };
+        weightEstimationServiceMock = {
+            resolveWeight: jest.fn(
+                async (_tenant, item) => ({
+                    weightKg: item.weight,
+                    source: 'actual',
+                }),
+            ),
+        };
+        capacityPlanningServiceMock = {};
         service = new CheckoutService(
             sourcingServiceMock as unknown as SourcingService,
             sourcingResultsRepositoryMock as unknown as SourcingResultsRepository,
@@ -553,6 +582,13 @@ describe('CheckoutService', () => {
 
             shipmentCreationServiceMock as unknown as
             ShipmentCreationService,
+            shipmentPlanConfirmationServiceMock as unknown as
+            ShipmentPlanConfirmationService,
+            weightEstimationServiceMock as any,
+
+            capacityPlanningServiceMock as any,
+
+
         );
     });
 
@@ -694,6 +730,13 @@ describe('CheckoutService', () => {
             .mockResolvedValue(
                 undefined,
             );
+        shipmentPlanConfirmationServiceMock
+            .confirmPlan
+            .mockImplementation(async (plan) => ({
+                plan,
+                confirmed: true,
+                confirmations: [],
+            }));
     };
 
     describe('getCheckouts', () => {
@@ -824,49 +867,31 @@ describe('CheckoutService', () => {
 
                 items: [
                     {
-                        sku:
-                            'SKU-1',
-
-                        name:
-                            'Product 1',
-
-                        quantity:
-                            2,
-
-                        unitWeight:
-                            1.5,
-
-                        supplierId:
-                            'supplier-1',
-
-                        category:
-                            'fashion',
-
-                        unitPrice:
-                            50,
+                        sku: 'SKU-1',
+                        name: 'Product 1',
+                        category: 'fashion',
+                        productType: undefined,
+                        size: undefined,
+                        supplierId: 'supplier-1',
+                        quantity: 2,
+                        unitPrice: 50,
+                        unitWeight: 1.5,
+                        weightSource: 'actual',
+                        weightEstimationRuleId: undefined,
                     },
                     {
-                        sku:
-                            'SKU-2',
-
-                        name:
-                            'Product 2',
-
-                        quantity:
-                            3,
-
-                        unitWeight:
-                            2,
-
-                        supplierId:
-                            'supplier-2',
-
-                        category:
-                            'electronics',
-
-                        unitPrice:
-                            20,
-                    },
+                        sku: 'SKU-2',
+                        name: 'Product 2',
+                        category: 'electronics',
+                        productType: undefined,
+                        size: undefined,
+                        supplierId: 'supplier-2',
+                        quantity: 3,
+                        unitPrice: 20,
+                        unitWeight: 2,
+                        weightSource: 'actual',
+                        weightEstimationRuleId: undefined,
+                    }
                 ],
 
                 totalItems: 5,
@@ -1061,11 +1086,11 @@ describe('CheckoutService', () => {
             );
 
             expect(
-                shipmentPlanEvaluatorServiceMock
-                    .evaluateAndSelect,
-            ).toHaveBeenCalledWith([
-                validPlan,
-            ]);
+                shipmentPlanEvaluatorServiceMock.evaluateAndSelect,
+            ).toHaveBeenCalledWith(
+                [validPlan],
+                1,
+            );
         });
     });
 
@@ -1093,6 +1118,15 @@ describe('CheckoutService', () => {
                     street: 'Dizengoff',
                 },
                 tenant,
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        confirmed: true,
+                        plan: expect.objectContaining({
+                            id: 'plan-1',
+                        }),
+                    }),
+                ]),
+                new Date('2026-09-07T12:00:00.000Z'),
             );
         });
 
@@ -1111,7 +1145,58 @@ describe('CheckoutService', () => {
                 quotedPlans,
             );
         });
+        it('should pass vehicle plan delivery option metrics to the decision engine', async () => {
+            setupHappyPath();
 
+            const vehiclePlanDeliveryOption = {
+                ...deliveryOption,
+
+                id: 'vehicle-plan-option',
+
+                metrics: {
+                    totalShippingPrice: 45,
+                    estimatedDeliveryDays: 1,
+                    averageProviderPriority: 0.9,
+                    shipmentCount: 2,
+                },
+            };
+
+            shipmentPlanDeliveryOptionsServiceMock
+                .generateForPlans
+                .mockReturnValue([
+                    {
+                        ...deliveryOptionsResult[0],
+
+                        deliveryOptions: [
+                            vehiclePlanDeliveryOption,
+                        ],
+                    },
+                ]);
+
+
+            await service.createCheckout(
+                checkoutDto,
+                tenant,
+            );
+
+            expect(
+                decisionServiceMock.scoreDeliveryOptions,
+            ).toHaveBeenCalledWith(
+                [
+                    expect.objectContaining({
+                        id: 'vehicle-plan-option',
+
+                        metrics: {
+                            totalShippingPrice: 45,
+                            estimatedDeliveryDays: 1,
+                            averageProviderPriority: 0.9,
+                            shipmentCount: 2,
+                        },
+                    }),
+                ],
+                priorityCards,
+            );
+        });
         it('should load priority cards and evaluate all delivery options', async () => {
             setupHappyPath();
 
@@ -1156,7 +1241,7 @@ describe('CheckoutService', () => {
 
             expect(
                 decisionServiceMock
-                    .selectBestDeliveryOption,
+                    .scoreDeliveryOptions,
             ).toHaveBeenCalledWith(
                 [
                     deliveryOption,
@@ -1170,10 +1255,8 @@ describe('CheckoutService', () => {
             setupHappyPath();
 
             decisionServiceMock
-                .selectBestDeliveryOption
-                .mockReturnValue(
-                    null,
-                );
+                .scoreDeliveryOptions
+                .mockReturnValue([]);
 
             await expect(
                 service.createCheckout(
@@ -1204,8 +1287,7 @@ describe('CheckoutService', () => {
             );
 
             expect(
-                decisionServiceMock
-                    .saveShipmentDecision,
+                decisionServiceMock.saveShipmentDecision,
             ).toHaveBeenCalledWith(
                 tenant,
                 'checkout-1',
@@ -1213,8 +1295,217 @@ describe('CheckoutService', () => {
                 deliveryOption,
                 priorityCards,
                 1,
+                [deliveryOption],
+                expect.objectContaining({
+                    generation: expect.anything(),
+                    allPlans: expect.anything(),
+                    validPlans: expect.anything(),
+                    rejectedPlans: expect.anything(),
+                    confirmationAttempts: expect.anything(),
+                    selectedPlans: expect.anything(),
+                    quotedPlans: expect.anything(),
+                }),
             );
         });
+
+        it('should not request carrier quotes when source confirmation fails', async () => {
+            setupHappyPath();
+
+            // המחסן מסרב לאשר את תוכנית המשלוח
+            shipmentPlanConfirmationServiceMock
+                .confirmPlan
+                .mockResolvedValue({
+                    plan: validPlan,
+                    confirmed: false,
+                    confirmations: [],
+                });
+
+            await expect(
+                service.createCheckout(
+                    checkoutDto,
+                    tenant,
+                ),
+            ).rejects.toThrow(
+                'No shipment plans passed source confirmation',
+            );
+
+            // נוודא שהתבקש אישור מהמחסן
+            expect(
+                shipmentPlanConfirmationServiceMock.confirmPlan,
+            ).toHaveBeenCalledWith(
+                validPlan,
+                'store-1',
+            );
+
+            // אסור לפנות לחברות השליחויות
+            expect(
+                shipmentPlanQuoteServiceMock.getQuotesForPlans,
+            ).not.toHaveBeenCalled();
+
+            // התהליך חייב להיכשל בשלב אישור המקורות
+            expect(
+                checkoutProcessingRepositoryMock.markFailed,
+            ).toHaveBeenCalledWith(
+                tenant,
+                'checkout-1',
+                'source_confirmation',
+                'No shipment plans passed source confirmation',
+            );
+
+            expect(
+                checkoutRepositoryMock.updateStatus,
+            ).toHaveBeenCalledWith(
+                tenant,
+                'checkout-1',
+                'failed',
+            );
+        });
+
+        it('should request quotes only for confirmed plans', async () => {
+            setupHappyPath();
+
+            const rejectedBySourcePlan = {
+                ...validPlan,
+                id: 'plan-unconfirmed',
+            };
+
+            shipmentPlanBuilderServiceMock
+                .buildPlans
+                .mockReturnValue([
+                    rejectedBySourcePlan,
+                    validPlan,
+                ]);
+
+            shipmentPlanEvaluatorServiceMock
+                .evaluateAndSelect
+                .mockReturnValue([
+                    rejectedBySourcePlan,
+                    validPlan,
+                ]);
+
+            shipmentPlanConfirmationServiceMock
+                .confirmPlan
+                .mockImplementation(async (plan) => ({
+                    plan,
+                    confirmed: plan.id === validPlan.id,
+                    confirmations: [],
+                }));
+
+            const result = await service.createCheckout(
+                checkoutDto,
+                tenant,
+            );
+
+            expect(
+                shipmentPlanConfirmationServiceMock.confirmPlan,
+            ).toHaveBeenCalledTimes(2);
+
+            expect(
+                shipmentPlanQuoteServiceMock.getQuotesForPlans,
+            ).toHaveBeenCalledTimes(1);
+
+            expect(
+                shipmentPlanQuoteServiceMock.getQuotesForPlans,
+            ).toHaveBeenCalledWith(
+                [validPlan],
+                expect.objectContaining({
+                    city: 'Tel Aviv',
+                }),
+                tenant, expect.arrayContaining([
+                    expect.objectContaining({
+                        confirmed: true,
+                        plan: expect.objectContaining({
+                            id: 'plan-1',
+                        }),
+                    }),
+                ]),
+                new Date('2026-09-07T12:00:00.000Z'),
+            );
+
+            expect(
+                result.planning.quotedPlans,
+            ).toEqual(quotedPlans);
+        });
+
+        it('should use an alternative plan when the first plan is rejected', async () => {
+            setupHappyPath();
+
+            const firstPlan = {
+                ...validPlan,
+                id: 'plan-first',
+            };
+
+            const alternativePlan = validPlan;
+
+            shipmentPlanBuilderServiceMock
+                .buildPlans
+                .mockReturnValue([
+                    firstPlan,
+                    alternativePlan,
+                ]);
+
+            shipmentPlanEvaluatorServiceMock
+                .evaluateAndSelect
+                .mockReturnValue([
+                    firstPlan,
+                    alternativePlan,
+                ]);
+
+            shipmentPlanConfirmationServiceMock
+                .confirmPlan
+                .mockImplementation(async (plan) => ({
+                    plan,
+                    confirmed: plan.id === alternativePlan.id,
+                    confirmations: [],
+                }));
+
+            await service.createCheckout(checkoutDto, tenant);
+
+            expect(
+                shipmentPlanEvaluatorServiceMock.evaluateAndSelect,
+            ).toHaveBeenCalledWith(
+                [firstPlan, alternativePlan],
+                2,
+            );
+
+            expect(
+                shipmentPlanConfirmationServiceMock.confirmPlan,
+            ).toHaveBeenCalledTimes(2);
+
+            expect(
+                shipmentPlanConfirmationServiceMock.confirmPlan,
+            ).toHaveBeenNthCalledWith(
+                1,
+                firstPlan,
+                checkoutDto.storeId,
+            );
+
+            expect(
+                shipmentPlanConfirmationServiceMock.confirmPlan,
+            ).toHaveBeenNthCalledWith(
+                2,
+                alternativePlan,
+                checkoutDto.storeId,
+            );
+
+            expect(
+                shipmentPlanQuoteServiceMock.getQuotesForPlans,
+            ).toHaveBeenCalledWith(
+                [alternativePlan],
+                checkoutDto.destination,
+                tenant,
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        confirmed: true,
+                        plan: expect.objectContaining({
+                            id: 'plan-1',
+                        }),
+                    }),
+                ]),
+                new Date('2026-09-07T12:00:00.000Z'),
+            );
+        });
+
     });
 
     describe('winning plan and shipment creation', () => {
@@ -1222,13 +1513,13 @@ describe('CheckoutService', () => {
             setupHappyPath();
 
             decisionServiceMock
-                .selectBestDeliveryOption
-                .mockReturnValue({
-                    ...deliveryOption,
-
-                    planId:
-                        'missing-plan',
-                });
+                .scoreDeliveryOptions
+                .mockReturnValue([
+                    {
+                        ...deliveryOption,
+                        planId: 'missing-plan',
+                    },
+                ]);
 
             await expect(
                 service.createCheckout(

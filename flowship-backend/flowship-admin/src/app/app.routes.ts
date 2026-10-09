@@ -12,7 +12,8 @@ import { GroupPurchases } from './pages/group-purchases/group-purchases';
 import { CheckoutsList } from './pages/checkouts-list/checkouts-list';
 import { CheckoutDetailsComponent } from './pages/checkout-details/checkout-details';
 import { authGuard } from './guards/auth-guard';
-
+import { StoreSettings } from './pages/store-settings/store-settings';
+import { WeightEstimationManagement } from './pages/weight-estimation-management/weight-estimation-management';
 export const routes: Routes = [
     {
         path: '',
@@ -64,12 +65,20 @@ export const routes: Routes = [
                 component: GroupPurchases,
             },
             {
+                path: 'weight-estimation',
+                component: WeightEstimationManagement,
+            },
+            {
                 path: 'checkouts',
                 component: CheckoutsList,
             },
             {
                 path: 'checkouts/:checkoutId',
                 component: CheckoutDetailsComponent,
+            },
+            {
+                path: 'store-settings',
+                component: StoreSettings,
             },
         ],
     },

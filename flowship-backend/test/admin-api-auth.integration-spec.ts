@@ -3,7 +3,7 @@ import {
     UnauthorizedException,
     ValidationPipe,
 } from '@nestjs/common';
-
+import { DeliverySettingsService } from '../src/modules/planning/delivery-settings.service';
 import {
     ConfigModule,
     ConfigService,
@@ -234,6 +234,13 @@ describe(
 
                                     useValue:
                                         authServiceMock,
+                                },
+                                {
+                                    provide: DeliverySettingsService,
+                                    useValue: {
+                                        getSettings: jest.fn(),
+                                        updateSettings: jest.fn(),
+                                    },
                                 },
                             ],
                         })

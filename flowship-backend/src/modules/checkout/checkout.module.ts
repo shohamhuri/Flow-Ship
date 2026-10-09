@@ -6,7 +6,7 @@ import { GroupingModule } from '../grouping/grouping.module';
 import { PlanningModule } from '../planning/planning.module';
 import { SourcingModule } from '../sourcing/sourcing.module';
 import { TenantsModule } from '../tenants/tenants.module';
-
+import { CapacityPlanningService } from './capacity-planning.service';
 import { CheckoutProcessingRepository } from './checkout-processing.repository';
 import { CheckoutController } from './checkout.controller';
 import { CheckoutRepository } from './checkout.repository';
@@ -16,6 +16,8 @@ import { CarriersModule } from '../carriers/carriers.module';
 import { ShipmentPlanDeliveryOptionsService } from '../planning/shipment-plan-delivery-options.service';
 import { DecisionModule } from '../decision/decision.module';
 import { ShipmentsModule } from '../shipments/shipments.module';
+import { WeightEstimationRepository } from './weight-estimation.repository';
+import { WeightEstimationService } from './weight-estimation.service';
 @Module({
   imports: [
     SourcingModule,
@@ -38,6 +40,9 @@ import { ShipmentsModule } from '../shipments/shipments.module';
     CheckoutProcessingRepository,
     ShipmentPlanQuoteService,
     ShipmentPlanDeliveryOptionsService,
+    WeightEstimationRepository,
+    WeightEstimationService,
+    CapacityPlanningService,
   ],
 })
 export class CheckoutModule { }

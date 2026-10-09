@@ -1,4 +1,5 @@
 import { CarrierQuoteOption } from '../../carriers/interfaces/carrier-adapter.interface';
+import { VehiclePlan } from '../../checkout/capacity-planning.service';
 import { QuotedShipmentPlan } from './shipment-plan-quote.interface';
 
 export interface SelectedGroupQuote {
@@ -6,7 +7,14 @@ export interface SelectedGroupQuote {
     pickupCities: string[];
     destinationCity: string;
     weightKg: number;
+
     quote: CarrierQuoteOption;
+
+    vehiclePlan?: {
+        providerId: string;
+        providerCode: string;
+        plan: VehiclePlan;
+    };
 }
 
 export interface ShipmentPlanDeliveryOption {

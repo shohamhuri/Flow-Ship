@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-
+import { CarrierQuoteOption } from
+    '../carriers/interfaces/carrier-adapter.interface';
 import { QuotedShipmentPlan } from './interfaces/shipment-plan-quote.interface';
 import {
     SelectedGroupQuote,
@@ -25,7 +26,11 @@ export class ShipmentPlanDeliveryOptionsService {
         const quotableGroups =
             quotedPlan.groupQuotes.filter(
                 (groupQuote) =>
-                    groupQuote.quotes.length > 0,
+                    groupQuote.quotes.length > 0 ||
+                    groupQuote.vehiclePlans?.some(
+                        (vehiclePlan) =>
+                            (vehiclePlan.alternatives?.length ?? 0) > 0,
+                    ),
             );
 
         if (
@@ -46,8 +51,26 @@ export class ShipmentPlanDeliveryOptionsService {
 
         const theoreticalCombinations =
             quotableGroups.reduce(
-                (total, groupQuote) =>
-                    total * groupQuote.quotes.length,
+                (total, groupQuote) => {
+                    const vehicleAlternativesCount =
+                        (groupQuote.vehiclePlans ?? [])
+                            .reduce(
+                                (sum, vehiclePlan) =>
+                                    sum +
+                                    (
+                                        vehiclePlan
+                                            .alternatives
+                                            ?.length ?? 0
+                                    ),
+                                0,
+                            );
+
+                    const choicesCount =
+                        groupQuote.quotes.length +
+                        vehicleAlternativesCount;
+
+                    return total * choicesCount;
+                },
                 1,
             );
 
@@ -112,16 +135,80 @@ export class ShipmentPlanDeliveryOptionsService {
         const currentGroup =
             groupQuotes[groupIndex];
 
-        for (const quote of currentGroup.quotes) {
+        const quotes = [
+            ...currentGroup.quotes.map((quote) => ({
+                quote,
+                vehiclePlan: undefined,
+            })),
+
+            ...(currentGroup.vehiclePlans ?? [])
+                .flatMap((vehiclePlan) =>
+                    (vehiclePlan.alternatives ?? [])
+                        .map((alternative) => ({
+                            quote: {
+                                carrierName:
+                                    vehiclePlan.providerCode,
+
+                                serviceName:
+                                    `${alternative.urgency} vehicle plan`,
+
+                                price:
+                                    alternative.totalPrice,
+
+                                currency:
+                                    alternative.currency,
+
+                                estimatedDays:
+                                    alternative.estimatedDays,
+
+                                urgency:
+                                    alternative.urgency,
+
+                                providerId:
+                                    vehiclePlan.providerId,
+
+                                providerCode:
+                                    vehiclePlan.providerCode,
+
+                                providerPriority:
+                                    alternative.providerPriority,
+                                vehicleCount:
+                                    alternative.vehicleCount,
+                            },
+
+                            vehiclePlan: {
+                                providerId:
+                                    vehiclePlan.providerId,
+
+                                providerCode:
+                                    vehiclePlan.providerCode,
+
+                                plan:
+                                    vehiclePlan.plan,
+                            },
+                        })),
+                ),
+        ];
+
+        for (const choice of quotes) {
             currentCombination.push({
-                groupId: currentGroup.groupId,
+                groupId:
+                    currentGroup.groupId,
+
                 pickupCities:
                     currentGroup.pickupCities,
+
                 destinationCity:
                     currentGroup.destinationCity,
+
                 weightKg:
                     currentGroup.weightKg,
-                quote,
+
+                quote:
+                    choice.quote,
+
+                vehiclePlan:
+                    choice.vehiclePlan,
             });
 
             this.buildCombinations(
@@ -177,7 +264,20 @@ export class ShipmentPlanDeliveryOptionsService {
                 ? totalProviderPriority /
                 selectedGroupQuotes.length
                 : 0;
-
+        const shipmentCount =
+            selectedGroupQuotes.reduce(
+                (sum, selected) =>
+                    sum +
+                    (
+                        (
+                            selected.quote as
+                            CarrierQuoteOption & {
+                                vehicleCount?: number;
+                            }
+                        ).vehicleCount ?? 1
+                    ),
+                0,
+            );
         return {
             id: `${quotedPlan.plan.id}-delivery-${index + 1}`,
 
@@ -189,8 +289,7 @@ export class ShipmentPlanDeliveryOptionsService {
                 totalShippingPrice,
                 estimatedDeliveryDays,
                 averageProviderPriority,
-                shipmentCount:
-                    selectedGroupQuotes.length,
+                shipmentCount,
             },
         };
     }

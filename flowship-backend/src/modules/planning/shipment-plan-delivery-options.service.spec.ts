@@ -618,4 +618,90 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
 
         expect(result).toEqual([]);
     });
+    it('should generate a delivery option from a vehicle plan alternative', () => {
+        const groupQuote = createGroupQuote(
+            'group-1',
+            [],
+        );
+
+        groupQuote.vehiclePlans = [
+            {
+                providerId: 'provider-1',
+                providerCode: 'delivery-center',
+                vehicleQuotes: [],
+                alternatives: [
+                    {
+                        urgency: 'standard',
+                        totalPrice: 45,
+                        currency: 'ILS',
+                        vehicleCount: 2,
+                        estimatedDays: 1,
+                        providerPriority: 0.9,
+                    },
+                ],
+            },
+        ];
+
+        const quotedPlan = createQuotedPlan(
+            'plan-1',
+            [groupQuote],
+        );
+
+        const result =
+            service.generateForPlans([
+                quotedPlan,
+            ]);
+
+        expect(
+            result[0].deliveryOptions,
+        ).toHaveLength(1);
+
+        expect(
+            result[0].deliveryOptions[0].metrics,
+        ).toEqual({
+            totalShippingPrice: 45,
+            estimatedDeliveryDays: 1,
+            averageProviderPriority: 0.9,
+            shipmentCount: 2,
+        });
+    });
+    it('should count vehicle plan alternatives in theoretical combinations', () => {
+        const groupQuote = createGroupQuote(
+            'group-1',
+            [],
+        );
+
+        groupQuote.vehiclePlans = [
+            {
+                providerId: 'provider-1',
+                providerCode: 'delivery-center',
+                vehicleQuotes: [],
+                alternatives: [
+                    {
+                        urgency: 'standard',
+                        totalPrice: 45,
+                        currency: 'ILS',
+                        vehicleCount: 2,
+                        estimatedDays: 1,
+                        providerPriority: 0.9,
+                    },
+                ],
+            },
+        ];
+
+        const quotedPlan = createQuotedPlan(
+            'plan-1',
+            [groupQuote],
+        );
+
+        const result =
+            service.generateForPlans([
+                quotedPlan,
+            ]);
+
+        expect(
+            result[0].statistics
+                .theoreticalCombinations,
+        ).toBe(1);
+    });
 });

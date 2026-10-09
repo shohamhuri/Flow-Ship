@@ -267,12 +267,12 @@ export class DecisionService {
                 b.score - a.score,
         )[0];
     }
-    selectBestDeliveryOption(
+    scoreDeliveryOptions(
         options: ShipmentPlanDeliveryOption[],
         cards: WeightedDecisionPriorityCard[],
-    ): ScoredShipmentPlanDeliveryOption | null {
+    ): ScoredShipmentPlanDeliveryOption[] {
         if (options.length === 0) {
-            return null;
+            return [];
         }
 
         const prices = options.map(
@@ -442,9 +442,20 @@ export class DecisionService {
                 a.metrics.shipmentCount -
                 b.metrics.shipmentCount
             );
-        })[0];
+        });
     }
+    selectBestDeliveryOption(
+        options: ShipmentPlanDeliveryOption[],
+        cards: WeightedDecisionPriorityCard[],
+    ): ScoredShipmentPlanDeliveryOption | null {
+        const scoredOptions =
+            this.scoreDeliveryOptions(
+                options,
+                cards,
+            );
 
+        return scoredOptions[0] ?? null;
+    }
     private calculateInverseScore(
         value: number,
         min: number,
@@ -480,19 +491,31 @@ export class DecisionService {
 
         const rows = await this.db.query<DecisionPriorityCardRow>(
             `
-        select
-            id,
-            provider_id,
-            criterion_key,
-            priority_rank,
-            is_active,
-            config
-        from ${schemaName}.decision_priority_cards
-        where is_active = true
-        order by priority_rank asc, created_at asc
-        `,
-        );
+    select
+        dpc.id,
+        dpc.provider_id,
+        dpc.criterion_key,
+        dpc.priority_rank,
+        dpc.is_active,
+        dpc.config
 
+    from ${schemaName}.decision_priority_cards dpc
+
+    left join ${schemaName}.providers p
+        on p.id = dpc.provider_id
+
+    where dpc.is_active = true
+
+      and (
+          dpc.provider_id is null
+          or p.is_active = true
+      )
+
+    order by
+        dpc.priority_rank asc,
+        dpc.created_at asc
+    `,
+        );
         const supportedCards = rows.filter((row) =>
             this.isSupportedCriterion(row.criterion_key),
         );
@@ -571,32 +594,68 @@ export class DecisionService {
         winner: ScoredShipmentPlanDeliveryOption,
         priorityCards: WeightedDecisionPriorityCard[],
         evaluatedOptionsCount: number,
+        evaluatedOptions:
+            ScoredShipmentPlanDeliveryOption[],
+        planningSnapshot: unknown,
     ): Promise<void> {
         const schemaName = tenant.schemaName;
 
         const sql = `
-       insert into ${schemaName}.shipment_decisions (
-    checkout_id,
-    order_id,
-    selected_plan_id,
-    selected_delivery_option_id,
-    score,
-    evaluated_options_count,
-    winner_snapshot,
-    priority_cards_snapshot
-)
-values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)
-on conflict (checkout_id)        do update set
-            selected_plan_id = excluded.selected_plan_id,
-            selected_delivery_option_id = excluded.selected_delivery_option_id,
-            score = excluded.score,
-            evaluated_options_count = excluded.evaluated_options_count,
-            winner_snapshot = excluded.winner_snapshot,
-            priority_cards_snapshot = excluded.priority_cards_snapshot,
+        insert into ${schemaName}.shipment_decisions (
+            checkout_id,
+            order_id,
+            selected_plan_id,
+            selected_delivery_option_id,
+            score,
+            evaluated_options_count,
+            winner_snapshot,
+            priority_cards_snapshot,
+            evaluated_options_snapshot,
+            planning_snapshot
+        )
+        values (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7::jsonb,
+            $8::jsonb,
+            $9::jsonb,
+            $10::jsonb
+        )
+        on conflict (checkout_id)
+        do update set
+            selected_plan_id =
+                excluded.selected_plan_id,
+
+            selected_delivery_option_id =
+                excluded.selected_delivery_option_id,
+
+            score =
+                excluded.score,
+
+            evaluated_options_count =
+                excluded.evaluated_options_count,
+
+            winner_snapshot =
+                excluded.winner_snapshot,
+
+            priority_cards_snapshot =
+                excluded.priority_cards_snapshot,
+
+            evaluated_options_snapshot =
+                excluded.evaluated_options_snapshot,
+
+            planning_snapshot =
+                excluded.planning_snapshot,
+
             updated_at = now()
     `;
 
-        await this.db.query(sql,
+        await this.db.query(
+            sql,
             [
                 checkoutId,
                 orderId,
@@ -606,8 +665,9 @@ on conflict (checkout_id)        do update set
                 evaluatedOptionsCount,
                 JSON.stringify(winner),
                 JSON.stringify(priorityCards),
-            ]
-
+                JSON.stringify(evaluatedOptions),
+                JSON.stringify(planningSnapshot),
+            ],
         );
     }
     async getDecisionSettings(

@@ -2,7 +2,12 @@ import {
     ConfigModule,
     ConfigService,
 } from '@nestjs/config';
-
+import { ShipmentPlanConfirmationService } from
+    '../src/modules/planning/shipment-plan-confirmation.service';
+import { WeightEstimationService } from
+    '../src/modules/checkout/weight-estimation.service';
+import { CapacityPlanningService } from
+    '../src/modules/checkout/capacity-planning.service';
 import {
     Test,
     TestingModule,
@@ -128,8 +133,8 @@ describe(
 
 
         const shipmentPlanEvaluatorServiceMock = {
-            evaluateAndSelect:
-                jest.fn(),
+            getMaxEvaluatedPlans: jest.fn(() => 30),
+            evaluateAndSelect: jest.fn(),
         };
 
 
@@ -148,6 +153,9 @@ describe(
         const decisionServiceMock = {
             getActivePriorityCards:
                 jest.fn(),
+
+            scoreDeliveryOptions:
+                jest.fn((options: any[]) => options),
 
             selectBestDeliveryOption:
                 jest.fn(),
@@ -823,6 +831,34 @@ describe(
                                     useValue:
                                         sourcingServiceMock,
                                 },
+
+                                {
+                                    provide: CapacityPlanningService,
+                                    useValue: {},
+                                },
+                                {
+                                    provide: WeightEstimationService,
+                                    useValue: {
+                                        resolveWeight: jest.fn(async (_tenant, item) => ({
+                                            weight: item.weight ?? 1,
+                                            weightSource: item.weight != null ? 'provided' : 'estimated',
+                                            weightEstimationRuleId: null,
+                                            weightEstimationRule: null,
+                                        })),
+                                    },
+                                },
+                                {
+                                    provide: ShipmentPlanConfirmationService,
+                                    useValue: {
+                                        confirmPlan: jest.fn(async (plan) => ({
+                                            plan,
+                                            confirmed: true,
+                                            confirmations: [],
+                                            confirmedAt: new Date().toISOString(),
+                                        })),
+                                    },
+                                },
+
 
                                 {
                                     provide:

@@ -1,17 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { AdminProviders } from './admin-providers';
+import { AdminProvidersComponent } from './admin-providers';
 
-describe('AdminProviders', () => {
-  let component: AdminProviders;
-  let fixture: ComponentFixture<AdminProviders>;
+describe('AdminProvidersComponent', () => {
+  let component: AdminProvidersComponent;
+  let fixture: ComponentFixture<AdminProvidersComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AdminProviders],
+      imports: [AdminProvidersComponent],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(AdminProviders);
+    fixture = TestBed.createComponent(AdminProvidersComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

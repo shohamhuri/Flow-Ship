@@ -6,8 +6,12 @@ import { ShipmentPlanCandidate } from './interfaces/shipment-plan.interface';
 export class ShipmentPlanEvaluatorService {
     private readonly maxEvaluatedPlans = 30;
 
+    getMaxEvaluatedPlans(): number {
+        return this.maxEvaluatedPlans;
+    }
     evaluateAndSelect(
         plans: ShipmentPlanCandidate[],
+        limit: number = this.maxEvaluatedPlans,
     ): ShipmentPlanCandidate[] {
         const evaluatedPlans = plans
             .filter(
@@ -77,9 +81,6 @@ export class ShipmentPlanEvaluatorService {
             );
         });
 
-        return evaluatedPlans.slice(
-            0,
-            this.maxEvaluatedPlans,
-        );
+        return evaluatedPlans.slice(0, limit);
     }
 }
