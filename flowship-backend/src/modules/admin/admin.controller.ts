@@ -584,6 +584,7 @@ export class AdminController {
             settings,
         };
     }
+
     @Patch('store-settings')
     async updateStoreSettings(
         @CurrentFlowShipAuth()
@@ -597,8 +598,15 @@ export class AdminController {
         const settings =
             await this.deliverySettingsService.updateSettings(
                 tenant,
-                dto.expressMaxMinutes,
-                dto.sameDayMaxMinutes,
+                {
+                    expressMaxMinutes: dto.expressMaxMinutes,
+                    sameDayMaxMinutes: dto.sameDayMaxMinutes,
+                    expressCutoffTime: dto.expressCutoffTime,
+                    expressAfterCutoffMode:
+                        dto.expressAfterCutoffMode,
+                    expressAfterCutoffMaxMinutes:
+                        dto.expressAfterCutoffMaxMinutes,
+                },
             );
 
         return {
@@ -611,4 +619,5 @@ export class AdminController {
             settings,
         };
     }
+
 }
