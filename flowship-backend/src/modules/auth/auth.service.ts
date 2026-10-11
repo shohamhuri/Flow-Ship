@@ -28,6 +28,7 @@ interface UserTenantRow {
     tenant_name: string;
     schema_name: string;
     tenant_status: string;
+    tenant_timezone: string;
 }
 
 @Injectable()
@@ -108,8 +109,8 @@ export class AuthService {
                     t.id as tenant_id,
                     t.name as tenant_name,
                     t.schema_name,
-                    t.status as tenant_status
-                from public.flowship_user_profiles p
+t.status as tenant_status,
+t.timezone as tenant_timezone                from public.flowship_user_profiles p
                 inner join public.flowship_tenants t
                     on t.id = p.tenant_id
                 where p.user_id = $1
@@ -150,8 +151,8 @@ export class AuthService {
             name: row.tenant_name,
             schemaName: row.schema_name,
             status: row.tenant_status,
+            timezone: row.tenant_timezone,
         };
-
         return {
             user,
             tenant,

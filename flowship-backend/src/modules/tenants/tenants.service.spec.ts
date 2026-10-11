@@ -176,11 +176,10 @@ describe('TenantsService', () => {
             "status = 'active'",
         );
 
-        expect(sql).toContain(
+        expect(sql.toLowerCase()).toContain(
             'from public.flowship_tenants',
         );
-
-        expect(sql).toContain(
+        expect(sql.toLowerCase()).toContain(
             'where api_key = $1',
         );
     });

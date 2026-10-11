@@ -1,20 +1,33 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { DbService } from '../../infrastructure/database/db.service';
+
+import {
+    Injectable,
+    UnauthorizedException,
+} from '@nestjs/common';
+
+import { DbService } from
+    '../../infrastructure/database/db.service';
 
 export type CurrentTenant = {
     id: string;
     name: string;
     schemaName: string;
     status: string;
+    timezone: string;
 };
 
 @Injectable()
 export class TenantsService {
-    constructor(private readonly db: DbService) { }
+    constructor(
+        private readonly db: DbService,
+    ) { }
 
-    async findByApiKey(apiKey: string | undefined): Promise<CurrentTenant> {
+    async findByApiKey(
+        apiKey: string | undefined,
+    ): Promise<CurrentTenant> {
         if (!apiKey) {
-            throw new UnauthorizedException('Missing x-api-key header');
+            throw new UnauthorizedException(
+                'Missing x-api-key header',
+            );
         }
 
         const tenant = await this.db.queryOne<{
@@ -22,19 +35,27 @@ export class TenantsService {
             name: string;
             schema_name: string;
             status: string;
+            timezone: string;
         }>(
             `
-      select id, name, schema_name, status
-      from public.flowship_tenants
-      where api_key = $1
-        and status = 'active'
-      limit 1
-      `,
+            SELECT
+                id,
+                name,
+                schema_name,
+                status,
+                timezone
+            FROM public.flowship_tenants
+            WHERE api_key = $1
+              AND status = 'active'
+            LIMIT 1
+            `,
             [apiKey],
         );
 
         if (!tenant) {
-            throw new UnauthorizedException('Invalid API key');
+            throw new UnauthorizedException(
+                'Invalid API key',
+            );
         }
 
         return {
@@ -42,6 +63,7 @@ export class TenantsService {
             name: tenant.name,
             schemaName: tenant.schema_name,
             status: tenant.status,
+            timezone: tenant.timezone,
         };
     }
 }
