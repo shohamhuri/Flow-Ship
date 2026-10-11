@@ -41,7 +41,9 @@ jobs:
       - name: Check required environment variables
         run: |
           node -e "console.log('DATABASE_URL:', !!process.env.DATABASE_URL); console.log('SUPABASE_URL:', !!process.env.SUPABASE_URL); console.log('TEST_A_KEY:', !!process.env.TEST_FLOW_SHIP_A_API_KEY); console.log('TEST_B_KEY:', !!process.env.TEST_FLOW_SHIP_B_API_KEY);"
-
+      - name: Identify Supabase project
+        run: |
+          node -e "const u = new URL(process.env.DATABASE_URL); const match = u.username.match(/^postgres\.([a-z0-9]+)$/); console.log('SUPABASE_PROJECT_ID:', match ? match[1] : 'UNKNOWN');"
       - name: Test database connection
         run: |
           node -e "const { Pool } = require('pg'); const p = new Pool({ connectionString: process.env.DATABASE_URL, ssl:{ rejectUnauthorized: false }, connectionTimeoutMillis: 10000 }); p.query('SELECT 1').then(() => { console.log('DATABASE CONNECTION OK'); return p.end(); }).catch(e => { console.error('DATABASE CONNECTION FAILED:', e.message); process.exit(1); });"
