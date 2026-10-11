@@ -25,6 +25,11 @@ import {
 export class StoreSettings implements OnInit {
   expressMaxMinutes: number | null = null;
   sameDayMaxMinutes: number | null = null;
+  expressCutoffTime: string | null = null;
+
+  expressAfterCutoffMode: 'extended' | 'disabled' = 'extended';
+
+  expressAfterCutoffMaxMinutes: number | null = null;
   isLoading = true;
   isSaving = false;
 
@@ -69,7 +74,14 @@ export class StoreSettings implements OnInit {
           response.settings.expressMaxMinutes;
         this.sameDayMaxMinutes =
           response.settings.sameDayMaxMinutes;
+        this.expressCutoffTime =
+          response.settings.expressCutoffTime?.slice(0, 5) ?? null;
 
+        this.expressAfterCutoffMode =
+          response.settings.expressAfterCutoffMode;
+
+        this.expressAfterCutoffMaxMinutes =
+          response.settings.expressAfterCutoffMaxMinutes;
         this.isLoading = false;
         this.cdr.detectChanges();
       },
@@ -108,33 +120,71 @@ export class StoreSettings implements OnInit {
         'יש להזין זמן תקין למשלוח מהיום להיום.';
       return;
     }
+    const cutoffTime = this.expressCutoffTime?.trim() || null;
+
+    if (
+      cutoffTime !== null &&
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoffTime)
+    ) {
+      this.errorMessage = 'יש להזין שעת חיתוך תקינה.';
+      return;
+    }
+
+    if (
+      cutoffTime !== null &&
+      this.expressAfterCutoffMode === 'extended' &&
+      (
+        this.expressAfterCutoffMaxMinutes === null ||
+        !Number.isSafeInteger(this.expressAfterCutoffMaxMinutes) ||
+        this.expressAfterCutoffMaxMinutes <= 0
+      )
+    ) {
+      this.errorMessage =
+        'יש להזין מספר דקות תקין לחלון המורחב.';
+      return;
+    }
     this.isSaving = true;
 
     this.adminApiService.updateStoreSettings({
       expressMaxMinutes: minutes,
       sameDayMaxMinutes: sameDayMinutes,
-    }).subscribe({
-      next: (response) => {
-        this.expressMaxMinutes =
-          response.settings.expressMaxMinutes;
-        this.sameDayMaxMinutes =
-          response.settings.sameDayMaxMinutes;
+      expressCutoffTime: cutoffTime,
+      expressAfterCutoffMode: this.expressAfterCutoffMode,
+      expressAfterCutoffMaxMinutes:
+        cutoffTime !== null &&
+          this.expressAfterCutoffMode === 'extended'
+          ? this.expressAfterCutoffMaxMinutes
+          : null,
+    })
+      .subscribe({
+        next: (response) => {
+          this.expressMaxMinutes =
+            response.settings.expressMaxMinutes;
+          this.sameDayMaxMinutes =
+            response.settings.sameDayMaxMinutes;
+          this.expressCutoffTime =
+            response.settings.expressCutoffTime?.slice(0, 5) ?? null;
 
-        this.successMessage =
-          'הגדרות החנות נשמרו בהצלחה.';
+          this.expressAfterCutoffMode =
+            response.settings.expressAfterCutoffMode;
 
-        this.isSaving = false;
-        this.cdr.detectChanges();
-      },
+          this.expressAfterCutoffMaxMinutes =
+            response.settings.expressAfterCutoffMaxMinutes;
+          this.successMessage =
+            'הגדרות החנות נשמרו בהצלחה.';
 
-      error: () => {
-        this.errorMessage =
-          'שמירת הגדרות החנות נכשלה.';
+          this.isSaving = false;
+          this.cdr.detectChanges();
+        },
 
-        this.isSaving = false;
-        this.cdr.detectChanges();
-      },
-    });
+        error: () => {
+          this.errorMessage =
+            'שמירת הגדרות החנות נכשלה.';
+
+          this.isSaving = false;
+          this.cdr.detectChanges();
+        },
+      });
   }
   get sameDayMaxHours(): number | null {
     if (this.sameDayMaxMinutes === null) {

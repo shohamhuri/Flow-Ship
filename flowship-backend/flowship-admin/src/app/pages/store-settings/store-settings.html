@@ -130,6 +130,72 @@
 
                 </div>
 
+                <!-- Express Cutoff Time -->
+                <div class="setting-row setting-row-separated">
+                    <div class="setting-info">
+                        <h3>שעת חיתוך למשלוח מהיר</h3>
+                        <p>
+                            עד שעה זו יחול זמן המשלוח המהיר הרגיל.
+                            לאחר מכן המערכת תפעל לפי המדיניות שנבחרה.
+                            השעה מחושבת לפי אזור הזמן של החנות.
+                        </p>
+                    </div>
+
+                    <div class="setting-control">
+                        <label for="expressCutoffTime">שעת חיתוך</label>
+                        <div class="input-wrapper">
+                            <input id="expressCutoffTime" name="expressCutoffTime" type="time"
+                                [(ngModel)]="expressCutoffTime" [disabled]="isSaving" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- After Cutoff Mode -->
+                <div *ngIf="expressCutoffTime" class="setting-row setting-row-separated">
+                    <div class="setting-info">
+                        <h3>מדיניות משלוח מהיר לאחר שעת החיתוך</h3>
+                        <p>
+                            ניתן להאריך את זמן המשלוח המותר או
+                            להפסיק להציע משלוח מהיר לאחר שעת החיתוך.
+                        </p>
+                    </div>
+
+                    <div class="setting-control">
+                        <label for="expressAfterCutoffMode">מדיניות</label>
+                        <select id="expressAfterCutoffMode" name="expressAfterCutoffMode"
+                            [(ngModel)]="expressAfterCutoffMode" [disabled]="isSaving">
+                            <option value="extended">הארכת זמן המשלוח</option>
+                            <option value="disabled">ביטול משלוח מהיר</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Extended Express Window -->
+                <div *ngIf="
+        expressCutoffTime &&
+        expressAfterCutoffMode === 'extended'
+    " class="setting-row setting-row-separated">
+                    <div class="setting-info">
+                        <h3>זמן משלוח מורחב לאחר שעת החיתוך</h3>
+                        <p>
+                            הזמן המרבי מרגע יצירת ההזמנה ועד המסירה,
+                            כולל הכנה ונסיעה, לאחר שעת החיתוך.
+                        </p>
+                    </div>
+
+                    <div class="setting-control">
+                        <label for="expressAfterCutoffMaxMinutes">
+                            משך זמן מורחב
+                        </label>
+                        <div class="input-wrapper">
+                            <input id="expressAfterCutoffMaxMinutes" name="expressAfterCutoffMaxMinutes" type="number"
+                                min="1" step="1" required [(ngModel)]="expressAfterCutoffMaxMinutes"
+                                [disabled]="isSaving" />
+                            <span>דקות</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="section-footer">
 
                     <span class="footer-note">
