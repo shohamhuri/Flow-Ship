@@ -371,6 +371,7 @@ describe(
 
                     status:
                         tenantA.status,
+                    timezone: 'Asia/Jerusalem',
                 });
             },
         );
