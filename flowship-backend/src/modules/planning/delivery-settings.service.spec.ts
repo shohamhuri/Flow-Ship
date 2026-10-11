@@ -22,10 +22,14 @@ describe('DeliverySettingsService', () => {
         );
     });
 
-    it('should return the tenant delivery time limits', async () => {
+
+    it('should return the tenant delivery settings', async () => {
         dbMock.queryOne.mockResolvedValue({
             express_max_minutes: 120,
             same_day_max_minutes: 1440,
+            express_cutoff_time: null,
+            express_after_cutoff_mode: 'extended',
+            express_after_cutoff_max_minutes: null,
         });
 
         const result = await service.getSettings(tenant);
@@ -33,6 +37,9 @@ describe('DeliverySettingsService', () => {
         expect(result).toEqual({
             expressMaxMinutes: 120,
             sameDayMaxMinutes: 1440,
+            expressCutoffTime: null,
+            expressAfterCutoffMode: 'extended',
+            expressAfterCutoffMaxMinutes: null,
         });
 
         expect(dbMock.queryOne).toHaveBeenCalledWith(
@@ -41,6 +48,44 @@ describe('DeliverySettingsService', () => {
             ),
             [1],
         );
+    });
+
+
+    it('should return express cutoff and extended window settings', async () => {
+        dbMock.queryOne.mockResolvedValue({
+            express_max_minutes: 180,
+            same_day_max_minutes: 1440,
+            express_cutoff_time: '12:00:00',
+            express_after_cutoff_mode: 'extended',
+            express_after_cutoff_max_minutes: 300,
+        });
+
+        const result = await service.getSettings(tenant);
+
+        expect(result).toEqual({
+            expressMaxMinutes: 180,
+            sameDayMaxMinutes: 1440,
+            expressCutoffTime: '12:00:00',
+            expressAfterCutoffMode: 'extended',
+            expressAfterCutoffMaxMinutes: 300,
+        });
+    });
+
+
+    it('should support disabling express after cutoff', async () => {
+        dbMock.queryOne.mockResolvedValue({
+            express_max_minutes: 180,
+            same_day_max_minutes: 1440,
+            express_cutoff_time: '12:00:00',
+            express_after_cutoff_mode: 'disabled',
+            express_after_cutoff_max_minutes: null,
+        });
+
+        const result = await service.getSettings(tenant);
+
+        expect(result.expressCutoffTime).toBe('12:00:00');
+        expect(result.expressAfterCutoffMode).toBe('disabled');
+        expect(result.expressAfterCutoffMaxMinutes).toBeNull();
     });
 
     it('should reject missing tenant settings', async () => {

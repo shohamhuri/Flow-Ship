@@ -424,4 +424,101 @@ describe('CarriersService', () => {
             expect(adapterB.getQuote).toHaveBeenCalledTimes(1);
         });
     });
+
+    describe('allowedUrgencies filtering', () => {
+        const createQuote = (
+            urgency?: 'urgent' | 'express' | 'standard',
+        ): CarrierQuoteOption => ({
+            carrierName: 'Mock Express',
+            serviceName: urgency ?? 'Legacy Delivery',
+            price: 25,
+            currency: 'ILS',
+            estimatedDays: urgency === 'standard' ? 1 : 0,
+            ...(urgency ? { urgency } : {}),
+        });
+
+        const setupAdapter = (quotes: CarrierQuoteOption[]) => {
+            dbQueryMock
+                .mockResolvedValueOnce([provider])
+                .mockResolvedValueOnce([]);
+
+            getAdapterMock.mockReturnValue(createAdapter(quotes));
+        };
+
+        it('filters out urgent and express when only standard is allowed', async () => {
+            setupAdapter([
+                createQuote('urgent'),
+                createQuote('express'),
+                createQuote('standard'),
+            ]);
+
+            const result = await service.getQuotes(
+                {
+                    ...request,
+                    allowedUrgencies: ['standard'],
+                },
+                tenant,
+            );
+
+            expect(result.quotes).toHaveLength(1);
+            expect(result.quotes[0].urgency).toBe('standard');
+            expect(result.failedProviders).toEqual([]);
+        });
+
+        it('allows Same Day quotes when express is permitted', async () => {
+            setupAdapter([
+                createQuote('urgent'),
+                createQuote('express'),
+                createQuote('standard'),
+            ]);
+
+            const result = await service.getQuotes(
+                {
+                    ...request,
+                    allowedUrgencies: ['express', 'standard'],
+                },
+                tenant,
+            );
+
+            expect(result.quotes.map(q => q.urgency)).toEqual([
+                'express',
+                'standard',
+            ]);
+        });
+
+        it('filters quotes without urgency when allowedUrgencies is provided', async () => {
+            setupAdapter([
+                createQuote(),
+                createQuote('standard'),
+            ]);
+
+            const result = await service.getQuotes(
+                {
+                    ...request,
+                    allowedUrgencies: ['standard'],
+                },
+                tenant,
+            );
+
+            expect(result.quotes).toHaveLength(1);
+            expect(result.quotes[0].urgency).toBe('standard');
+        });
+
+        it('preserves legacy quotes when allowedUrgencies is omitted', async () => {
+            setupAdapter([
+                createQuote(),
+                createQuote('urgent'),
+                createQuote('standard'),
+            ]);
+
+            const result = await service.getQuotes(
+                request,
+                tenant,
+            );
+
+            expect(result.quotes).toHaveLength(3);
+            expect(result.quotes[0].urgency).toBeUndefined();
+        });
+    });
+
 });

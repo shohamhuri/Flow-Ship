@@ -54,6 +54,9 @@ export type ProviderSettings = {
 export interface StoreSettings {
   expressMaxMinutes: number;
   sameDayMaxMinutes: number;
+  expressCutoffTime: string | null;
+  expressAfterCutoffMode: 'extended' | 'disabled';
+  expressAfterCutoffMaxMinutes: number | null;
 }
 
 export interface StoreSettingsResponse {
@@ -65,6 +68,9 @@ export interface StoreSettingsResponse {
 export interface UpdateStoreSettingsPayload {
   expressMaxMinutes: number;
   sameDayMaxMinutes: number;
+  expressCutoffTime?: string | null;
+  expressAfterCutoffMode?: 'extended' | 'disabled';
+  expressAfterCutoffMaxMinutes?: number | null;
 }
 export type AdminProvider = {
   id: string;

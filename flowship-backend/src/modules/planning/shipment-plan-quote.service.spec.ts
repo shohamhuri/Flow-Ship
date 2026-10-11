@@ -27,6 +27,7 @@ describe('ShipmentPlanQuoteService', () => {
         id: 'tenant-1',
         name: 'Queen',
         schemaName: 'queen',
+        timezone: 'Asia/Jerusalem',
     } as any;
 
     const createSource = (
@@ -152,11 +153,17 @@ describe('ShipmentPlanQuoteService', () => {
                 durationMinutes: 25,
             }),
         };
+
         const deliverySettingsServiceMock = {
             getSettings: jest.fn().mockResolvedValue({
                 expressMaxMinutes: 180,
+                sameDayMaxMinutes: 1440,
+                expressCutoffTime: null,
+                expressAfterCutoffMode: 'extended',
+                expressAfterCutoffMaxMinutes: null,
             }),
         };
+
         service = new ShipmentPlanQuoteService(
             carriersServiceMock as unknown as CarriersService,
             distanceProviderMock as unknown as DistanceProvider,
@@ -939,7 +946,7 @@ describe('ShipmentPlanQuoteService', () => {
             carriersServiceMock.getQuotes,
         ).toHaveBeenCalledWith(
             expect.objectContaining({
-                allowedUrgencies: ['standard'],
+                allowedUrgencies: ['express', 'standard'],
             }),
             tenant,
         );
@@ -1001,6 +1008,7 @@ describe('ShipmentPlanQuoteService', () => {
             expect.objectContaining({
                 allowedUrgencies: [
                     'urgent',
+                    'express',
                     'standard',
                 ],
             }),
@@ -1064,10 +1072,15 @@ describe('ShipmentPlanQuoteService', () => {
             service['deliverySettingsService'],
             'getSettings',
         )
+
             .mockResolvedValue({
                 expressMaxMinutes: 120,
                 sameDayMaxMinutes: 1440,
+                expressCutoffTime: null,
+                expressAfterCutoffMode: 'extended',
+                expressAfterCutoffMaxMinutes: null,
             });
+
         jest.spyOn(
             service['distanceProvider'],
             'getDistance',
@@ -1833,4 +1846,201 @@ describe('ShipmentPlanQuoteService', () => {
             },
         ]);
     });
+
+    describe('Express cutoff by tenant timezone', () => {
+        const createTestPlan = () => {
+            const group = createGroup({
+                groupId: 'cutoff-group',
+                sources: [
+                    createSource('cutoff-source', 'Jerusalem'),
+                ],
+            });
+
+            return createPlan('cutoff-plan', [group]);
+        };
+
+        const configureSettings = (
+            mode: 'extended' | 'disabled',
+            timezone = 'Asia/Jerusalem',
+        ) => {
+            tenant.timezone = timezone;
+
+            jest.spyOn(
+                service['deliverySettingsService'],
+                'getSettings',
+            ).mockResolvedValue({
+                expressMaxMinutes: 180,
+                sameDayMaxMinutes: 1440,
+                expressCutoffTime: '12:00',
+                expressAfterCutoffMode: mode,
+                expressAfterCutoffMaxMinutes:
+                    mode === 'extended' ? 300 : null,
+            });
+        };
+
+        const getAllowedUrgencies = async (
+            orderCreatedAt: string,
+        ) => {
+            const plan = createTestPlan();
+
+            const confirmations = [{
+                plan,
+                confirmed: true,
+                confirmations: [{
+                    sourceId: 'cutoff-source',
+                    available: true,
+                    preparationMinutes: 25,
+                    confirmedAt: orderCreatedAt,
+                    items: [],
+                }],
+            }];
+
+            carriersServiceMock.getQuotes.mockResolvedValue({
+                quotes: [],
+                failedProviders: [],
+            });
+
+            await service.getQuotesForPlans(
+                [plan],
+                destination,
+                tenant,
+                confirmations,
+                new Date(orderCreatedAt),
+            );
+
+            const request =
+                carriersServiceMock.getQuotes.mock.calls[0][0];
+
+            return request.allowedUrgencies;
+        };
+
+        it('allows regular express before cutoff', async () => {
+            configureSettings('disabled');
+
+            // 11:00 in Israel, summer time
+            const urgencies = await getAllowedUrgencies(
+                '2026-07-01T08:00:00.000Z',
+            );
+
+            expect(urgencies).toEqual([
+                'urgent',
+                'express',
+                'standard',
+            ]);
+        });
+
+        it('applies disabled mode exactly at cutoff', async () => {
+            configureSettings('disabled');
+
+            // 12:00 in Israel, summer time
+            const urgencies = await getAllowedUrgencies(
+                '2026-07-01T09:00:00.000Z',
+            );
+
+            expect(urgencies).toEqual([
+                'express',
+                'standard',
+            ]);
+        });
+
+        it('keeps express available with extended window', async () => {
+            configureSettings('extended');
+
+            // 14:00 in Israel, summer time
+            const urgencies = await getAllowedUrgencies(
+                '2026-07-01T11:00:00.000Z',
+            );
+
+            expect(urgencies).toEqual([
+                'urgent',
+                'express',
+                'standard',
+            ]);
+        });
+
+        it('uses tenant timezone rather than server timezone', async () => {
+            configureSettings('disabled', 'America/New_York');
+
+            // 09:00 in New York, before 12:00 cutoff
+            const urgencies = await getAllowedUrgencies(
+                '2026-07-01T13:00:00.000Z',
+            );
+
+            expect(urgencies).toEqual([
+                'urgent',
+                'express',
+                'standard',
+            ]);
+        });
+
+        it('handles Israel winter time', async () => {
+            configureSettings('disabled');
+
+            // 12:00 in Israel, winter time
+            const urgencies = await getAllowedUrgencies(
+                '2026-12-01T10:00:00.000Z',
+            );
+
+            expect(urgencies).toEqual([
+                'express',
+                'standard',
+            ]);
+        });
+
+        it('applies extended minutes to actual delivery feasibility', async () => {
+            const orderCreatedAt = '2026-07-01T11:00:00.000Z';
+            // 14:00 in Israel - after the 12:00 cutoff
+
+            const plan = createTestPlan();
+
+            const confirmations = [{
+                plan,
+                confirmed: true,
+                confirmations: [{
+                    sourceId: 'cutoff-source',
+                    available: true,
+                    preparationMinutes: 220,
+                    confirmedAt: orderCreatedAt,
+                    items: [],
+                }],
+            }];
+
+            jest.spyOn(
+                service['distanceProvider'],
+                'getDistance',
+            ).mockResolvedValue({
+                distanceKm: 15,
+                durationMinutes: 20,
+            });
+
+            carriersServiceMock.getQuotes.mockResolvedValue({
+                quotes: [],
+                failedProviders: [],
+            });
+
+            for (const mode of ['extended', 'disabled'] as const) {
+                carriersServiceMock.getQuotes.mockClear();
+                configureSettings(mode);
+
+                await service.getQuotesForPlans(
+                    [plan],
+                    destination,
+                    tenant,
+                    confirmations,
+                    new Date(orderCreatedAt),
+                );
+
+                const request =
+                    carriersServiceMock.getQuotes.mock.calls[0][0];
+
+                expect(request.allowedUrgencies).toEqual(
+                    mode === 'extended'
+                        ? ['urgent', 'express', 'standard']
+                        : ['express', 'standard'],
+                );
+            }
+        });
+
+    });
+
 });

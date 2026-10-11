@@ -13,8 +13,6 @@ export class MockCarrierAdapter implements CarrierAdapter {
     async getQuote(
         request: CarrierQuoteRequest,
     ): Promise<CarrierQuoteOption[]> {
-        const basePrice = request.weightKg <= 5 ? 25 : 40;
-
         return [
             {
                 carrierName: 'Mock Express',
@@ -22,15 +20,8 @@ export class MockCarrierAdapter implements CarrierAdapter {
                 price: 15,
                 currency: 'ILS',
                 estimatedDays: 7,
+                urgency: 'standard',
             },
-
-            // {
-            //     carrierName: 'Mock Express',
-            //         serviceName: 'Fast Delivery',
-            //             price: basePrice + 20,
-            //                 currency: 'ILS',
-            //                     estimatedDays: 1,
-            //     },
         ];
     }
 }

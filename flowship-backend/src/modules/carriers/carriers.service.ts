@@ -84,15 +84,28 @@ export class CarriersService {
                         provider.adapter_key as CarrierCode,
                     );
 
+
                     const quotes = await adapter.getQuote(
                         request,
                         {
                             settings: provider.settings,
                         },
                     );
+
+                    const allowedUrgencies = request.allowedUrgencies;
+
+                    const filteredQuotes = allowedUrgencies
+                        ? quotes.filter(
+                            (quote) =>
+                                quote.urgency !== undefined &&
+                                allowedUrgencies.includes(quote.urgency),
+                        )
+                        : quotes;
+
                     const responseTimeMs = Date.now() - startedAt;
 
-                    const quotesWithProvider = quotes.map((quote) => ({
+
+                    const quotesWithProvider = filteredQuotes.map((quote) => ({
                         ...quote,
                         providerPriority: Number(provider.priority_score),
                         providerCode: provider.code,
@@ -110,7 +123,10 @@ export class CarriersService {
                             payload: request,
                         },
                         response: {
-                            quotesCount: quotes.length,
+                            receivedQuotesCount: quotes.length,
+                            quotesCount: quotesWithProvider.length,
+                            filteredOutCount:
+                                quotes.length - quotesWithProvider.length,
                             quotes: quotesWithProvider,
                         },
                         status: 'success',
