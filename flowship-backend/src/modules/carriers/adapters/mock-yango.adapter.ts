@@ -10,6 +10,7 @@ import {
 export class MockYangoAdapter implements CarrierAdapter {
     code = CarrierCode.MOCK_YANGO;
 
+
     async getQuote(
         request: CarrierQuoteRequest,
     ): Promise<CarrierQuoteOption[]> {
@@ -20,7 +21,9 @@ export class MockYangoAdapter implements CarrierAdapter {
                 price: 150,
                 currency: 'ILS',
                 estimatedDays: 0,
+                urgency: 'express',
             },
         ];
     }
+
 }
