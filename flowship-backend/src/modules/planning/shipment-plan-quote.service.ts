@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { DeliverySettings } from './delivery-settings.service';
 import type {
     VehicleQuoteResult, VehiclePlanQuoteAlternative,
 } from './interfaces/shipment-plan-quote.interface';
@@ -39,6 +40,60 @@ export class ShipmentPlanQuoteService {
             CapacityPlanningService,
     ) { }
 
+    private resolveExpressMaxMinutes(
+        settings: DeliverySettings,
+        tenantTimezone: string,
+        orderCreatedAt?: Date,
+    ): number {
+        if (!settings.expressCutoffTime) {
+            return settings.expressMaxMinutes;
+        }
+
+        if (!orderCreatedAt) {
+            return 0;
+        }
+
+        const orderDate = new Date(orderCreatedAt);
+
+        if (Number.isNaN(orderDate.getTime())) {
+            return 0;
+        }
+
+        const formatter = new Intl.DateTimeFormat('en-GB', {
+            timeZone: tenantTimezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hourCycle: 'h23',
+        });
+
+        const parts = formatter.formatToParts(orderDate);
+
+        const getPart = (type: string): number =>
+            Number(parts.find((part) => part.type === type)?.value);
+
+        const orderSeconds =
+            getPart('hour') * 3600 +
+            getPart('minute') * 60 +
+            getPart('second');
+
+        const [hour, minute, second = 0] =
+            settings.expressCutoffTime.split(':').map(Number);
+
+        const cutoffSeconds =
+            hour * 3600 + minute * 60 + second;
+
+        if (orderSeconds < cutoffSeconds) {
+            return settings.expressMaxMinutes;
+        }
+
+        if (settings.expressAfterCutoffMode === 'disabled') {
+            return 0;
+        }
+
+        return settings.expressAfterCutoffMaxMinutes ?? 0;
+    }
+
     async getQuotesForPlans(
         plans: ShipmentPlanCandidate[],
         destination: CheckoutDestination,
@@ -53,7 +108,12 @@ export class ShipmentPlanQuoteService {
             const settings =
                 await this.deliverySettingsService.getSettings(tenant);
 
-            expressMaxMinutes = settings.expressMaxMinutes;
+            expressMaxMinutes = this.resolveExpressMaxMinutes(
+                settings,
+                tenant.timezone,
+                orderCreatedAt,
+            );
+
             sameDayMaxMinutes = settings.sameDayMaxMinutes;
         } catch (error) {
             // כשל בקריאת ההגדרות:
