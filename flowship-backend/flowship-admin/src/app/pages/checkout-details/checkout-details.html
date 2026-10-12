@@ -851,12 +851,11 @@
 
                                 <ng-container *ngIf="isPlanningSectionExpanded(plan.id, 'capacity')">
 
-                                    <div *ngFor="let groupQuote of quotedPlan.groupQuotes"
+                                    <div *ngFor="let groupQuote of quotedPlan.groupQuotes; let groupIndex = index"
                                         class="planning-capacity-group">
                                         <div class="planning-capacity-group-header">
                                             <strong>
-                                                קבוצה {{ groupQuote.groupId }}
-                                            </strong>
+                                                קבוצה {{ groupIndex + 1 }} </strong>
 
                                             <span>
                                                 {{ groupQuote.weightKg | number:'1.0-3' }}
@@ -864,118 +863,123 @@
                                             </span>
                                         </div>
 
-                                        <div *ngFor="
-                let providerTrace of
-                    groupQuote.capacityPlanningTrace
-            " class="planning-capacity-provider">
-                                            <ng-container *ngIf="providerTrace.capacities.length > 0">
-                                                <div class="planning-capacity-provider-header">
-                                                    <strong>
-                                                        {{ providerTrace.providerCode }}
-                                                    </strong>
+                                        <ng-container *ngFor="
+    let providerTrace of groupQuote.capacityPlanningTrace
+">
+                                            <div *ngIf="providerTrace.capacities.length > 0"
+                                                class="planning-capacity-provider">
+                                                <ng-container *ngIf="providerTrace.capacities.length > 0">
+                                                    <div class="planning-capacity-provider-header">
+                                                        <strong>
+                                                            {{ providerTrace.providerCode }}
+                                                        </strong>
 
-                                                    <span *ngIf="
+                                                        <span *ngIf="
                         providerTrace.capacities.length === 0
                     ">
-                                                        ללא תכנון קיבולת
-                                                    </span>
-                                                </div>
+                                                            ללא תכנון קיבולת
+                                                        </span>
+                                                    </div>
 
-                                                <ng-container *ngIf="
+                                                    <ng-container *ngIf="
                     providerTrace.capacities.length > 0
                 ">
-                                                    <div class="planning-capacity-capacities">
-                                                        <strong>קיבולות:</strong>
+                                                        <div class="planning-capacity-capacities">
+                                                            <strong>קיבולות:</strong>
 
-                                                        <span *ngFor="
+                                                            <span *ngFor="
                             let capacity of
                                 providerTrace.capacities;
                             let last = last
                         ">
-                                                            {{
-                                                            getVehicleTypeLabel(
-                                                            capacity.vehicleType
-                                                            )
-                                                            }}
-                                                            —
-                                                            {{
-                                                            capacity.maxWeightKg === null
-                                                            ? 'ללא מגבלה'
-                                                            : (
-                                                            capacity.maxWeightKg
-                                                            | number:'1.0-3'
-                                                            ) + ' ק״ג'
-                                                            }}{{ last ? '' : ' · ' }}
-                                                        </span>
-                                                    </div>
+                                                                {{
+                                                                getVehicleTypeLabel(
+                                                                capacity.vehicleType
+                                                                )
+                                                                }}
+                                                                —
+                                                                {{
+                                                                capacity.maxWeightKg === null
+                                                                ? 'ללא מגבלה'
+                                                                : (
+                                                                capacity.maxWeightKg
+                                                                | number:'1.0-3'
+                                                                ) + ' ק״ג'
+                                                                }}{{ last ? '' : ' · ' }}
+                                                            </span>
+                                                        </div>
 
-                                                    <div class="planning-capacity-candidates">
-                                                        <div *ngFor="
+                                                        <div class="planning-capacity-candidates">
+                                                            <div *ngFor="
                             let candidate of
                                 providerTrace.candidates;
                             let candidateIndex = index
                         " class="planning-capacity-candidate" [class.planning-capacity-candidate-rejected]="
                             candidate.status === 'rejected'
                         ">
-                                                            <div class="planning-capacity-candidate-header">
-                                                                <strong>
-                                                                    {{
-                                                                    candidate.status === 'accepted'
-                                                                    ? '✓'
-                                                                    : '✕'
-                                                                    }}
-                                                                    חלופה
-                                                                    {{ candidateIndex + 1 }}
-                                                                </strong>
+                                                                <div class="planning-capacity-candidate-header">
+                                                                    <strong>
+                                                                        {{
+                                                                        candidate.status === 'accepted'
+                                                                        ? '✓'
+                                                                        : '✕'
+                                                                        }}
+                                                                        חלופה
+                                                                        {{ candidateIndex + 1 }}
+                                                                    </strong>
 
-                                                                <span>
-                                                                    <ng-container *ngFor="
+                                                                    <span>
+                                                                        <ng-container *ngFor="
                                         let part of
                                             candidate.plan.parts;
                                         let last = last
                                     ">
-                                                                        {{
-                                                                        getVehicleTypeLabel(
-                                                                        part.vehicleType
-                                                                        )
-                                                                        }}
-                                                                        × {{ part.vehicleCount
-                                                                        }}{{ last ? '' : ' + ' }}
-                                                                    </ng-container>
-                                                                </span>
-                                                            </div>
+                                                                            {{
+                                                                            getVehicleTypeLabel(
+                                                                            part.vehicleType
+                                                                            )
+                                                                            }}
+                                                                            × {{ part.vehicleCount
+                                                                            }}{{ last ? '' : ' + ' }}
+                                                                        </ng-container>
+                                                                    </span>
+                                                                </div>
 
-                                                            <div *ngIf="
+                                                                <div *ngIf="
                                 candidate.status ===
                                 'rejected'
                             " class="planning-capacity-rejection">
-                                                                {{
-                                                                getCapacityRejectionReasonLabel(
-                                                                candidate.rejectionReason
-                                                                )
-                                                                }}
+                                                                    {{
+                                                                    getCapacityRejectionReasonLabel(
+                                                                    candidate.rejectionReason
+                                                                    )
+                                                                    }}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </ng-container>
+
                                                 </ng-container>
 
-                                            </ng-container>
-                                            <div *ngIf="
-        getProvidersWithoutCapacity(
-            groupQuote.capacityPlanningTrace
-        ) as providersWithoutCapacity
-    " class="planning-capacity-no-capacity">
-                                                <span *ngIf="providersWithoutCapacity">
-                                                    ספקים שנבדקו ללא תכנון קיבולת:
-                                                    <strong>
-                                                        {{ providersWithoutCapacity }}
-                                                    </strong>
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </ng-container>
+                                            </div> <!-- סוף providerTrace -->
+                                        </ng-container>
 
+                                        <div *ngIf="
+                                            getProvidersWithoutCapacity(
+                                                groupQuote.capacityPlanningTrace
+                                            ) as providersWithoutCapacity
+                                        " class="planning-capacity-no-capacity">
+
+                                            <span>
+                                                ספקים שנבדקו ללא תכנון קיבולת:
+                                                <strong>
+                                                    {{ providersWithoutCapacity }}
+                                                </strong>
+                                            </span>
+
+                                        </div>
+                                    </div> <!-- סוף groupQuote -->
+                                </ng-container>
                             </div>
                             <div *ngIf="getPlanningQuotedPlan(plan.id) as quotedPlan" class="planning-quotes-trace">
 
