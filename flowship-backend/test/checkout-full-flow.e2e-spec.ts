@@ -1192,11 +1192,8 @@ describe(
                 expect(
                     rows[0],
                 ).toMatchObject({
-                    status:
-                        'processing',
-
-                    current_step:
-                        'awaiting_quotes',
+                    status: 'completed',
+                    current_step: 'completed',
 
                     sourcing_completed:
                         true,

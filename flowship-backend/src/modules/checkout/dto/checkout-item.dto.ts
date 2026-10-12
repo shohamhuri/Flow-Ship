@@ -44,4 +44,6 @@ export class CheckoutItemDto {
     @IsNumber()
     @Min(0)
     price!: number; //מחיר ליחידה
+
+
 }

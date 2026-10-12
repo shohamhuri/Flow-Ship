@@ -90,6 +90,7 @@ describe('CheckoutService', () => {
         markSourcingCompleted: jest.Mock;
         markGroupingCompleted: jest.Mock;
         markFailed: jest.Mock;
+        markCompleted: jest.Mock;
     };
 
     let shipmentGroupsRepositoryMock: {
@@ -482,7 +483,8 @@ describe('CheckoutService', () => {
 
             markGroupingCompleted:
                 jest.fn(),
-
+            markCompleted:
+                jest.fn(),
             markFailed:
                 jest.fn(),
         };
@@ -712,7 +714,9 @@ describe('CheckoutService', () => {
                         'group-1',
                 },
             ]);
-
+        checkoutProcessingRepositoryMock
+            .markCompleted
+            .mockResolvedValue(undefined);
         checkoutProcessingRepositoryMock
             .markGroupingCompleted
             .mockResolvedValue(
@@ -1652,21 +1656,26 @@ describe('CheckoutService', () => {
             );
         });
 
-        it('should mark grouping completed and update checkout status according to ungrouped items', async () => {
+        it('should mark processing completed and update checkout status according to ungrouped items', async () => {
             setupHappyPath();
 
             await service.createCheckout(
                 checkoutDto,
                 tenant,
             );
-
             expect(
                 checkoutProcessingRepositoryMock
-                    .markGroupingCompleted,
+                    .markCompleted,
             ).toHaveBeenCalledWith(
                 tenant,
                 'checkout-1',
             );
+            expect(
+                checkoutProcessingRepositoryMock
+                    .markCompleted,).toHaveBeenCalledWith(
+                        tenant,
+                        'checkout-1',
+                    );
 
             expect(
                 checkoutRepositoryMock
