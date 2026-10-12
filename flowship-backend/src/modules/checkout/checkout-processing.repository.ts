@@ -71,6 +71,28 @@ export class CheckoutProcessingRepository {
             [checkoutId],
         );
     }
+    async markCompleted(
+        tenant: CurrentTenant,
+        checkoutId: string,
+    ): Promise<void> {
+        await this.databaseService.query(
+            `
+        update ${tenant.schemaName}.checkout_processing
+        set
+            status = 'completed',
+            current_step = 'completed',
+            sourcing_completed = true,
+            grouping_completed = true,
+            quotes_completed = true,
+            carrier_selected = true,
+            shipment_created = true,
+            completed_at = now(),
+            updated_at = now()
+        where checkout_id = $1
+        `,
+            [checkoutId],
+        );
+    }
     async markFailed(
         tenant: CurrentTenant,
         checkoutId: string,

@@ -669,11 +669,10 @@ export class CheckoutService {
                 `Created ${createdShipments.length} shipments for checkout ${checkoutId}`,
             );
 
-            await this.checkoutProcessingRepository
-                .markGroupingCompleted(
-                    tenant,
-                    checkoutId,
-                );
+            await this.checkoutProcessingRepository.markCompleted(
+                tenant,
+                checkoutId,
+            );
 
             await this.checkoutRepository.updateStatus(
                 tenant,
