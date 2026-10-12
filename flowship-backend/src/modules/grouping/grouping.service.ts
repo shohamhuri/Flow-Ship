@@ -363,6 +363,10 @@ export class GroupingService {
         groups: ShipmentGroup[],
         maxItems: number,
     ): ShipmentGroup[] {
+        if (!Number.isInteger(maxItems) || maxItems <= 0) {
+            throw new Error('maxItems must be a positive integer');
+        }
+
         const result: ShipmentGroup[] = [];
 
         for (const group of groups) {
@@ -371,13 +375,42 @@ export class GroupingService {
                 continue;
             }
 
+            const splitItems: ShipmentGroupItem[] = [];
+            let remainingCapacity = maxItems;
+
+            for (const item of group.items) {
+                let remainingQuantity = item.quantity;
+
+                while (remainingQuantity > 0) {
+                    const quantity = Math.min(
+                        remainingQuantity,
+                        remainingCapacity,
+                    );
+
+                    splitItems.push({
+                        ...item,
+                        quantity,
+                    });
+
+                    remainingQuantity -= quantity;
+                    remainingCapacity -= quantity;
+
+                    if (remainingCapacity === 0) {
+                        remainingCapacity = maxItems;
+                    }
+                }
+            }
+
+            const splitGroup = {
+                ...group,
+                items: splitItems,
+            };
+
             result.push(
                 ...this.splitGroup(
-                    group,
+                    splitGroup,
                     (currentGroup, item) =>
-                        currentGroup.totalItems +
-                        item.quantity >
-                        maxItems,
+                        currentGroup.totalItems + item.quantity > maxItems,
                     'MAX_ITEMS_EXCEEDED',
                 ),
             );
@@ -385,7 +418,6 @@ export class GroupingService {
 
         return result;
     }
-
     private splitGroup(
         originalGroup: ShipmentGroup,
         shouldStartNewGroup: (

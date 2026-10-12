@@ -365,7 +365,47 @@ describe('GroupingService', () => {
             ),
         ).toBe(true);
     });
+    it('should split a single item quantity across groups', () => {
+        const checkout = createCheckout([
+            createItem('SKU-1', 12),
+        ]);
 
+        const assignments = [
+            {
+                itemIndex: 0,
+                selectedSource: createRankedSource('source-1'),
+            },
+        ] as any;
+
+        const strategies = [
+            {
+                strategyKey: 'split_by_max_items',
+                config: {
+                    maxItems: 10,
+                },
+            },
+        ] as any;
+
+        const result = service.groupShipmentPlan(
+            checkout,
+            assignments,
+            strategies,
+        );
+
+        expect(result.shipmentGroups).toHaveLength(2);
+
+        expect(
+            result.shipmentGroups.map((group) => group.totalItems),
+        ).toEqual([10, 2]);
+
+        expect(result.totalGroupedItems).toBe(12);
+
+        expect(
+            result.shipmentGroups.every((group) =>
+                group.totalItems <= 10,
+            ),
+        ).toBe(true);
+    });
     it('should not split a group when weight is within the limit', () => {
         const checkout = createCheckout([
             createItem('SKU-1', 1, 4, 10),
