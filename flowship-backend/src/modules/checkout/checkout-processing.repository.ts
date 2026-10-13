@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
-import { DbService } from '../../infrastructure/database/db.service';
+import {
+    DbService, DbTransaction,
+} from '../../infrastructure/database/db.service';
 import { CurrentTenant } from '../tenants/tenants.service';
 import type { CheckoutProcessingResult } from './checkout.service';
 @Injectable()
@@ -75,9 +77,10 @@ export class CheckoutProcessingRepository {
         tenant: CurrentTenant,
         checkoutId: string,
         response: CheckoutProcessingResult,
+        tx?: DbTransaction,
+
     ): Promise<void> {
-        await this.databaseService.query(
-            `
+        await (tx ?? this.databaseService).query(`
         update "${this.safeSchemaName(tenant.schemaName)}".checkout_processing
         set
             status = 'completed',

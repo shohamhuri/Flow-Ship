@@ -90,6 +90,7 @@ describe(
         let tenantsService: TenantsService;
 
         let checkoutService: CheckoutService;
+        let checkoutProcessingRepository: CheckoutProcessingRepository;
 
         let config: ConfigService;
 
@@ -109,8 +110,8 @@ describe(
 
         let successCheckoutId: string;
         let failedCheckoutId: string;
-
-        /*
+        let rollbackOrderId: string;
+        let rollbackCheckoutId: string | undefined;        /*
          * אנחנו שומרים את ה-ID-ים של rows
          * שהיו פעילים לפני הטסט,
          * כדי להחזיר את סביבת הטסט למצבה המקורי.
@@ -259,7 +260,10 @@ describe(
                     moduleRef.get(
                         CheckoutService,
                     );
-
+                checkoutProcessingRepository =
+                    moduleRef.get(
+                        CheckoutProcessingRepository,
+                    );
                 config =
                     moduleRef.get(
                         ConfigService,
@@ -324,7 +328,8 @@ describe(
 
                 failedOrderId =
                     `PIPELINE-FAILED-${Date.now()}-${randomUUID()}`;
-
+                rollbackOrderId =
+                    `PIPELINE-ROLLBACK-${Date.now()}-${randomUUID()}`;
 
                 /*
                  * =====================================================
@@ -565,6 +570,7 @@ describe(
                 const checkoutIds = [
                     successCheckoutId,
                     failedCheckoutId,
+                    rollbackCheckoutId,
                 ].filter(
                     (
                         id,
@@ -717,6 +723,8 @@ describe(
                     [[
                         successOrderId,
                         failedOrderId,
+                        rollbackOrderId,
+
                     ]],
                 );
 
@@ -2414,5 +2422,98 @@ describe(
                 );
             },
         );
+        it(
+            'should rollback shipments when checkout completion fails',
+            async () => {
+                const checkoutDto = {
+                    ...createSuccessfulCheckoutDto(),
+                    orderId: rollbackOrderId,
+                };
+
+                const completionError = new Error(
+                    'SIMULATED_COMPLETION_FAILURE',
+                );
+
+                const markCompletedSpy = jest
+                    .spyOn(
+                        checkoutProcessingRepository,
+                        'markCompleted',
+                    )
+                    .mockRejectedValueOnce(completionError);
+
+                try {
+                    await expect(
+                        checkoutService.createCheckout(
+                            checkoutDto,
+                            tenantA,
+                        ),
+                    ).rejects.toThrow(
+                        'SIMULATED_COMPLETION_FAILURE',
+                    );
+
+                    rollbackCheckoutId =
+                        await findCheckoutIdByOrderId(
+                            rollbackOrderId,
+                        );
+
+                    const shipments = await db.query(
+                        `
+                select id
+                from flow_ship_test_a.shipments
+                where checkout_id = $1
+                `,
+                        [rollbackCheckoutId],
+                    );
+
+                    expect(shipments).toHaveLength(0);
+
+                    const checkoutRows = await db.query(
+                        `
+                select status
+                from flow_ship_test_a.checkouts
+                where id = $1
+                `,
+                        [rollbackCheckoutId],
+                    );
+
+                    expect(checkoutRows[0]?.status).toBe(
+                        'failed',
+                    );
+
+                    const processingRows = await db.query(
+                        `
+                select status
+                from flow_ship_test_a.checkout_processing
+                where checkout_id = $1
+                `,
+                        [rollbackCheckoutId],
+                    );
+
+                    expect(processingRows[0]?.status).toBe(
+                        'failed',
+                    );
+                } finally {
+                    markCompletedSpy.mockRestore();
+
+                    // Preserve the ID for afterAll cleanup even if an assertion fails.
+                    if (!rollbackCheckoutId) {
+                        const rows = await db.query(
+                            `
+                    select id
+                    from flow_ship_test_a.checkouts
+                    where external_order_id = $1
+                    order by created_at desc
+                    limit 1
+                    `,
+                            [rollbackOrderId],
+                        );
+
+                        rollbackCheckoutId = rows[0]?.id;
+                    }
+                }
+            },
+            30000,
+        );
     },
+
 );

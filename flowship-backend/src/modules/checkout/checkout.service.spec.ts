@@ -2,6 +2,10 @@ import {
     CheckoutService,
 } from './checkout.service';
 import {
+    DbService,
+    DbTransaction,
+} from '../../infrastructure/database/db.service';
+import {
     createCheckoutFingerprint,
 } from './checkout-fingerprint';
 import {
@@ -556,6 +560,20 @@ describe('CheckoutService', () => {
             ),
         };
         capacityPlanningServiceMock = {};
+        const dbMock = {
+            transaction: jest.fn(
+                async <T>(
+                    callback: (tx: DbTransaction) => Promise<T>,
+                ): Promise<T> => {
+                    const tx: DbTransaction = {
+                        query: jest.fn().mockResolvedValue([]),
+                        queryOne: jest.fn().mockResolvedValue(null),
+                    };
+
+                    return callback(tx);
+                },
+            ),
+        };
         service = new CheckoutService(
             sourcingServiceMock as unknown as SourcingService,
             sourcingResultsRepositoryMock as unknown as SourcingResultsRepository,
@@ -599,6 +617,7 @@ describe('CheckoutService', () => {
             weightEstimationServiceMock as any,
 
             capacityPlanningServiceMock as any,
+            dbMock as unknown as DbService,
 
 
         );
@@ -1801,6 +1820,10 @@ describe('CheckoutService', () => {
                 expect.any(Object),
                 validPlan,
                 deliveryOption,
+                expect.objectContaining({
+                    query: expect.any(Function),
+                    queryOne: expect.any(Function),
+                }),
             );
 
             const saveGroupingOrder =
@@ -1819,7 +1842,44 @@ describe('CheckoutService', () => {
                 createShipmentsOrder,
             );
         });
+        it('should mark checkout as failed when completion fails inside the shipment transaction', async () => {
+            setupHappyPath();
 
+            checkoutProcessingRepositoryMock
+                .markCompleted
+                .mockRejectedValueOnce(
+                    new Error('SIMULATED_COMPLETION_FAILURE'),
+                );
+
+            await expect(
+                service.createCheckout(checkoutDto, tenant),
+            ).rejects.toThrow('SIMULATED_COMPLETION_FAILURE');
+
+            expect(
+                shipmentCreationServiceMock.createShipments,
+            ).toHaveBeenCalledTimes(1);
+
+            expect(
+                checkoutProcessingRepositoryMock.markCompleted,
+            ).toHaveBeenCalledTimes(1);
+
+            expect(
+                checkoutProcessingRepositoryMock.markFailed,
+            ).toHaveBeenCalledWith(
+                tenant,
+                'checkout-1',
+                'shipment_creation',
+                'SIMULATED_COMPLETION_FAILURE',
+            );
+
+            expect(
+                checkoutRepositoryMock.updateStatus,
+            ).toHaveBeenCalledWith(
+                tenant,
+                'checkout-1',
+                'failed',
+            );
+        });
         it('should mark processing completed and update checkout status according to ungrouped items', async () => {
             setupHappyPath();
 
@@ -1841,6 +1901,10 @@ describe('CheckoutService', () => {
                     grouping: expect.any(Object),
                     planning: expect.any(Object),
                 }),
+                expect.objectContaining({
+                    query: expect.any(Function),
+                    queryOne: expect.any(Function),
+                }),
             );
 
 
@@ -1851,6 +1915,10 @@ describe('CheckoutService', () => {
                 tenant,
                 'checkout-1',
                 'grouped',
+                expect.objectContaining({
+                    query: expect.any(Function),
+                    queryOne: expect.any(Function),
+                }),
             );
 
             const partiallyGroupedResult = {
@@ -1904,6 +1972,10 @@ describe('CheckoutService', () => {
                 tenant,
                 'checkout-1',
                 'partially_grouped',
+                expect.objectContaining({
+                    query: expect.any(Function),
+                    queryOne: expect.any(Function),
+                }),
             );
         });
     });
