@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 
 import { DbService } from '../../infrastructure/database/db.service';
 import { CurrentTenant } from '../tenants/tenants.service';
-
+import type { CheckoutProcessingResult } from './checkout.service';
 @Injectable()
 export class CheckoutProcessingRepository {
     constructor(
@@ -18,7 +18,7 @@ export class CheckoutProcessingRepository {
 
         await this.databaseService.query(
             `
-            insert into ${tenant.schemaName}.checkout_processing (
+            insert into "${this.safeSchemaName(tenant.schemaName)}".checkout_processing (
                 id,
                 checkout_id,
                 status,
@@ -43,7 +43,7 @@ export class CheckoutProcessingRepository {
     ): Promise<void> {
         await this.databaseService.query(
             `
-            update ${tenant.schemaName}.checkout_processing
+            update "${this.safeSchemaName(tenant.schemaName)}".checkout_processing
             set
                 sourcing_completed = true,
                 current_step = 'grouping',
@@ -60,7 +60,7 @@ export class CheckoutProcessingRepository {
     ): Promise<void> {
         await this.databaseService.query(
             `
-        update ${tenant.schemaName}.checkout_processing
+        update "${this.safeSchemaName(tenant.schemaName)}".checkout_processing
         set
             grouping_completed = true,
             status = 'processing',
@@ -74,10 +74,11 @@ export class CheckoutProcessingRepository {
     async markCompleted(
         tenant: CurrentTenant,
         checkoutId: string,
+        response: CheckoutProcessingResult,
     ): Promise<void> {
         await this.databaseService.query(
             `
-        update ${tenant.schemaName}.checkout_processing
+        update "${this.safeSchemaName(tenant.schemaName)}".checkout_processing
         set
             status = 'completed',
             current_step = 'completed',
@@ -86,12 +87,50 @@ export class CheckoutProcessingRepository {
             quotes_completed = true,
             carrier_selected = true,
             shipment_created = true,
+            response_payload = $2::jsonb,
             completed_at = now(),
             updated_at = now()
         where checkout_id = $1
         `,
+            [
+                checkoutId,
+                JSON.stringify(response),
+            ],
+        );
+    }
+    async getProcessingResult(
+        tenant: CurrentTenant,
+        checkoutId: string,
+    ): Promise<{
+        status: string;
+        response: CheckoutProcessingResult | null;
+    } | null> {
+        const rows = await this.databaseService.query<{
+            status: string;
+            response_payload: CheckoutProcessingResult | null;
+        }>(
+            `
+        select
+            status,
+            response_payload
+        from "${this.safeSchemaName(tenant.schemaName)}".checkout_processing
+        where checkout_id = $1
+        order by created_at desc
+        limit 1
+        `,
             [checkoutId],
         );
+
+        const row = rows[0];
+
+        if (!row) {
+            return null;
+        }
+
+        return {
+            status: row.status,
+            response: row.response_payload,
+        };
     }
     async markFailed(
         tenant: CurrentTenant,
@@ -101,7 +140,7 @@ export class CheckoutProcessingRepository {
     ): Promise<void> {
         await this.databaseService.query(
             `
-        update ${tenant.schemaName}.checkout_processing
+        update "${this.safeSchemaName(tenant.schemaName)}".checkout_processing
         set
             status = 'failed',
             current_step = $2,
@@ -116,5 +155,12 @@ export class CheckoutProcessingRepository {
                 errorMessage,
             ],
         );
+    }
+    private safeSchemaName(schemaName: string): string {
+        if (!/^[a-zA-Z0-9_]+$/.test(schemaName)) {
+            throw new Error('Invalid tenant schema name');
+        }
+
+        return schemaName;
     }
 }

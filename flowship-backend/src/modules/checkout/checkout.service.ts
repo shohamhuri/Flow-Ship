@@ -5,6 +5,8 @@ import { GroupingService } from '../grouping/grouping.service';
 import { ShipmentGroupsRepository } from '../grouping/shipment-groups.repository';
 import { ShipmentPlanEvaluatorService } from '../planning/shipment-plan-evaluator.service';
 import { CapacityPlanningService } from './capacity-planning.service';
+import { createCheckoutFingerprint } from './checkout-fingerprint';
+import { ConflictException } from '@nestjs/common';
 import {
     ShipmentPlanCandidate,
     ShipmentPlanGenerationResult,
@@ -137,18 +139,80 @@ export class CheckoutService {
         createCheckoutDto: CreateCheckoutDto,
         tenant: CurrentTenant,
     ): Promise<CheckoutProcessingResult> {
+        const requestFingerprint =
+            createCheckoutFingerprint(createCheckoutDto);
+        const existingCheckout =
+            await this.checkoutRepository.findExistingCheckout(
+                tenant,
+                'manual',
+                createCheckoutDto.storeId,
+                createCheckoutDto.orderId,
+            );
+
+        if (existingCheckout) {
+            if (
+                existingCheckout.requestFingerprint !==
+                requestFingerprint
+            ) {
+                throw new ConflictException(
+                    'Checkout already exists with different content',
+                );
+            }
+
+            const existingProcessing =
+                await this.checkoutProcessingRepository.getProcessingResult(
+                    tenant,
+                    existingCheckout.id,
+                );
+
+            if (
+                existingProcessing?.status === 'completed' &&
+                existingProcessing.response
+            ) {
+                return existingProcessing.response;
+            }
+
+            throw new ConflictException(
+                'Checkout already exists and is not available for replay',
+            );
+        }
         const checkout =
             await this.mapToInternalCheckout(
                 createCheckoutDto,
                 tenant,
             );
-        const checkoutId =
-            await this.checkoutRepository.saveCheckout(
-                tenant,
-                checkout,
-                'manual',
-            );
+        let checkoutId: string;
 
+        try {
+            checkoutId =
+                await this.checkoutRepository.saveCheckout(
+                    tenant,
+                    checkout,
+                    'manual',
+                    requestFingerprint,
+                );
+        } catch (error) {
+            const dbError = error as {
+                code?: string;
+                constraint?: string;
+            };
+
+            if (
+                dbError.code === '23505' &&
+                (
+                    dbError.constraint ===
+                    'checkouts_platform_store_external_order_unique' ||
+                    dbError.constraint ===
+                    'checkouts_platform_store_external_checkout_unique'
+                )
+            ) {
+                throw new ConflictException(
+                    'Checkout already exists. Please retry the request.',
+                );
+            }
+
+            throw error;
+        }
         const checkoutItemIdsBySku =
             await this.checkoutRepository.saveCheckoutItems(
                 tenant,
@@ -669,10 +733,7 @@ export class CheckoutService {
                 `Created ${createdShipments.length} shipments for checkout ${checkoutId}`,
             );
 
-            await this.checkoutProcessingRepository.markCompleted(
-                tenant,
-                checkoutId,
-            );
+
 
             await this.checkoutRepository.updateStatus(
                 tenant,
@@ -685,7 +746,7 @@ export class CheckoutService {
                 'FINAL_GROUPING_STRATEGIES:',
                 JSON.stringify(activeGroupingStrategies, null, 2),
             );
-            return {
+            const response: CheckoutProcessingResult = {
                 checkout,
                 sourcing,
                 grouping,
@@ -707,6 +768,13 @@ export class CheckoutService {
                     },
                 },
             };
+            await this.checkoutProcessingRepository.markCompleted(
+                tenant,
+                checkoutId,
+                response,
+            );
+
+            return response;
         } catch (error) {
             const errorMessage =
                 error instanceof Error

@@ -183,4 +183,19 @@ describe('TenantsService', () => {
             'where api_key = $1',
         );
     });
+    it('should reject an invalid tenant schema name', async () => {
+        queryOneMock.mockResolvedValue({
+            id: 'tenant-1',
+            name: 'QUEEN',
+            schema_name: 'queen; DROP TABLE checkouts;',
+            status: 'active',
+            timezone: 'Asia/Jerusalem',
+        });
+
+        await expect(
+            service.findByApiKey('valid-key'),
+        ).rejects.toThrow(
+            'Invalid tenant schema name',
+        );
+    });
 });
