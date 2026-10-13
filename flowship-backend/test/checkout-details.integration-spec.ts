@@ -681,7 +681,7 @@ describe(
                     );
 
                 expect(details!.storeId)
-                    .toBeNull();
+                    .toBe('checkout-details-store');
                 expect(details!.platform)
                     .toBe(
                         'integration-test',
