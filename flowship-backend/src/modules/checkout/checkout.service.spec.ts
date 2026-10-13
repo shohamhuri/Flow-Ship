@@ -1,7 +1,9 @@
 import {
     CheckoutService,
 } from './checkout.service';
-
+import {
+    createCheckoutFingerprint,
+} from './checkout-fingerprint';
 import {
     CheckoutRepository,
 } from './checkout.repository';
@@ -83,6 +85,8 @@ describe('CheckoutService', () => {
         saveCheckoutItems: jest.Mock;
         updateGroupingSplitReasons: jest.Mock;
         updateStatus: jest.Mock;
+        findExistingCheckout: jest.Mock;
+
     };
 
     let checkoutProcessingRepositoryMock: {
@@ -91,6 +95,7 @@ describe('CheckoutService', () => {
         markGroupingCompleted: jest.Mock;
         markFailed: jest.Mock;
         markCompleted: jest.Mock;
+        getProcessingResult: jest.Mock;
     };
 
     let shipmentGroupsRepositoryMock: {
@@ -140,6 +145,9 @@ describe('CheckoutService', () => {
         name: 'QUEEN',
         schemaName: 'queen',
         status: 'active',
+        timezone: 'Asia/Jerusalem',
+
+
     };
 
     const checkoutDto = {
@@ -472,6 +480,7 @@ describe('CheckoutService', () => {
 
             updateStatus:
                 jest.fn(),
+            findExistingCheckout: jest.fn().mockResolvedValue(null),
         };
 
         checkoutProcessingRepositoryMock = {
@@ -487,6 +496,7 @@ describe('CheckoutService', () => {
                 jest.fn(),
             markFailed:
                 jest.fn(),
+            getProcessingResult: jest.fn(),
         };
 
         shipmentGroupsRepositoryMock = {
@@ -742,7 +752,161 @@ describe('CheckoutService', () => {
                 confirmations: [],
             }));
     };
+    describe('checkout idempotency', () => {
+        it('should return the original result without reprocessing', async () => {
+            const originalResponse = {
+                checkout: { orderId: 'order-100' },
+                sourcing: [],
+                grouping: { shipmentGroups: [] },
+                planning: {},
+            } as any;
 
+            const fingerprint =
+                createCheckoutFingerprint(checkoutDto);
+
+            checkoutRepositoryMock.findExistingCheckout
+                .mockResolvedValue({
+                    id: 'checkout-existing',
+                    status: 'completed',
+                    requestFingerprint: fingerprint,
+                });
+
+            checkoutProcessingRepositoryMock.getProcessingResult
+                .mockResolvedValue({
+                    status: 'completed',
+                    response: originalResponse,
+                });
+
+            const result = await service.createCheckout(
+                checkoutDto,
+                tenant,
+            );
+
+            expect(result).toEqual(originalResponse);
+
+            expect(
+                checkoutRepositoryMock.saveCheckout,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                shipmentCreationServiceMock.createShipments,
+            ).not.toHaveBeenCalled();
+        });
+        it('should reject an existing checkout with different content', async () => {
+            checkoutRepositoryMock.findExistingCheckout
+                .mockResolvedValue({
+                    id: 'checkout-existing',
+                    status: 'completed',
+                    requestFingerprint: 'different-fingerprint',
+                });
+
+            await expect(
+                service.createCheckout(checkoutDto, tenant),
+            ).rejects.toMatchObject({
+                status: 409,
+            });
+
+            expect(
+                checkoutRepositoryMock.saveCheckout,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                checkoutProcessingRepositoryMock.getProcessingResult,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                shipmentCreationServiceMock.createShipments,
+            ).not.toHaveBeenCalled();
+        });
+        it('should return 409 when a concurrent checkout insert violates uniqueness', async () => {
+            checkoutRepositoryMock.saveCheckout
+                .mockRejectedValue({
+                    code: '23505',
+                    constraint:
+                        'checkouts_platform_store_external_order_unique',
+                });
+
+            await expect(
+                service.createCheckout(checkoutDto, tenant),
+            ).rejects.toMatchObject({
+                status: 409,
+            });
+
+            expect(
+                checkoutProcessingRepositoryMock.create,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                shipmentCreationServiceMock.createShipments,
+            ).not.toHaveBeenCalled();
+        });
+        it('should reject replay while the original checkout is processing', async () => {
+            const fingerprint =
+                createCheckoutFingerprint(checkoutDto);
+
+            checkoutRepositoryMock.findExistingCheckout
+                .mockResolvedValue({
+                    id: 'checkout-existing',
+                    status: 'processing',
+                    requestFingerprint: fingerprint,
+                });
+
+            checkoutProcessingRepositoryMock.getProcessingResult
+                .mockResolvedValue({
+                    status: 'processing',
+                    response: null,
+                });
+
+            await expect(
+                service.createCheckout(checkoutDto, tenant),
+            ).rejects.toMatchObject({
+                status: 409,
+            });
+
+            expect(
+                checkoutRepositoryMock.saveCheckout,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                shipmentCreationServiceMock.createShipments,
+            ).not.toHaveBeenCalled();
+        });
+        it('should reject replay of a failed checkout without retrying', async () => {
+            const fingerprint =
+                createCheckoutFingerprint(checkoutDto);
+
+            checkoutRepositoryMock.findExistingCheckout
+                .mockResolvedValue({
+                    id: 'checkout-existing',
+                    status: 'failed',
+                    requestFingerprint: fingerprint,
+                });
+
+            checkoutProcessingRepositoryMock.getProcessingResult
+                .mockResolvedValue({
+                    status: 'failed',
+                    response: null,
+                });
+
+            await expect(
+                service.createCheckout(checkoutDto, tenant),
+            ).rejects.toMatchObject({
+                status: 409,
+            });
+
+            expect(
+                checkoutRepositoryMock.saveCheckout,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                sourcingServiceMock.findSourcesForCheckout,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                shipmentCreationServiceMock.createShipments,
+            ).not.toHaveBeenCalled();
+        });
+    });
     describe('getCheckouts', () => {
         it('should return checkouts from repository', async () => {
             const checkouts = [
@@ -954,12 +1118,12 @@ describe('CheckoutService', () => {
             );
 
             expect(
-                checkoutRepositoryMock
-                    .saveCheckout,
+                checkoutRepositoryMock.saveCheckout,
             ).toHaveBeenCalledWith(
                 tenant,
                 expect.any(Object),
                 'manual',
+                expect.stringMatching(/^[a-f0-9]{64}$/),
             );
         });
 
@@ -1664,18 +1828,21 @@ describe('CheckoutService', () => {
                 tenant,
             );
             expect(
-                checkoutProcessingRepositoryMock
-                    .markCompleted,
+                checkoutProcessingRepositoryMock.markCompleted,
             ).toHaveBeenCalledWith(
                 tenant,
                 'checkout-1',
+                expect.objectContaining({
+                    checkout: expect.objectContaining({
+                        orderId: 'order-100',
+                        storeId: 'store-1',
+                    }),
+                    sourcing: expect.any(Array),
+                    grouping: expect.any(Object),
+                    planning: expect.any(Object),
+                }),
             );
-            expect(
-                checkoutProcessingRepositoryMock
-                    .markCompleted,).toHaveBeenCalledWith(
-                        tenant,
-                        'checkout-1',
-                    );
+
 
             expect(
                 checkoutRepositoryMock

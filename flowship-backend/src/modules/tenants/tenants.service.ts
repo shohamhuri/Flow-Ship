@@ -58,6 +58,10 @@ export class TenantsService {
             );
         }
 
+        if (!/^[a-zA-Z0-9_]+$/.test(tenant.schema_name)) {
+            throw new Error('Invalid tenant schema name');
+        }
+
         return {
             id: tenant.id,
             name: tenant.name,

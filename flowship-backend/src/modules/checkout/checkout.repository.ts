@@ -152,11 +152,61 @@ export class CheckoutRepository {
     constructor(
         private readonly databaseService: DbService,
     ) { }
+    async findExistingCheckout(
+        tenant: CurrentTenant,
+        platform: string,
+        storeId: string,
+        orderId: string,
 
+    ): Promise<{
+        id: string;
+        status: string;
+        rawPayload: unknown;
+        requestFingerprint: string | null;
+    } | null> {
+        const schemaName = this.safeSchemaName(
+            tenant.schemaName,
+        );
+
+        const rows = await this.databaseService.query<{
+            id: string;
+            status: string;
+            raw_payload: unknown;
+            request_fingerprint: string | null;
+        }>(
+            `
+        select
+            id,
+            status,
+            raw_payload,
+            request_fingerprint
+        from "${schemaName}".checkouts
+        where platform = $1
+          and store_id = $2
+          and external_order_id = $3
+        limit 1
+        `,
+            [platform, storeId, orderId],
+        );
+
+        const row = rows[0];
+
+        if (!row) {
+            return null;
+        }
+
+        return {
+            id: row.id,
+            status: row.status,
+            rawPayload: row.raw_payload,
+            requestFingerprint: row.request_fingerprint,
+        };
+    }
     async saveCheckout(
         tenant: CurrentTenant,
         checkout: Checkout,
-        platform = 'manual',
+        platform: string,
+        requestFingerprint: string,
     ): Promise<string> {
         const checkoutId = randomUUID();
 
@@ -172,6 +222,8 @@ export class CheckoutRepository {
                     cart,
                     destination,
                     raw_payload,
+                    request_fingerprint,
+
                     status
                 )
                 values (
@@ -184,18 +236,20 @@ export class CheckoutRepository {
                     $7::jsonb,
                     $8::jsonb,
                     $9::jsonb,
-                    $10
+                    $10,
+                    $11
                 )
                 `,
             [
                 checkoutId,
-                null, platform,
-                checkout.orderId,
+                checkout.storeId, platform, checkout.orderId,
                 checkout.orderId,
                 JSON.stringify({}),
                 JSON.stringify(checkout.items),
                 JSON.stringify(checkout.destination),
                 JSON.stringify(checkout),
+                requestFingerprint ?? null,
+
                 'processing',
             ],
         );
