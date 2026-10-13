@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
-import { DbService } from '../../infrastructure/database/db.service';
-import { CurrentTenant } from '../tenants/tenants.service';
+import {
+    DbService,
+    DbTransaction,
+} from '../../infrastructure/database/db.service'; import { CurrentTenant } from '../tenants/tenants.service';
 import { Checkout } from './interfaces/checkout.interface';
 
 export interface CheckoutListRow {
@@ -951,15 +953,21 @@ values (
         tenant: CurrentTenant,
         checkoutId: string,
         status: string,
+        tx?: DbTransaction,
     ): Promise<void> {
-        await this.databaseService.query(
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        const database = tx ?? this.databaseService;
+
+        await database.query(
             `
-                update ${tenant.schemaName}.checkouts
-                set
-                    status = $1,
-                    updated_at = now()
-                where id = $2
-                `,
+        update "${schemaName}".checkouts
+        set
+            status = $1,
+            updated_at = now()
+        where id = $2
+        `,
             [status, checkoutId],
         );
     }

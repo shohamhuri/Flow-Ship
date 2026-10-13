@@ -7,6 +7,7 @@ import { ShipmentPlanEvaluatorService } from '../planning/shipment-plan-evaluato
 import { CapacityPlanningService } from './capacity-planning.service';
 import { createCheckoutFingerprint } from './checkout-fingerprint';
 import { ConflictException } from '@nestjs/common';
+import { DbService } from '../../infrastructure/database/db.service';
 import {
     ShipmentPlanCandidate,
     ShipmentPlanGenerationResult,
@@ -117,6 +118,8 @@ export class CheckoutService {
             WeightEstimationService,
         private readonly capacityPlanningService:
             CapacityPlanningService,
+
+        private readonly db: DbService,
 
     ) { }
 
@@ -719,62 +722,70 @@ export class CheckoutService {
              * רק לאחר שהקבוצות נשמרו במסד,
              * יוצרים Shipment אחד לכל Shipment Group.
              */
-            currentStage = 'shipment_creation';
-            const createdShipments =
-                await this.shipmentCreationService.createShipments(
-                    tenant,
-                    checkoutId,
-                    checkout,
-                    winningPlan,
-                    selectedDeliveryOption,
+            return await this.db.transaction(async (tx) => {
+                currentStage = 'shipment_creation';
+                const createdShipments =
+                    await this.shipmentCreationService.createShipments(
+                        tenant,
+                        checkoutId,
+                        checkout,
+                        winningPlan,
+                        selectedDeliveryOption,
+                        tx,
+
+                    );
+
+                console.log(
+                    `Created ${createdShipments.length} shipments for checkout ${checkoutId}`,
                 );
 
-            console.log(
-                `Created ${createdShipments.length} shipments for checkout ${checkoutId}`,
-            );
 
 
+                await this.checkoutRepository.updateStatus(
+                    tenant,
+                    checkoutId,
+                    grouping.hasUngroupedItems
+                        ? 'partially_grouped'
+                        : 'grouped',
+                    tx,
 
-            await this.checkoutRepository.updateStatus(
-                tenant,
-                checkoutId,
-                grouping.hasUngroupedItems
-                    ? 'partially_grouped'
-                    : 'grouped',
-            );
-            console.log(
-                'FINAL_GROUPING_STRATEGIES:',
-                JSON.stringify(activeGroupingStrategies, null, 2),
-            );
-            const response: CheckoutProcessingResult = {
-                checkout,
-                sourcing,
-                grouping,
+                );
+                console.log(
+                    'FINAL_GROUPING_STRATEGIES:',
+                    JSON.stringify(activeGroupingStrategies, null, 2),
+                );
+                const response: CheckoutProcessingResult = {
+                    checkout,
+                    sourcing,
+                    grouping,
 
-                planning: {
-                    generation,
-                    allPlans,
-                    validPlans,
-                    rejectedPlans,
-                    selectedPlans,
-                    quotedPlans,
-                    deliveryOptions,
-                    decision: {
-                        priorityCards,
-                        evaluatedOptionsCount:
-                            allDeliveryOptions.length,
-                        winner:
-                            selectedDeliveryOption,
+                    planning: {
+                        generation,
+                        allPlans,
+                        validPlans,
+                        rejectedPlans,
+                        selectedPlans,
+                        quotedPlans,
+                        deliveryOptions,
+                        decision: {
+                            priorityCards,
+                            evaluatedOptionsCount:
+                                allDeliveryOptions.length,
+                            winner:
+                                selectedDeliveryOption,
+                        },
                     },
-                },
-            };
-            await this.checkoutProcessingRepository.markCompleted(
-                tenant,
-                checkoutId,
-                response,
-            );
+                };
+                await this.checkoutProcessingRepository.markCompleted(
+                    tenant,
+                    checkoutId,
+                    response,
+                    tx,
 
-            return response;
+                );
+
+                return response;
+            });
         } catch (error) {
             const errorMessage =
                 error instanceof Error
