@@ -841,8 +841,8 @@ describe('CheckoutService', () => {
             checkoutRepositoryMock.saveCheckout
                 .mockRejectedValue({
                     code: '23505',
-                    constraint:
-                        'checkouts_platform_store_external_order_unique',
+                    constraint: 'checkouts_platform_store_id_external_order_id_idx'
+                    ,
                 });
 
             await expect(

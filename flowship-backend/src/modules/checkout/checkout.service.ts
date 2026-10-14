@@ -202,18 +202,17 @@ export class CheckoutService {
 
             if (
                 dbError.code === '23505' &&
-                (
-                    dbError.constraint ===
-                    'checkouts_platform_store_external_order_unique' ||
-                    dbError.constraint ===
-                    'checkouts_platform_store_external_checkout_unique'
-                )
+                [
+                    'checkouts_platform_store_id_external_order_id_idx',
+                    'checkouts_platform_store_id_external_checkout_id_idx',
+                    'checkouts_platform_store_external_order_unique',
+                    'checkouts_platform_store_external_checkout_unique',
+                ].includes(dbError.constraint ?? '')
             ) {
                 throw new ConflictException(
                     'Checkout already exists. Please retry the request.',
                 );
             }
-
             throw error;
         }
         const checkoutItemIdsBySku =

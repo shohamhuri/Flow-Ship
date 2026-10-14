@@ -15,5 +15,8 @@
       }
     ]
   },
-  "testTimeout": 60000
+  "testTimeout": 60000,
+  "setupFiles": [
+    "<rootDir>/test/integration-safety.ts"
+  ]
 }

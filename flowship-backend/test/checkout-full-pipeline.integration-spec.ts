@@ -110,12 +110,18 @@ describe(
 
         let successCheckoutId: string;
         let failedCheckoutId: string;
+
         let rollbackOrderId: string;
-        let rollbackCheckoutId: string | undefined;        /*
-         * אנחנו שומרים את ה-ID-ים של rows
-         * שהיו פעילים לפני הטסט,
-         * כדי להחזיר את סביבת הטסט למצבה המקורי.
-         */
+        let rollbackCheckoutId: string | undefined;
+
+        let concurrencyOrderId: string =
+            `PIPELINE-CONCURRENCY-${Date.now()}-${randomUUID()}`;
+        let concurrencyCheckoutId: string | undefined;
+        /*
+ * אנחנו שומרים את ה-ID-ים של rows
+ * שהיו פעילים לפני הטסט,
+ * כדי להחזיר את סביבת הטסט למצבה המקורי.
+ */
         let previouslyActiveProviderIdsA:
             string[] = [];
 
@@ -571,13 +577,11 @@ describe(
                     successCheckoutId,
                     failedCheckoutId,
                     rollbackCheckoutId,
+                    concurrencyCheckoutId,
                 ].filter(
-                    (
-                        id,
-                    ): id is string =>
+                    (id): id is string =>
                         Boolean(id),
                 );
-
 
                 /*
                  * =====================================================
@@ -724,6 +728,8 @@ describe(
                         successOrderId,
                         failedOrderId,
                         rollbackOrderId,
+                        concurrencyOrderId,
+
 
                     ]],
                 );
@@ -2509,6 +2515,80 @@ describe(
                         );
 
                         rollbackCheckoutId = rows[0]?.id;
+                    }
+                }
+            },
+            30000,
+        );
+        it(
+            'should prevent duplicate checkouts under concurrent requests',
+            async () => {
+                const checkoutDto = {
+                    ...createSuccessfulCheckoutDto(),
+                    orderId: concurrencyOrderId,
+                };
+
+                try {
+                    const results = await Promise.allSettled([
+                        checkoutService.createCheckout(checkoutDto, tenantA),
+                        checkoutService.createCheckout(checkoutDto, tenantA),
+                    ]);
+
+                    const fulfilled = results.filter(
+                        (result) => result.status === 'fulfilled',
+                    );
+
+                    const rejected = results.filter(
+                        (result) => result.status === 'rejected',
+                    );
+
+                    expect(fulfilled).toHaveLength(1);
+                    expect(rejected).toHaveLength(1);
+
+                    const error = (
+                        rejected[0] as PromiseRejectedResult
+                    ).reason;
+
+                    expect(error.getStatus()).toBe(409);
+
+                    const checkouts = await db.query<{ id: string }>(
+                        `
+                SELECT id
+                FROM flow_ship_test_a.checkouts
+                WHERE external_order_id = $1
+                `,
+                        [concurrencyOrderId],
+                    );
+
+                    expect(checkouts).toHaveLength(1);
+
+                    concurrencyCheckoutId = checkouts[0].id;
+
+                    const shipments = await db.query<{ id: string }>(
+                        `
+                SELECT id
+                FROM flow_ship_test_a.shipments
+                WHERE checkout_id = $1
+                `,
+                        [concurrencyCheckoutId],
+                    );
+
+                    expect(shipments).toHaveLength(1);
+                } finally {
+                    // Preserve the checkout ID for afterAll cleanup,
+                    // even if an assertion fails.
+                    if (!concurrencyCheckoutId) {
+                        const rows = await db.query<{ id: string }>(
+                            `
+                    SELECT id
+                    FROM flow_ship_test_a.checkouts
+                    WHERE external_order_id = $1
+                    LIMIT 1
+                    `,
+                            [concurrencyOrderId],
+                        );
+
+                        concurrencyCheckoutId = rows[0]?.id;
                     }
                 }
             },
