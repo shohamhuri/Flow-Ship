@@ -139,3 +139,5 @@ jobs:
 
       - name: Run E2E tests
         run: npm run test:e2e
+        SUPABASE_URL: https://example.supabase.co
+SUPABASE_PUBLISHABLE_KEY: local-test-placeholder-key
