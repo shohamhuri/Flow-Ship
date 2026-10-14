@@ -91,6 +91,8 @@ jobs:
       TEST_FLOW_SHIP_A_API_KEY: local-test-key-a
       TEST_FLOW_SHIP_B_API_KEY: local-test-key-b
       PGPASSWORD: local_test_password
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: local-test-placeholder-key
 
     services:
       postgres:
