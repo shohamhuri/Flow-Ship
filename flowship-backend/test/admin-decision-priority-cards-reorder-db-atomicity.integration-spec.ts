@@ -77,7 +77,7 @@ describe(
 
             return `"${schemaName}"`;
         }
-
+        const createdCriteriaKeys: string[] = [];
 
         async function ensureCriteria() {
             const schema =
@@ -94,31 +94,29 @@ describe(
             for (
                 const key of criteria
             ) {
-                await db.query(
+                const inserted = await db.query<{ key: string }>(
                     `
-                    insert into ${schema}.decision_criteria (
-                        key,
-                        label,
-                        description,
-                        weight,
-                        is_active
-                    )
-                    values (
-                        $1,
-                        $2,
-                        $3,
-                        1,
-                        true
-                    )
-                    on conflict (key)
-                    do nothing
-                    `,
+    insert into ${schema}.decision_criteria (
+        key,
+        label,
+        description,
+        weight,
+        is_active
+    )
+    values ($1, $2, $3, 1, true)
+    on conflict (key) do nothing
+    returning key
+    `,
                     [
                         key,
                         key,
                         'Integration atomicity criterion',
                     ],
                 );
+
+                if (inserted.length > 0) {
+                    createdCriteriaKeys.push(inserted[0].key);
+                }
             }
         }
 
@@ -140,7 +138,23 @@ describe(
             );
         }
 
+        async function cleanupCriteria() {
+            if (createdCriteriaKeys.length === 0) {
+                return;
+            }
 
+            const schema = qSchema(tenant.schemaName);
+
+            await db.query(
+                `
+        delete from ${schema}.decision_criteria
+        where key = any($1::text[])
+        `,
+                [createdCriteriaKeys],
+            );
+
+            createdCriteriaKeys.length = 0;
+        }
         async function seedCards() {
             const schema =
                 qSchema(
@@ -346,12 +360,15 @@ describe(
 
         afterAll(
             async () => {
-                if (tenant) {
-                    await cleanupCards();
-                }
-
-                if (moduleRef) {
-                    await moduleRef.close();
+                try {
+                    if (tenant) {
+                        await cleanupCards();
+                        await cleanupCriteria();
+                    }
+                } finally {
+                    if (moduleRef) {
+                        await moduleRef.close();
+                    }
                 }
             },
             30000,

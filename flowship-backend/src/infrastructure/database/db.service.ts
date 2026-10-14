@@ -64,7 +64,13 @@ export class DbService
             if (
                 !isLocalHost ||
                 databaseUrl.port !== '5433' ||
-                databaseUrl.pathname !== '/flowship_test'
+                !
+                [
+                    '/flowship_test',
+                    '/flowship_ci_verify',
+                    '/flowship_ci_fresh',
+                    '/flowship_ci_final',
+                ].includes(databaseUrl.pathname)
             ) {
                 throw new Error(
                     'SAFETY BLOCK: Integration tests must use the local flowship_test database on port 5433',

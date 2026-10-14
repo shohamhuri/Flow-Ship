@@ -18,11 +18,26 @@ jobs:
         working-directory: flowship-backend
 
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-      TEST_FLOW_SHIP_A_API_KEY: ${{ secrets.TEST_FLOW_SHIP_A_API_KEY }}
-      TEST_FLOW_SHIP_B_API_KEY: ${{ secrets.TEST_FLOW_SHIP_B_API_KEY }}
+      FLOWSHIP_LOCAL_DB_TEST: 'true'
+      DATABASE_URL: postgresql://flowship_test:local_test_password@127.0.0.1:5433/flowship_test
+      TEST_FLOW_SHIP_A_API_KEY: local-test-key-a
+      TEST_FLOW_SHIP_B_API_KEY: local-test-key-b
+      PGPASSWORD: local_test_password
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: flowship_test
+          POSTGRES_PASSWORD: local_test_password
+          POSTGRES_DB: flowship_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U flowship_test -d flowship_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout repository
@@ -38,13 +53,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check required environment variables
+      - name: Install PostgreSQL client
         run: |
-          node -e "console.log('DATABASE_URL:', !!process.env.DATABASE_URL); console.log('SUPABASE_URL:', !!process.env.SUPABASE_URL); console.log('TEST_A_KEY:', !!process.env.TEST_FLOW_SHIP_A_API_KEY); console.log('TEST_B_KEY:', !!process.env.TEST_FLOW_SHIP_B_API_KEY);"
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
 
-      - name: Test database connection
+      - name: Initialize test database
         run: |
-          node -e "const { Pool } = require('pg'); const p = new Pool({ connectionString: process.env.DATABASE_URL, ssl:{ rejectUnauthorized: false }, connectionTimeoutMillis: 10000 }); p.query('SELECT 1').then(() => { console.log('DATABASE CONNECTION OK'); return p.end(); }).catch(e => { console.error('DATABASE CONNECTION FAILED:', e.message); process.exit(1); });"
+          set -e
+          for file in \
+            database/flowship-test-schema.sql \
+            database/flowship-test-seed.sql \
+            database/flowship-test-auth.sql \
+            database/flowship-test-express.sql
+          do
+            echo "Loading $file"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
+          done
 
       - name: Run integration tests
         run: npm run test:integration
@@ -59,11 +84,26 @@ jobs:
         working-directory: flowship-backend
 
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-      TEST_FLOW_SHIP_A_API_KEY: ${{ secrets.TEST_FLOW_SHIP_A_API_KEY }}
-      TEST_FLOW_SHIP_B_API_KEY: ${{ secrets.TEST_FLOW_SHIP_B_API_KEY }}
+      FLOWSHIP_LOCAL_DB_TEST: 'true'
+      DATABASE_URL: postgresql://flowship_test:local_test_password@127.0.0.1:5433/flowship_test
+      TEST_FLOW_SHIP_A_API_KEY: local-test-key-a
+      TEST_FLOW_SHIP_B_API_KEY: local-test-key-b
+      PGPASSWORD: local_test_password
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: flowship_test
+          POSTGRES_PASSWORD: local_test_password
+          POSTGRES_DB: flowship_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U flowship_test -d flowship_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout repository
@@ -79,13 +119,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check required environment variables
+      - name: Install PostgreSQL client
         run: |
-          node -e "console.log('DATABASE_URL:', !!process.env.DATABASE_URL); console.log('SUPABASE_URL:', !!process.env.SUPABASE_URL); console.log('TEST_A_KEY:', !!process.env.TEST_FLOW_SHIP_A_API_KEY); console.log('TEST_B_KEY:', !!process.env.TEST_FLOW_SHIP_B_API_KEY);"
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
 
-      - name: Test database connection
+      - name: Initialize test database
         run: |
-          node -e "const { Pool } = require('pg'); const p = new Pool({ connectionString: process.env.DATABASE_URL, ssl:{ rejectUnauthorized: false }, connectionTimeoutMillis: 10000 }); p.query('SELECT 1').then(() => { console.log('DATABASE CONNECTION OK'); return p.end(); }).catch(e => { console.error('DATABASE CONNECTION FAILED:', e.message); process.exit(1); });"
+          set -e
+          for file in \
+            database/flowship-test-schema.sql \
+            database/flowship-test-seed.sql \
+            database/flowship-test-auth.sql \
+            database/flowship-test-express.sql
+          do
+            echo "Loading $file"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
+          done
 
       - name: Run E2E tests
         run: npm run test:e2e

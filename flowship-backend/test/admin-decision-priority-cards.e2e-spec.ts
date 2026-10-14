@@ -48,7 +48,10 @@ describe(
 
         const createdCardsA: string[] = [];
         const createdCardsB: string[] = [];
-
+        const createdCriteria: {
+            schemaName: string;
+            key: string;
+        }[] = [];
 
         const CRITERION_PRICE =
             'price';
@@ -189,11 +192,10 @@ describe(
             tenant: CurrentTenant,
             key: string,
         ) {
-            await db.query(
-                `
+            const result = await db.query(`
                 insert into ${qSchema(
-                    tenant.schemaName,
-                )}.decision_criteria (
+                tenant.schemaName,
+            )}.decision_criteria (
                     key,
                     label,
                     description,
@@ -207,9 +209,10 @@ describe(
                     $4,
                     $5
                 )
-                on conflict (key)
-                do nothing
-                `,
+              on conflict (key)
+do nothing
+returning key
+`,
                 [
                     key,
                     'Price',
@@ -218,6 +221,12 @@ describe(
                     true,
                 ],
             );
+            if (result.length > 0) {
+                createdCriteria.push({
+                    schemaName: tenant.schemaName,
+                    key,
+                });
+            }
         }
 
 
@@ -548,7 +557,17 @@ describe(
                         TEST_PROVIDER_B_ID,
                     );
                 }
+                for (const criterion of createdCriteria) {
+                    const schema = qSchema(criterion.schemaName);
 
+                    await db.query(
+                        `
+        delete from ${schema}.decision_criteria
+        where key = $1
+        `,
+                        [criterion.key],
+                    );
+                }
 
                 if (app) {
                     await app.close();

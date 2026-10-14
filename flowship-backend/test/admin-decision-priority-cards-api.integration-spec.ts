@@ -79,7 +79,10 @@ describe(
 
         const createdCardsB:
             string[] = [];
-
+        const createdCriteria: {
+            schemaName: string;
+            key: string;
+        }[] = [];
         const CRITERION_PRICE =
             'price';
 
@@ -180,12 +183,9 @@ describe(
             tenant: CurrentTenant,
             key: string,
         ) {
-            const schema =
-                qSchema(
-                    tenant.schemaName,
-                );
+            const schema = qSchema(tenant.schemaName);
 
-            await db.query(
+            const result = await db.query<{ key: string }>(
                 `
         insert into ${schema}.decision_criteria (
             key,
@@ -194,15 +194,10 @@ describe(
             weight,
             is_active
         )
-        values (
-            $1,
-            $2,
-            $3,
-            $4,
-            $5
-        )
+        values ($1, $2, $3, $4, $5)
         on conflict (key)
         do nothing
+        returning key
         `,
                 [
                     key,
@@ -212,6 +207,13 @@ describe(
                     true,
                 ],
             );
+
+            if (result.length > 0) {
+                createdCriteria.push({
+                    schemaName: tenant.schemaName,
+                    key,
+                });
+            }
         }
         function qSchema(
             schemaName: string,
@@ -567,6 +569,7 @@ describe(
 
         afterAll(
             async () => {
+
                 if (tenantA) {
                     await cleanupCards(
                         tenantA,
@@ -598,7 +601,17 @@ describe(
 
 
                 }
+                for (const criterion of createdCriteria) {
+                    const schema = qSchema(criterion.schemaName);
 
+                    await db.query(
+                        `
+        delete from ${schema}.decision_criteria
+        where key = $1
+        `,
+                        [criterion.key],
+                    );
+                }
                 if (app) {
                     await app.close();
                 }

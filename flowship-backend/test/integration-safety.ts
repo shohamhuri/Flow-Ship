@@ -1,11 +1,15 @@
-﻿const expectedUrl =
-    'postgresql://flowship_test:local_test_password@127.0.0.1:5433/flowship_test';
+﻿const allowedUrls = [
+    'postgresql://flowship_test:local_test_password@127.0.0.1:5433/flowship_test',
+    'postgresql://flowship_test:local_test_password@127.0.0.1:5433/flowship_ci_verify',
+    'postgresql://flowship_test:local_test_password@127.0.0.1:5433/flowship_ci_fresh',
+    'postgresql://flowship_test:local_test_password@127.0.0.1:5433/flowship_ci_final',
+];
 
 if (
     process.env.FLOWSHIP_LOCAL_DB_TEST !== 'true' ||
-    process.env.DATABASE_URL !== expectedUrl
+    !allowedUrls.includes(process.env.DATABASE_URL ?? '')
 ) {
     throw new Error(
-        'SAFETY BLOCK: Integration tests require the isolated local PostgreSQL database. Set FLOWSHIP_LOCAL_DB_TEST=true and DATABASE_URL to the local test database.',
+        'SAFETY BLOCK: Integration tests require an isolated local PostgreSQL test database.',
     );
 }
