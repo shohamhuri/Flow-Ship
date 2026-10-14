@@ -50,15 +50,34 @@ export class DbService
         }
 
 
-        this.pool =
-            new Pool({
-                connectionString,
+        const isIntegrationTest =
+            process.env.FLOWSHIP_LOCAL_DB_TEST === 'true';
 
-                ssl: {
-                    rejectUnauthorized:
-                        false,
-                },
-            });
+        const databaseUrl = new URL(connectionString);
+
+        if (isIntegrationTest) {
+            const isLocalHost =
+                ['localhost', '127.0.0.1'].includes(
+                    databaseUrl.hostname,
+                );
+
+            if (
+                !isLocalHost ||
+                databaseUrl.port !== '5433' ||
+                databaseUrl.pathname !== '/flowship_test'
+            ) {
+                throw new Error(
+                    'SAFETY BLOCK: Integration tests must use the local flowship_test database on port 5433',
+                );
+            }
+        }
+
+        this.pool = new Pool({
+            connectionString,
+            ssl: isIntegrationTest
+                ? false
+                : { rejectUnauthorized: false },
+        });
     }
 
 

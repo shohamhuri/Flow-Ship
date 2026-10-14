@@ -1,19 +1,22 @@
 {
-    "moduleFileExtensions": [
-        "js",
-        "json",
-        "ts"
-    ],
-    "rootDir": "..",
-    "testEnvironment": "node",
-    "testRegex": ".*\\.integration-spec\\.ts$",
-    "transform": {
-        "^.+\\.(t|j)s$": [
-            "ts-jest",
-            {
-                "tsconfig": "test/tsconfig.integration.json"
-            }
-        ]
-    },
-    "testTimeout": 30000
+    "moduleFileExtensions":  [
+                                 "js",
+                                 "json",
+                                 "ts"
+                             ],
+    "rootDir":  "..",
+    "testEnvironment":  "node",
+    "testRegex":  ".*\\.integration-spec\\.ts$",
+    "transform":  {
+                      "^.+\\.(t|j)s$":  [
+                                            "ts-jest",
+                                            {
+                                                "tsconfig":  "test/tsconfig.integration.json"
+                                            }
+                                        ]
+                  },
+    "testTimeout":  30000,
+    "setupFiles":  [
+                       "\u003crootDir\u003e/test/integration-safety.ts"
+                   ]
 }

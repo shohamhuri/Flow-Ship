@@ -204,9 +204,9 @@ export class CheckoutService {
                 dbError.code === '23505' &&
                 (
                     dbError.constraint ===
-                    'checkouts_platform_store_external_order_unique' ||
+                    'checkouts_platform_store_id_external_order_id_idx' ||
                     dbError.constraint ===
-                    'checkouts_platform_store_external_checkout_unique'
+                    'checkouts_platform_store_id_external_checkout_id_idx'
                 )
             ) {
                 throw new ConflictException(
