@@ -1,0 +1,300 @@
+﻿             * Shipment Groups ׳׳׳™׳×׳™׳™׳ ׳‘׳–׳™׳›׳¨׳•׳.
+             */
+            const allPlans =
+                this.shipmentPlanBuilderService.buildPlans(
+                    checkout,
+                    generation.plans,
+                    activeGroupingStrategies,
+                );
+            const validPlans = allPlans.filter(
+                (plan) => plan.status === 'grouped',
+            );
+            const rejectedPlans = allPlans.filter(
+                (plan) => plan.status === 'rejected',
+            );
+
+            if (validPlans.length === 0) {
+                const unresolvedSummary =
+                    generation.unresolvedItems
+                        .map(
+                            (item) =>
+                                `${item.sku} (itemIndex: ${item.itemIndex}, quantity: ${item.requestedQuantity})`,
+                        )
+                        .join(' | ');
+
+                throw new Error(
+                    unresolvedSummary
+                        ? `No valid shipment plans could be generated. Unresolved items: ${unresolvedSummary}`
+                        : 'No valid shipment plans could be generated',
+                );
+            }
+
+
+
+            const rankedPlans =
+                this.shipmentPlanEvaluatorService
+                    .evaluateAndSelect(
+                        validPlans,
+                        validPlans.length,
+                    );
+
+            currentStage = 'source_confirmation';
+
+            const confirmedPlans: ShipmentPlanCandidate[] = [];
+            const planConfirmations: ConfirmedShipmentPlan[] = [];
+            const confirmationAttempts: ConfirmedShipmentPlan[] = []; const maxConfirmedPlans =
+                this.shipmentPlanEvaluatorService
+                    .getMaxEvaluatedPlans();
+
+            for (const plan of rankedPlans) {
+                const result =
+                    await this.shipmentPlanConfirmationService
+                        .confirmPlan(
+                            plan,
+                            checkout.storeId,
+                        );
+                confirmationAttempts.push(result);
+                if (result.confirmed) {
+                    confirmedPlans.push(plan);
+                    planConfirmations.push(result);
+                }
+
+                if (confirmedPlans.length >= maxConfirmedPlans) {
+                    break;
+                }
+            }
+
+            if (confirmedPlans.length === 0) {
+                throw new Error(
+                    'No shipment plans passed source confirmation',
+                );
+            }
+
+            const selectedPlans = confirmedPlans;
+
+            currentStage = 'awaiting_quotes';
+
+            const quotedPlans =
+                await this.shipmentPlanQuoteService
+                    .getQuotesForPlans(
+                        selectedPlans,
+                        checkout.destination,
+                        tenant,
+                        planConfirmations,
+                        checkout.createdAt,
+
+                    );
+
+            const deliveryOptions =
+                this.shipmentPlanDeliveryOptionsService
+                    .generateForPlans(quotedPlans);
+            currentStage = 'carrier_selection';
+            const priorityCards =
+                await this.decisionService
+                    .getActivePriorityCards(tenant);
+
+            const allDeliveryOptions =
+                deliveryOptions.flatMap(
+                    (result) =>
+                        result.deliveryOptions,
+                );
+
+            const scoredDeliveryOptions =
+                this.decisionService
+                    .scoreDeliveryOptions(
+                        allDeliveryOptions,
+                        priorityCards,
+                    );
+
+            const selectedDeliveryOption =
+                scoredDeliveryOptions[0] ?? null;
+            if (!selectedDeliveryOption) {
+                throw new Error(
+                    'No delivery option could be selected',
+                );
+            }
+
+            const winningPlan =
+                validPlans.find(
+                    (plan) =>
+                        plan.id ===
+                        selectedDeliveryOption.planId,
+                );
+
+            if (!winningPlan) {
+                throw new Error(
+                    `Winning shipment plan not found: ${selectedDeliveryOption.planId}`,
+                );
+            }
+
+            if (!winningPlan.grouping) {
+                throw new Error(
+                    `Winning shipment plan has no grouping result: ${winningPlan.id}`,
+                );
+            }
+
+            const grouping = winningPlan.grouping;
+
+            await this.decisionService.saveShipmentDecision(
+                tenant,
+                checkoutId,
+                checkout.orderId,
+                selectedDeliveryOption,
+                priorityCards,
+                allDeliveryOptions.length,
+                scoredDeliveryOptions,
+                {
+                    generation,
+                    allPlans,
+                    validPlans,
+                    rejectedPlans,
+                    confirmationAttempts,
+                    selectedPlans,
+                    quotedPlans,
+                    deliveryOptions,
+                },
+            );
+            console.dir(
+                {
+                    deliveryOptions:
+                        deliveryOptions.map((result) => ({
+                            planId:
+                                result.quotedPlan.plan.id,
+
+                            statistics:
+                                result.statistics,
+
+                            options:
+                                result.deliveryOptions.map(
+                                    (option) => ({
+                                        id: option.id,
+
+                                        totalShippingPrice:
+                                            option.metrics
+                                                .totalShippingPrice,
+
+                                        estimatedDeliveryDays:
+                                            option.metrics
+                                                .estimatedDeliveryDays,
+
+                                        averageProviderPriority:
+                                            option.metrics
+                                                .averageProviderPriority,
+
+                                        shipmentCount:
+                                            option.metrics
+                                                .shipmentCount,
+
+                                        selectedQuotes:
+                                            option.selectedGroupQuotes.map(
+                                                (selected) => ({
+                                                    groupId:
+                                                        selected.groupId,
+
+                                                    carrierName:
+                                                        selected.quote
+                                                            .carrierName,
+
+                                                    serviceName:
+                                                        selected.quote
+                                                            .serviceName,
+
+                                                    price:
+                                                        selected.quote
+                                                            .price,
+
+                                                    estimatedDays:
+                                                        selected.quote
+                                                            .estimatedDays,
+                                                }),
+                                            ),
+                                    }),
+                                ),
+                        })),
+                },
+                {
+                    depth: null,
+                },
+            );
+            console.dir(
+                {
+                    quotedPlans: quotedPlans.map(
+                        (quotedPlan) => ({
+                            planId: quotedPlan.plan.id,
+                            status: quotedPlan.status,
+
+                            quoteMetrics:
+                                quotedPlan.quoteMetrics,
+
+                            groups:
+                                quotedPlan.groupQuotes.map(
+                                    (groupQuote) => ({
+                                        groupId:
+                                            groupQuote.groupId,
+
+                                        pickupCities:
+                                            groupQuote.pickupCities,
+
+                                        destinationCity:
+                                            groupQuote.destinationCity,
+
+                                        weightKg:
+                                            groupQuote.weightKg,
+
+                                        quotesCount:
+                                            groupQuote.quotes.length,
+
+                                        failedProvidersCount:
+                                            groupQuote
+                                                .failedProviders
+                                                .length,
+                                    }),
+                                ),
+                        }),
+                    ),
+                },
+                {
+                    depth: null,
+                },
+            );
+
+
+            console.dir(
+                {
+                    generatedPlansCount:
+                        generation.statistics.generatedPlansCount,
+
+                    validPlansCount:
+                        validPlans.length,
+
+                    selectedPlansCount:
+                        selectedPlans.length,
+
+                    selectedPlans:
+                        selectedPlans.map((plan) => ({
+                            id: plan.id,
+
+                            shipmentCount:
+                                plan.metrics?.shipmentCount,
+
+                            averageSourceScore:
+                                plan.metrics?.averageSourceScore,
+
+                            assignments:
+                                plan.assignments.map(
+                                    (assignment) => ({
+                                        sku: assignment.sku,
+                                        sourceId:
+                                            assignment
+                                                .selectedSource
+                                                .source.id,
+                                    }),
+                                ),
+                        })),
+                },
+                {
+                    depth: null,
+                },
+            );
+            /*
+             * ׳׳•׳’ ׳–׳׳ ׳™ ׳׳¦׳•׳¨׳ ׳‘׳“׳™׳§׳× ׳׳ ׳’׳ ׳•׳ ׳”׳×׳•׳›׳ ׳™׳•׳×.

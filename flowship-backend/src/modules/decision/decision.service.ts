@@ -301,9 +301,7 @@ export class DecisionService {
 
         const maxShipmentCount =
             Math.max(...shipmentCounts);
-        console.log('Prices:', prices);
-        console.log('Min:', minPrice);
-        console.log('Max:', maxPrice);
+
         const scoredOptions:
             ScoredShipmentPlanDeliveryOption[] =
             options.map((option) => {

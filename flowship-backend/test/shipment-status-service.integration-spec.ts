@@ -510,7 +510,39 @@ describe('ShipmentStatusService Integration', () => {
             'in_transit',
         );
     });
+    it('should not move shipment backwards from in_transit to picked_up', async () => {
 
+        // מכינים משלוח שנמצא בסטטוס in_transit
+        await db.query(
+            `
+        UPDATE flow_ship_test_a.shipments
+        SET status = 'in_transit'
+        WHERE id = $1
+        `,
+            [shipmentA1Id],
+        );
+
+        // מנסים להחזיר אותו ל-picked_up
+        await shipmentsRepository.updateStatus(
+            tenantA,
+            shipmentA1Id,
+            'picked_up',
+        );
+
+        // בודקים שהסטטוס לא השתנה
+        const rows = await db.query<{
+            status: string;
+        }>(
+            `
+        SELECT status
+        FROM flow_ship_test_a.shipments
+        WHERE id = $1
+        `,
+            [shipmentA1Id],
+        );
+
+        expect(rows[0].status).toBe('in_transit');
+    });
     it('should keep checkout in processing while no shipment is delivered or failed', async () => {
         const rows =
             await db.query<{

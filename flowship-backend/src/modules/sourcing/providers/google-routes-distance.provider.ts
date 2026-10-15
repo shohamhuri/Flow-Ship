@@ -36,10 +36,7 @@ export class GoogleRoutesDistanceProvider
                 'GOOGLE_ROUTES_API_KEY is not configured',
             );
         }
-        console.log('GOOGLE ROUTES REQUEST', {
-            origin: this.buildAddress(origin),
-            destination: this.buildAddress(destination),
-        });
+
         const response = await fetch(
             this.endpoint,
             {
@@ -81,11 +78,7 @@ export class GoogleRoutesDistanceProvider
 
         const data =
             (await response.json()) as GoogleRoutesResponse;
-        console.log(
-            'GOOGLE ROUTES RESPONSE',
-            this.buildAddress(origin),
-            JSON.stringify(data),
-        );
+
         const route = data.routes?.[0];
 
         if (!route) {

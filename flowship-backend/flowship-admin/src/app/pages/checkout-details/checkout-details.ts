@@ -88,10 +88,6 @@ export class CheckoutDetailsComponent implements OnInit {
     const checkoutId =
       this.route.snapshot.paramMap.get('checkoutId');
 
-    console.log(
-      'Checkout ID from route:',
-      checkoutId,
-    );
 
     if (!checkoutId) {
       this.errorMessage = 'מזהה Checkout חסר.';
@@ -103,10 +99,6 @@ export class CheckoutDetailsComponent implements OnInit {
   }
 
   loadCheckout(checkoutId: string): void {
-    console.log(
-      'Loading checkout details:',
-      checkoutId,
-    );
 
     this.isLoading = true;
     this.errorMessage = '';
@@ -115,10 +107,7 @@ export class CheckoutDetailsComponent implements OnInit {
       .getCheckoutById(checkoutId)
       .subscribe({
         next: (checkout) => {
-          console.log(
-            'Checkout details received:',
-            checkout,
-          );
+
 
           this.checkout = checkout;
           this.isLoading = false;

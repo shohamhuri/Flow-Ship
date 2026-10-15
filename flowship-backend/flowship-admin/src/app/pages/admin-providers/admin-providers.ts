@@ -37,14 +37,12 @@ export class AdminProvidersComponent implements OnInit {
 
     this.adminApi.getProviders().subscribe({
       next: (res) => {
-        console.log('providers response:', res);
 
         this.tenantName = res.tenant.name;
         this.schemaName = res.tenant.schemaName;
         this.providers = res.providers ?? [];
         this.loading = false;
 
-        console.log('providers:', this.providers);
         this.cdr.detectChanges();
       },
       error: (err) => {
@@ -65,7 +63,6 @@ export class AdminProvidersComponent implements OnInit {
       })
       .subscribe({
         next: (res) => {
-          console.log('toggle provider response:', res);
           this.loadProviders();
         },
         error: (err) => {
@@ -82,7 +79,6 @@ export class AdminProvidersComponent implements OnInit {
       })
       .subscribe({
         next: (res) => {
-          console.log('save priority response:', res);
           this.loadProviders();
         },
         error: (err) => {

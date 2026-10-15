@@ -251,10 +251,7 @@ export class CheckoutService {
             const activeGroupingStrategies =
                 await this.groupingRulesService
                     .getActiveStrategies(tenant);
-            console.log(
-                'GROUPING_STRATEGIES_CHECK:',
-                JSON.stringify(activeGroupingStrategies),
-            );
+
 
             console.dir(
                 {
@@ -734,9 +731,6 @@ export class CheckoutService {
 
                     );
 
-                console.log(
-                    `Created ${createdShipments.length} shipments for checkout ${checkoutId}`,
-                );
 
 
 
@@ -749,10 +743,7 @@ export class CheckoutService {
                     tx,
 
                 );
-                console.log(
-                    'FINAL_GROUPING_STRATEGIES:',
-                    JSON.stringify(activeGroupingStrategies, null, 2),
-                );
+
                 const response: CheckoutProcessingResult = {
                     checkout,
                     sourcing,

@@ -19,6 +19,7 @@ export const authInterceptor: HttpInterceptorFn =
             authService.getAccessToken(),
         ).pipe(
             switchMap((token) => {
+
                 if (!token) {
                     return next(request);
                 }
