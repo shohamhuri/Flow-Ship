@@ -1,7 +1,7 @@
 import {
     BadRequestException,
 } from '@nestjs/common';
-
+import { DbService } from '../../infrastructure/database/db.service';
 import {
     ShipmentStatusService,
 } from './shipment-status.service';
@@ -95,10 +95,23 @@ describe('ShipmentStatusService', () => {
                 updateCheckoutStatusMock,
         } as unknown as ShipmentsRepository;
 
-        service =
-            new ShipmentStatusService(
-                repositoryMock,
-            );
+        const dbMock = {
+            transaction: jest.fn().mockImplementation(
+                async (callback) => {
+                    const txMock = {
+                        query: jest.fn(),
+                        queryOne: jest.fn(),
+                    };
+
+                    return callback(txMock);
+                },
+            ),
+        } as unknown as DbService;
+
+        service = new ShipmentStatusService(
+            repositoryMock,
+            dbMock,
+        );
 
         jest.clearAllMocks();
     });
@@ -170,6 +183,8 @@ describe('ShipmentStatusService', () => {
         ).toHaveBeenCalledWith(
             tenant,
             'shipment-1',
+            undefined,
+
         );
 
         expect(
@@ -177,6 +192,8 @@ describe('ShipmentStatusService', () => {
         ).toHaveBeenCalledWith(
             tenant,
             'checkout-1',
+            undefined,
+
         );
     });
 
@@ -199,6 +216,8 @@ describe('ShipmentStatusService', () => {
         ).toHaveBeenCalledWith(
             tenant,
             'shipment-1',
+            undefined,
+
         );
     });
 
@@ -218,6 +237,10 @@ describe('ShipmentStatusService', () => {
             tenant,
             'shipment-1',
             occurredAt,
+            expect.objectContaining({
+                query: expect.any(Function),
+                queryOne: expect.any(Function),
+            }),
         );
 
         expect(
@@ -226,6 +249,10 @@ describe('ShipmentStatusService', () => {
             tenant,
             'shipment-1',
             occurredAt,
+            expect.objectContaining({
+                query: expect.any(Function),
+                queryOne: expect.any(Function),
+            }),
         );
     });
 
@@ -364,6 +391,10 @@ describe('ShipmentStatusService', () => {
             tenant,
             'shipment-1',
             new Date(occurredAt),
+            expect.objectContaining({
+                query: expect.any(Function),
+                queryOne: expect.any(Function),
+            }),
         );
 
         expect(
@@ -372,6 +403,10 @@ describe('ShipmentStatusService', () => {
             tenant,
             'shipment-1',
             new Date(occurredAt),
+            expect.objectContaining({
+                query: expect.any(Function),
+                queryOne: expect.any(Function),
+            }),
         );
     });
 
@@ -499,6 +534,10 @@ describe('ShipmentStatusService', () => {
             tenant,
             'checkout-1',
             'delivered',
+            expect.objectContaining({
+                query: expect.any(Function),
+                queryOne: expect.any(Function),
+            }),
         );
     });
 
@@ -522,6 +561,7 @@ describe('ShipmentStatusService', () => {
             tenant,
             'checkout-1',
             'partially_failed',
+            undefined,
         );
     });
 
@@ -575,6 +615,8 @@ describe('ShipmentStatusService', () => {
                 tenant,
                 'checkout-1',
                 expectedStatus,
+                undefined,
+
             );
         },
     );

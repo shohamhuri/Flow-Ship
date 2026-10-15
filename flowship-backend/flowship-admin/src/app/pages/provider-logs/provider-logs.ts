@@ -154,10 +154,6 @@ export class ProviderLogs implements OnInit, OnDestroy {
     this.loading = true;
     this.errorMessage = '';
 
-    console.log('loading provider logs:', {
-      limit,
-      offset,
-    });
 
     this.adminApi
       .getProviderCallLogs({
@@ -173,15 +169,14 @@ export class ProviderLogs implements OnInit, OnDestroy {
       .pipe(
         takeUntil(this.destroy$),
         finalize(() => {
-          console.log('provider logs request finalized');
 
           this.loading = false;
           this.cdr.detectChanges();
-        }),
+        }
+        ),
       )
       .subscribe({
         next: (response) => {
-          console.log('provider logs response:', response);
 
           this.logs = response.logs ?? [];
           this.total = Number(response.total ?? 0);
@@ -235,7 +230,6 @@ export class ProviderLogs implements OnInit, OnDestroy {
 
   openLog(log: ProviderCallLog): void {
     this.selectedLog = log;
-    console.log('Selected log:', log);
   }
 
   closeLog(): void {

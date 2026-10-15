@@ -55,7 +55,6 @@ export class AuthService {
                 'SUPABASE_PUBLISHABLE_KEY environment variable is missing',
             );
         }
-
         this.supabase = createClient(
             supabaseUrl,
             supabasePublishableKey,
@@ -84,11 +83,11 @@ export class AuthService {
         );
 
         if (error || !data.user) {
+
             throw new UnauthorizedException(
                 'Invalid or expired access token',
             );
         }
-
         return this.loadFlowShipContext(
             data.user,
         );

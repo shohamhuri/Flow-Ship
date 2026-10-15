@@ -134,11 +134,9 @@ export class DecisionCriteriaComponent implements OnInit {
       priorityRank: index + 1,
     }));
 
-    console.log('reorder payload:', payload);
 
     this.adminApi.reorderDecisionPriorityCards(payload).subscribe({
       next: (res) => {
-        console.log('reorder response:', res);
 
         this.cards = res.cards ?? this.cards;
         this.successMsg = 'הסדר נשמר בהצלחה';

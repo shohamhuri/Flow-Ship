@@ -437,7 +437,30 @@ describe(
                 );
             },
         );
+        it(
+            '1b. duplicate delivered does not overwrite dropoff completed_at',
+            async () => {
+                await shipmentStatusService.markDelivered(
+                    tenant,
+                    SHIPMENT_ID,
+                    FIRST_DELIVERED_AT,
+                );
 
+                await shipmentStatusService.markDelivered(
+                    tenant,
+                    SHIPMENT_ID,
+                    SECOND_DELIVERED_AT,
+                );
+
+                const dropoff = await getDropoff();
+
+                expect(dropoff.status).toBe('completed');
+
+                expect(
+                    new Date(dropoff.completed_at).toISOString(),
+                ).toBe(FIRST_DELIVERED_AT.toISOString());
+            },
+        );
         /*
          * 2
          *
@@ -678,7 +701,7 @@ describe(
 
                 const checkout =
                     await getCheckout();
-
+                const dropoff = await getDropoff();
                 expect(shipment.status)
                     .toBe('failed');
 
@@ -701,6 +724,41 @@ describe(
 
                 expect(checkout.status)
                     .toBe('failed');
+                expect(dropoff.status).not.toBe('completed');
+                expect(dropoff.completed_at).toBeNull();
+            },
+        );
+        it(
+            'should rollback dropoff completion when shipment delivery update fails',
+            async () => {
+                const repository = moduleRef.get(ShipmentsRepository);
+
+                const spy = jest
+                    .spyOn(repository, 'markDelivered')
+                    .mockRejectedValueOnce(
+                        new Error('Simulated database write failure'),
+                    );
+
+                try {
+                    await expect(
+                        shipmentStatusService.markDelivered(
+                            tenant,
+                            SHIPMENT_ID,
+                            FIRST_DELIVERED_AT,
+                        ),
+                    ).rejects.toThrow(
+                        'Simulated database write failure',
+                    );
+                } finally {
+                    spy.mockRestore();
+                }
+
+                const shipment = await getShipment();
+                const dropoff = await getDropoff();
+
+                expect(shipment.status).not.toBe('delivered');
+                expect(dropoff.status).not.toBe('completed');
+                expect(dropoff.completed_at).toBeNull();
             },
         );
 

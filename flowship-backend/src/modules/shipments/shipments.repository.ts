@@ -222,12 +222,12 @@ export class ShipmentsRepository {
         tenant: CurrentTenant,
         shipmentId: string,
         deliveredAt: Date = new Date(),
+        tx?: DbTransaction,
     ): Promise<void> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await this.db.query(`
-    update "${schemaName}".shipments
+        await (tx ?? this.db).query(`    update "${schemaName}".shipments
     set
       status = 'delivered',
     delivered_at = coalesce(delivered_at, $1),
@@ -275,19 +275,25 @@ where id = $3
         tenant: CurrentTenant,
         shipmentId: string,
         completedAt: Date = new Date(),
+        tx?: DbTransaction,
     ): Promise<void> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await this.db.query(
-            `
+        await (tx ?? this.db).query(`
     update "${schemaName}".shipment_stops
-    set
-      status = 'completed',
-      arrived_at = coalesce(arrived_at, $1),
-      completed_at = $1
-    where shipment_id = $2
-      and stop_type = 'dropoff'
+set
+  status = 'completed',
+  arrived_at = coalesce(arrived_at, $1),
+  completed_at = coalesce(completed_at, $1)
+where shipment_id = $2
+  and stop_type = 'dropoff'
+  and exists (
+    select 1
+    from "${schemaName}".shipments s
+    where s.id = $2
+      and s.status not in ('delivered', 'failed')
+  )
     `,
             [
                 completedAt,
@@ -362,7 +368,11 @@ where id = $3
        status = $1,
         updated_at = now()
     where id = $2
-      and status not in ('delivered', 'failed')
+  and (
+    (status in ('created', 'pending') and $1 = 'picked_up')
+    or
+    (status in ('created', 'pending', 'picked_up') and $1 = 'in_transit')
+  )
     `,
             [
                 status,
@@ -373,11 +383,12 @@ where id = $3
     async findCheckoutIdByShipmentId(
         tenant: CurrentTenant,
         shipmentId: string,
+        tx?: DbTransaction,
     ): Promise<string | null> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        const rows = await this.db.query<{
+        const rows = await (tx ?? this.db).query<{
             checkout_id: string | null;
         }>(
             `
@@ -394,11 +405,13 @@ where id = $3
     async getShipmentStatusSummary(
         tenant: CurrentTenant,
         checkoutId: string,
+        tx?: DbTransaction,
+
     ): Promise<ShipmentStatusSummary | null> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        const rows = await this.db.query<{
+        const rows = await (tx ?? this.db).query<{
             checkout_id: string;
             total_shipments: string | number;
             delivered_shipments: string | number;
@@ -460,11 +473,11 @@ where id = $3
         tenant: CurrentTenant,
         checkoutId: string,
         status: string,
+        tx?: DbTransaction,
     ): Promise<void> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
-
-        const rows = await this.db.query<{
+        const rows = await (tx ?? this.db).query<{
             id: string;
         }>(
             `

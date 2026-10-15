@@ -3,7 +3,10 @@ import {
     Injectable,
 } from '@nestjs/common';
 
-
+import {
+    DbService,
+    DbTransaction,
+} from '../../infrastructure/database/db.service';
 import {
     CurrentTenant,
 } from '../tenants/tenants.service';
@@ -22,10 +25,8 @@ export class ShipmentStatusService {
     constructor(
         private readonly shipmentsRepository:
             ShipmentsRepository,
-
-
+        private readonly db: DbService,
     ) { }
-
     async markPickedUp(
         tenant: CurrentTenant,
         shipmentId: string,
@@ -76,27 +77,33 @@ export class ShipmentStatusService {
         );
     }
 
+
     async markDelivered(
         tenant: CurrentTenant,
         shipmentId: string,
         occurredAt: Date = new Date(),
     ): Promise<void> {
-        await this.shipmentsRepository.markDropoffCompleted(
-            tenant,
-            shipmentId,
-            occurredAt,
-        );
+        await this.db.transaction(async (tx) => {
+            await this.shipmentsRepository.markDropoffCompleted(
+                tenant,
+                shipmentId,
+                occurredAt,
+                tx,
+            );
 
-        await this.shipmentsRepository.markDelivered(
-            tenant,
-            shipmentId,
-            occurredAt,
-        );
+            await this.shipmentsRepository.markDelivered(
+                tenant,
+                shipmentId,
+                occurredAt,
+                tx,
+            );
 
-        await this.synchronizeCheckoutStatus(
-            tenant,
-            shipmentId,
-        );
+            await this.synchronizeCheckoutStatus(
+                tenant,
+                shipmentId,
+                tx,
+            );
+        });
     }
 
     async markFailed(
@@ -196,12 +203,15 @@ export class ShipmentStatusService {
     private async synchronizeCheckoutStatus(
         tenant: CurrentTenant,
         shipmentId: string,
+        tx?: DbTransaction,
     ): Promise<void> {
         const checkoutId =
             await this.shipmentsRepository
                 .findCheckoutIdByShipmentId(
                     tenant,
                     shipmentId,
+                    tx,
+
                 );
 
         if (!checkoutId) {
@@ -215,6 +225,9 @@ export class ShipmentStatusService {
                 .getShipmentStatusSummary(
                     tenant,
                     checkoutId,
+                    tx,
+
+
                 );
 
         if (
@@ -253,6 +266,8 @@ export class ShipmentStatusService {
                 tenant,
                 checkoutId,
                 checkoutStatus,
+                tx,
+
             );
     }
 }
