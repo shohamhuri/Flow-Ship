@@ -16,6 +16,7 @@ export class ShipmentGroupsRepository {
         grouping: GroupingResult,
         checkoutItemIdsBySku: Map<string, string>,
     ): Promise<void> {
+        const schemaName = this.safeSchemaName(tenant.schemaName);
         await this.databaseService.transaction(
             async (executor) => {
                 for (
@@ -27,7 +28,7 @@ export class ShipmentGroupsRepository {
                      */
                     await executor.query(
                         `
-                    insert into ${tenant.schemaName}.shipment_groups (
+                    insert into "${schemaName}".shipment_groups (
                         id,
                         checkout_id,
                         handling_group,
@@ -72,7 +73,7 @@ export class ShipmentGroupsRepository {
                     ) {
                         await executor.query(
                             `
-                        insert into ${tenant.schemaName}.shipment_group_sources (
+                        insert into "${schemaName}".shipment_group_sources (
                             shipment_group_id,
                             source_id,
                             source_name,
@@ -117,7 +118,7 @@ export class ShipmentGroupsRepository {
 
                         await executor.query(
                             `
-                        insert into ${tenant.schemaName}.shipment_group_items (
+                        insert into "${schemaName}".shipment_group_items (
                             shipment_group_id,
                             checkout_item_id,
                             sku,
@@ -153,5 +154,12 @@ export class ShipmentGroupsRepository {
                 }
             },
         );
+    }
+    private safeSchemaName(schemaName: string): string {
+        if (!/^[a-zA-Z0-9_]+$/.test(schemaName)) {
+            throw new Error(`Invalid schema name: ${schemaName}`);
+        }
+
+        return schemaName;
     }
 }

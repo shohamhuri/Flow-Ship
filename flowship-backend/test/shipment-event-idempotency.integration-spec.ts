@@ -137,6 +137,7 @@ describe(
                     tenant,
                     checkout,
                     'integration-test',
+                    'shipment-event-idempotency-test',
                 );
             /*
              * Shipment group נדרש בגלל FK של shipment.

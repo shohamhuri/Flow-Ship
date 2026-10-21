@@ -50,8 +50,8 @@ describe('GroupingRulesService', () => {
         name: 'FLOW_SHIP_TEST',
         schemaName: 'flow_ship_test',
         status: 'active',
+        timezone: 'Asia/Jerusalem',
     };
-
     const createStrategy = (
         overrides: Partial<GroupingStrategySetting> = {},
     ): GroupingStrategySetting => {

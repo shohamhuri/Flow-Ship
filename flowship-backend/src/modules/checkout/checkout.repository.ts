@@ -211,10 +211,10 @@ export class CheckoutRepository {
         requestFingerprint: string,
     ): Promise<string> {
         const checkoutId = randomUUID();
-
+        const schemaName = this.safeSchemaName(tenant.schemaName);
         await this.databaseService.query(
             `
-                insert into ${tenant.schemaName}.checkouts (
+                insert into "${schemaName}".checkouts (
                     id,
                     store_id,
                     platform,
@@ -265,13 +265,13 @@ export class CheckoutRepository {
         checkout: Checkout,
     ): Promise<Map<string, string>> {
         const itemIdsBySku = new Map<string, string>();
-
+        const schemaName = this.safeSchemaName(tenant.schemaName);
         for (const item of checkout.items) {
             const itemId = randomUUID();
 
             await this.databaseService.query(
                 `
-                   insert into ${tenant.schemaName}.checkout_items (
+                   insert into "${schemaName}".checkout_items (
     id,
     checkout_id,
     sku,
@@ -328,7 +328,9 @@ values (
     async getCheckouts(
         tenant: CurrentTenant,
     ): Promise<CheckoutListRow[]> {
+        const schemaName = this.safeSchemaName(tenant.schemaName);
         const result = await this.databaseService.query(
+
             `
             select
                 id,
@@ -340,7 +342,7 @@ values (
                 raw_payload,
                 created_at,
                 updated_at
-            from ${tenant.schemaName}.checkouts
+            from "${schemaName}".checkouts
             order by created_at desc
             `,
         );

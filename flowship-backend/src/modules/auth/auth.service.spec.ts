@@ -592,4 +592,47 @@ describe('AuthService', () => {
             },
         });
     });
+
+    it.each([
+        '',
+        'tenant_a; DROP TABLE users',
+        'tenant_a--',
+        'tenant_a"public',
+        'tenant_a.public',
+        'tenant a',
+    ])(
+        'should reject invalid tenant schema: %s',
+        async (schemaName) => {
+            const service = createService();
+
+            getUserMock.mockResolvedValue({
+                data: {
+                    user: {
+                        id: 'user-1',
+                        email: 'user@example.com',
+                    },
+                },
+                error: null,
+            });
+
+            queryMock.mockResolvedValue([{
+                user_id: 'user-1',
+                display_name: 'Test User',
+                user_role: 'admin',
+                user_status: 'active',
+                tenant_id: 'tenant-1',
+                tenant_name: 'QUEEN',
+                schema_name: schemaName,
+                tenant_status: 'active',
+                tenant_timezone: 'Asia/Jerusalem',
+            }]);
+
+            await expect(
+                service.authenticateAccessToken('valid-token'),
+            ).rejects.toThrow(
+                'Invalid tenant schema configuration',
+            );
+        },
+    );
+
 });

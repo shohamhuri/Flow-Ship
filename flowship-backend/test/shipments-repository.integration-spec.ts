@@ -235,6 +235,8 @@ describe('ShipmentsRepository Integration', () => {
                 tenantA,
                 checkoutA,
                 'integration-test',
+                'checkout-details-integration-fingerprint',
+
             );
 
         const checkoutItemsA =
@@ -249,6 +251,7 @@ describe('ShipmentsRepository Integration', () => {
                 tenantB,
                 checkoutB,
                 'integration-test',
+                'checkout-details-integration-fingerprint',
             );
 
         const checkoutItemsB =
@@ -1151,5 +1154,34 @@ describe('ShipmentsRepository Integration', () => {
             activeShipments:
                 0,
         });
+    });
+    it('should not update Tenant A shipment using Tenant B', async () => {
+        const beforeRows = await db.query<{ status: string }>(
+            `
+        select status
+        from flow_ship_test_a.shipments
+        where id = $1
+        `,
+            [shipmentAId],
+        );
+
+        expect(beforeRows).toHaveLength(1);
+
+        await shipmentsRepository.updateStatus(
+            tenantB,
+            shipmentAId,
+            'in_transit',
+        );
+
+        const afterRows = await db.query<{ status: string }>(
+            `
+        select status
+        from flow_ship_test_a.shipments
+        where id = $1
+        `,
+            [shipmentAId],
+        );
+
+        expect(afterRows).toEqual(beforeRows);
     });
 });

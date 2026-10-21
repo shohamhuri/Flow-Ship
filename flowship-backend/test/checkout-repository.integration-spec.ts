@@ -220,6 +220,7 @@ describe('Checkout Repository Multi-Tenant Integration', () => {
                 tenantA,
                 checkoutA,
                 'integration-test',
+                'checkout-repository-tenant-a',
             );
 
         await checkoutRepository.saveCheckoutItems(
@@ -233,8 +234,8 @@ describe('Checkout Repository Multi-Tenant Integration', () => {
                 tenantB,
                 checkoutB,
                 'integration-test',
+                'checkout-repository-tenant-b',
             );
-
         await checkoutRepository.saveCheckoutItems(
             tenantB,
             checkoutBId,

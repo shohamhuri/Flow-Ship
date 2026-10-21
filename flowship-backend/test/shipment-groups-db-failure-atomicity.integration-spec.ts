@@ -7,11 +7,7 @@ import {
     Test,
     TestingModule,
 } from '@nestjs/testing';
-
-import {
-    randomUUID,
-} from 'crypto';
-
+import { randomUUID } from 'node:crypto';
 import {
     DbService,
 } from '../src/infrastructure/database/db.service';
@@ -602,13 +598,11 @@ describe(
 
 
                 checkoutId =
-                    await checkoutRepository
-                        .saveCheckout(
-                            tenant,
-                            checkout,
-                            'manual',
-                        );
-
+                    await checkoutRepository.saveCheckout(
+                        tenant,
+                        checkout,
+                        'manual',
+                        `shipment-groups-atomicity-${randomUUID()}`,);
 
                 checkoutItemIdsBySku =
                     await checkoutRepository

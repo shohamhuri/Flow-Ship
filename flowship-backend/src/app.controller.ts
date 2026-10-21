@@ -18,25 +18,23 @@ export class AppController {
 
   @Get('health/db')
   async checkDb() {
-    const result = await this.db.queryOne<{ now: string }>('select now()');
+    await this.db.queryOne('select now()');
 
     return {
       ok: true,
-      dbTime: result?.now,
     };
   }
 
   @Get('health/tenants')
   async checkTenantsTable() {
-    const result = await this.db.queryOne<{ count: string }>(`
-      select count(*)::text as count
-      from public.flowship_tenants
-    `);
+    await this.db.queryOne(`
+    select 1
+    from public.flowship_tenants
+    limit 1
+  `);
 
     return {
       ok: true,
-      table: 'public.flowship_tenants',
-      tenantsCount: result?.count,
     };
   }
 
@@ -46,7 +44,12 @@ export class AppController {
 
     return {
       ok: true,
-      tenant,
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        schemaName: tenant.schemaName,
+        status: tenant.status,
+      },
     };
   }
 }

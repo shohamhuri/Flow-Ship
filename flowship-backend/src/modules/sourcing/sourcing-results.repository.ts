@@ -17,6 +17,7 @@ export class SourcingResultsRepository {
         sourcing: ItemSourcingResult[],
         checkoutItemIdsBySku: Map<string, string>,
     ): Promise<void> {
+        const schemaName = this.safeSchemaName(tenant.schemaName);
         for (const itemResult of sourcing) {
             const checkoutItemId =
                 checkoutItemIdsBySku.get(itemResult.sku);
@@ -35,7 +36,7 @@ export class SourcingResultsRepository {
             for (const rankedSource of allSources) {
                 await this.databaseService.query(
                     `
-                    insert into ${tenant.schemaName}.checkout_sourcing_results (
+                    insert into "${schemaName}".checkout_sourcing_results(
                         id,
                         checkout_id,
                         checkout_item_id,
@@ -98,5 +99,12 @@ export class SourcingResultsRepository {
                 );
             }
         }
+    }
+    private safeSchemaName(schemaName: string): string {
+        if (!/^[a-zA-Z0-9_]+$/.test(schemaName)) {
+            throw new Error(`Invalid schema name: ${schemaName}`);
+        }
+
+        return schemaName;
     }
 }
