@@ -797,7 +797,11 @@ describe('DecisionService Integration', () => {
 
             const options =
                 createDeliveryOptions();
-
+            const scoredOptions =
+                decisionService.scoreDeliveryOptions(
+                    options,
+                    cards,
+                );
             const winner =
                 decisionService
                     .selectBestDeliveryOption(
@@ -851,7 +855,11 @@ describe('DecisionService Integration', () => {
 
             const options =
                 createDeliveryOptions();
-
+            const scoredOptions =
+                decisionService.scoreDeliveryOptions(
+                    options,
+                    cards,
+                );
             const winner =
                 decisionService
                     .selectBestDeliveryOption(
@@ -863,15 +871,16 @@ describe('DecisionService Integration', () => {
                 winner,
             ).not.toBeNull();
 
-            await decisionService
-                .saveShipmentDecision(
-                    tenantA,
-                    checkoutAId,
-                    'INTEGRATION-ORDER',
-                    winner as ScoredShipmentPlanDeliveryOption,
-                    cards,
-                    options.length,
-                );
+            await decisionService.saveShipmentDecision(
+                tenantA,
+                checkoutAId,
+                'INTEGRATION-ORDER',
+                winner as ScoredShipmentPlanDeliveryOption,
+                cards,
+                options.length,
+                scoredOptions,
+                null,
+            );
 
             const rows =
                 await db.query<{
@@ -969,7 +978,11 @@ describe('DecisionService Integration', () => {
 
             const options =
                 createDeliveryOptions();
-
+            const scoredOptions =
+                decisionService.scoreDeliveryOptions(
+                    options,
+                    cards,
+                );
             const winner =
                 decisionService
                     .selectBestDeliveryOption(
@@ -981,16 +994,16 @@ describe('DecisionService Integration', () => {
                 winner,
             ).not.toBeNull();
 
-            await decisionService
-                .saveShipmentDecision(
-                    tenantA,
-                    checkoutAId,
-                    'INTEGRATION-ORDER',
-                    winner as ScoredShipmentPlanDeliveryOption,
-                    cards,
-                    99,
-                );
-
+            await decisionService.saveShipmentDecision(
+                tenantA,
+                checkoutAId,
+                'INTEGRATION-ORDER',
+                winner as ScoredShipmentPlanDeliveryOption,
+                cards,
+                99,
+                scoredOptions,
+                null,
+            );
             const rows =
                 await db.query<{
                     count: string;

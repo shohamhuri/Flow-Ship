@@ -596,8 +596,7 @@ export class DecisionService {
             ScoredShipmentPlanDeliveryOption[],
         planningSnapshot: unknown,
     ): Promise<void> {
-        const schemaName = tenant.schemaName;
-
+        const schemaName = this.safeSchemaName(tenant.schemaName);
         const sql = `
         insert into ${schemaName}.shipment_decisions (
             checkout_id,

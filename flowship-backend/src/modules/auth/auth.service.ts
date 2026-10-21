@@ -137,7 +137,11 @@ t.timezone as tenant_timezone                from public.flowship_user_profiles 
                 'FlowShip tenant is disabled',
             );
         }
-
+        if (!/^[a-zA-Z0-9_]+$/.test(row.schema_name)) {
+            throw new UnauthorizedException(
+                'Invalid tenant schema configuration',
+            );
+        }
         const user: AuthenticatedFlowShipUser = {
             id: row.user_id,
             email: supabaseUser.email ?? null,

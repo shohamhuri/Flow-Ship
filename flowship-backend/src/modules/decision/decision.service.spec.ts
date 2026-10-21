@@ -323,4 +323,53 @@ describe('DecisionService', () => {
             expect(dbQueryMock).not.toHaveBeenCalled();
         });
     });
+    describe('saveShipmentDecision security', () => {
+        it('should reject an invalid tenant schema before writing to the database', async () => {
+            const invalidTenant = {
+                schemaName: 'tenant_a; DROP SCHEMA tenant_b CASCADE; --',
+            };
+
+            await expect(
+                service.saveShipmentDecision(
+                    invalidTenant,
+                    'checkout-1',
+                    'order-1',
+                    {} as any,
+                    [],
+                    0,
+                    [],
+                    {},
+                ),
+            ).rejects.toThrow('Invalid schema name');
+
+            expect(dbQueryMock).not.toHaveBeenCalled();
+        });
+
+        it('should write to the validated tenant schema', async () => {
+            dbQueryMock.mockResolvedValue([]);
+
+            await service.saveShipmentDecision(
+                { schemaName: 'flow_ship_test' },
+                'checkout-1',
+                'order-1',
+                {
+                    id: 'option-1',
+                    planId: 'plan-1',
+                    score: 0.8,
+                } as any,
+                [],
+                1,
+                [],
+                {},
+            );
+
+            expect(dbQueryMock).toHaveBeenCalledTimes(1);
+
+            const [sql] = dbQueryMock.mock.calls[0];
+
+            expect(sql).toContain(
+                'insert into "flow_ship_test".shipment_decisions',
+            );
+        });
+    });
 });

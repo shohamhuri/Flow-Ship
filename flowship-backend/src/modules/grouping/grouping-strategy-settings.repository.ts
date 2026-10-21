@@ -30,10 +30,19 @@ export class GroupingStrategySettingsRepository {
     constructor(
         private readonly databaseService: DbService,
     ) { }
+    private safeSchemaName(schemaName: string): string {
+        if (!/^[a-zA-Z0-9_]+$/.test(schemaName)) {
+            throw new Error(
+                `Invalid schema name: ${schemaName}`,
+            );
+        }
 
+        return schemaName;
+    }
     async findActiveStrategies(
         tenant: CurrentTenant,
     ): Promise<GroupingStrategySetting[]> {
+        const schemaName = this.safeSchemaName(tenant.schemaName);
         const result =
             await this.databaseService.query<GroupingStrategySettingRow>(
                 `
@@ -47,7 +56,7 @@ export class GroupingStrategySettingsRepository {
                     config,
                     created_at,
                     updated_at
-                from ${tenant.schemaName}.grouping_strategy_settings
+                from "${schemaName}".grouping_strategy_settings
                 where is_enabled = true
                 order by
                     execution_order asc,
@@ -77,6 +86,7 @@ export class GroupingStrategySettingsRepository {
     async findAllStrategies(
         tenant: CurrentTenant,
     ): Promise<GroupingStrategySetting[]> {
+        const schemaName = this.safeSchemaName(tenant.schemaName);
         const result =
             await this.databaseService.query<GroupingStrategySettingRow>(
                 `
@@ -90,7 +100,7 @@ export class GroupingStrategySettingsRepository {
         config,
         created_at,
         updated_at
-      from ${tenant.schemaName}.grouping_strategy_settings
+      from "${schemaName}".grouping_strategy_settings
       order by
         execution_order asc,
         conflict_priority desc
@@ -127,10 +137,11 @@ export class GroupingStrategySettingsRepository {
             config?: GroupingStrategyConfig;
         },
     ): Promise<GroupingStrategySetting | null> {
+        const schemaName = this.safeSchemaName(tenant.schemaName);
         const rows =
             await this.databaseService.query<GroupingStrategySettingRow>(
                 `
-      update ${tenant.schemaName}.grouping_strategy_settings
+      update "${schemaName}".grouping_strategy_settings
       set
         display_name =
           coalesce($1, display_name),
@@ -205,12 +216,13 @@ export class GroupingStrategySettingsRepository {
             conflictPriority: number;
         }>,
     ): Promise<GroupingStrategySetting[]> {
+        const schemaName = this.safeSchemaName(tenant.schemaName);
         await this.databaseService.transaction(
             async (executor) => {
                 for (const item of items) {
                     await executor.query(
                         `
-                    update ${tenant.schemaName}.grouping_strategy_settings
+                    update "${schemaName}".grouping_strategy_settings
                     set
                         execution_order = $1,
                         conflict_priority = $2,

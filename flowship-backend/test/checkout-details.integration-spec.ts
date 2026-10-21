@@ -216,8 +216,8 @@ describe(
                     tenantA,
                     checkout,
                     'integration-test',
+                    'checkout-details-integration-fingerprint',
                 );
-
             /*
              * 2. Checkout Items
              */

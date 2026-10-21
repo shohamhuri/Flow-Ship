@@ -236,6 +236,7 @@ describe('ShipmentGroupsRepository Integration', () => {
                 tenantA,
                 checkoutA,
                 'integration-test',
+                'shipment-groups-tenant-a',
             );
 
         checkoutItemIdsA =
@@ -250,8 +251,8 @@ describe('ShipmentGroupsRepository Integration', () => {
                 tenantB,
                 checkoutB,
                 'integration-test',
+                'shipment-groups-tenant-b',
             );
-
         checkoutItemIdsB =
             await checkoutRepository.saveCheckoutItems(
                 tenantB,
