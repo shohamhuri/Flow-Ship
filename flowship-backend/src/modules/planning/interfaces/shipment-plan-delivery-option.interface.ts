@@ -1,13 +1,22 @@
 import { CarrierQuoteOption } from '../../carriers/interfaces/carrier-adapter.interface';
-import { VehiclePlan } from '../../checkout/capacity-planning.service';
-import { QuotedShipmentPlan } from './shipment-plan-quote.interface';
-
+import {
+    VehiclePlan,
+    VehiclePlanItem,
+} from '../../checkout/capacity-planning.service'; import { QuotedShipmentPlan } from './shipment-plan-quote.interface';
+export interface SelectedVehicleShipment {
+    sourceId: string;
+    vehicleIndex: number;
+    vehicleType?: 'scooter' | 'car' | 'commercial';
+    assignedWeightKg?: number;
+    items?: VehiclePlanItem[];
+    quote: CarrierQuoteOption;
+}
 export interface SelectedGroupQuote {
     groupId: string;
     pickupCities: string[];
     destinationCity: string;
     weightKg: number;
-
+    shipments?: SelectedVehicleShipment[];
     quote: CarrierQuoteOption;
 
     vehiclePlan?: {

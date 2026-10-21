@@ -61,8 +61,15 @@ describe('ShipmentPlanQuoteService', () => {
             sources,
             categories: ['fashion'],
             handlingGroup: 'standard',
-            items: [],
-            totalItems: 1,
+            items: sources.map((source, index) => ({
+                sku: `SKU-${index + 1}`,
+                name: `Item ${index + 1}`,
+                quantity: 1,
+                unitWeight: totalWeight / sources.length,
+                unitPrice: 100 / sources.length,
+                sourceId: source.id,
+            })),
+            totalItems: sources.length,
             totalWeight,
             totalPrice: 100,
             groupingReasons: [
@@ -144,8 +151,7 @@ describe('ShipmentPlanQuoteService', () => {
         }) as any;
 
     beforeEach(() => {
-        jest.clearAllMocks();
-        carriersServiceMock.getActiveProviders.mockResolvedValue([]);
+        jest.resetAllMocks(); carriersServiceMock.getActiveProviders.mockResolvedValue([]);
         capacityPlanningServiceMock.planVehiclesForProviders.mockReturnValue([]);
         const distanceProviderMock = {
             getDistance: jest.fn().mockResolvedValue({
@@ -314,35 +320,37 @@ describe('ShipmentPlanQuoteService', () => {
 
         expect(
             carriersServiceMock.getQuotes,
-        ).toHaveBeenCalledWith(
-            {
-                pickupCities: [
-                    'Netivot',
-                    'Beer Sheva',
-                ],
-                destinationCity:
-                    'Tel Aviv',
-                weightKg: 12,
-                pickupAddress:
-                    'Test Street 10, Netivot | Test Street 10, Beer Sheva',
-                destinationAddress:
-                    'Dizengoff 50, Tel Aviv',
-                readyAt: '2026-09-27T07:25:00.000Z',
+        ).toHaveBeenCalledTimes(2);
 
+        expect(
+            carriersServiceMock.getQuotes,
+        ).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({
+                pickupCities: ['Netivot'],
+                weightKg: 6,
                 pickupSources: [
-                    {
+                    expect.objectContaining({
                         sourceId: 'source-1',
-                        address: 'Test Street 10, Netivot',
-                        readyAt: '2026-09-27T07:25:00.000Z',
-                    },
-                    {
-                        sourceId: 'source-2',
-                        address: 'Test Street 10, Beer Sheva',
-                        readyAt: '2026-09-27T07:25:00.000Z',
-                    },
+                    }),
                 ],
-                allowedUrgencies: ['standard'],
-            },
+            }),
+            tenant,
+        );
+
+        expect(
+            carriersServiceMock.getQuotes,
+        ).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({
+                pickupCities: ['Beer Sheva'],
+                weightKg: 6,
+                pickupSources: [
+                    expect.objectContaining({
+                        sourceId: 'source-2',
+                    }),
+                ],
+            }),
             tenant,
         );
     });
@@ -1353,11 +1361,14 @@ describe('ShipmentPlanQuoteService', () => {
                 sku: 'SKU-1',
                 quantity: 1,
                 unitWeight: 40,
+                sourceId: 'source-1',
             },
+
             {
                 sku: 'SKU-2',
                 quantity: 1,
                 unitWeight: 30,
+                sourceId: 'source-1',
             },
         ] as any;
 
@@ -1387,13 +1398,25 @@ describe('ShipmentPlanQuoteService', () => {
                                 vehicleType: 'scooter',
                                 maxWeightKg: 48,
                                 assignedWeightKg: 40,
-                                items: [],
+                                items: [
+                                    {
+                                        sku: 'SKU-1',
+                                        quantity: 1,
+                                        unitWeightKg: 40,
+                                    },
+                                ],
                             },
                             {
                                 vehicleType: 'scooter',
                                 maxWeightKg: 48,
                                 assignedWeightKg: 30,
-                                items: [],
+                                items: [
+                                    {
+                                        sku: 'SKU-2',
+                                        quantity: 1,
+                                        unitWeightKg: 30,
+                                    },
+                                ],
                             },
                         ],
                     },
@@ -1421,6 +1444,7 @@ describe('ShipmentPlanQuoteService', () => {
             result[0].groupQuotes[0];
 
         expect(groupQuote.vehiclePlans).toEqual([{
+            sourceId: 'source-1',
             providerId: 'provider-1',
             providerCode: 'delivery-center',
 
@@ -1431,13 +1455,25 @@ describe('ShipmentPlanQuoteService', () => {
                         vehicleType: 'scooter',
                         maxWeightKg: 48,
                         assignedWeightKg: 40,
-                        items: [],
+                        items: [
+                            {
+                                sku: 'SKU-1',
+                                quantity: 1,
+                                unitWeightKg: 40,
+                            },
+                        ],
                     },
                     {
                         vehicleType: 'scooter',
                         maxWeightKg: 48,
                         assignedWeightKg: 30,
-                        items: [],
+                        items: [
+                            {
+                                sku: 'SKU-2',
+                                quantity: 1,
+                                unitWeightKg: 30,
+                            },
+                        ],
                     },
                 ],
             },
@@ -1485,6 +1521,7 @@ describe('ShipmentPlanQuoteService', () => {
                 sku: 'SKU-1',
                 quantity: 1,
                 unitWeight: 70,
+                sourceId: 'source-1',
             },
         ] as any;
 
@@ -1554,6 +1591,7 @@ describe('ShipmentPlanQuoteService', () => {
                 sku: 'SKU-1',
                 quantity: 1,
                 unitWeight: 40,
+                sourceId: 'source-1',
             },
         ] as any;
 
@@ -1583,7 +1621,13 @@ describe('ShipmentPlanQuoteService', () => {
                                 vehicleType: 'scooter',
                                 maxWeightKg: 48,
                                 assignedWeightKg: 40,
-                                items: [],
+                                items: [
+                                    {
+                                        sku: 'SKU-1',
+                                        quantity: 1,
+                                        unitWeightKg: 40,
+                                    },
+                                ],
                             },
                         ],
                     },
@@ -1592,7 +1636,11 @@ describe('ShipmentPlanQuoteService', () => {
 
         carriersServiceMock.getQuotes.mockResolvedValue({
             quotes: [
-                createQuote('quote-1', 100),],
+                {
+                    ...createQuote('quote-1', 100),
+                    urgency: 'standard',
+                },
+            ],
             failedProviders: [],
         });
 

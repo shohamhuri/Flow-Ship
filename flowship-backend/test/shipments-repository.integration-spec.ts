@@ -584,19 +584,7 @@ describe('ShipmentsRepository Integration', () => {
                     houseNumber:
                         '10',
                 },
-                {
-                    country:
-                        'IL',
 
-                    city:
-                        'Ramat Gan',
-
-                    street:
-                        'Pickup Two',
-
-                    houseNumber:
-                        '20',
-                },
             ],
             {
                 country:
@@ -825,49 +813,32 @@ describe('ShipmentsRepository Integration', () => {
     });
 
     it('should create pickup and dropoff stops in the correct order', async () => {
-        const rows =
-            await db.query<{
-                stop_order: number;
-                stop_type: string;
-            }>(
-                `
-                select
-                    stop_order,
-                    stop_type
-                from flow_ship_test_a.shipment_stops
-                where shipment_id = $1
-                order by stop_order
-                `,
-                [shipmentAId],
-            );
+        const rows = await db.query<{
+            stop_order: number;
+            stop_type: string;
+        }>(
+            `
+        select stop_order, stop_type
+        from flow_ship_test_a.shipment_stops
+        where shipment_id = $1
+        order by stop_order
+        `,
+            [shipmentAId],
+        );
 
-        expect(rows).toHaveLength(3);
+        expect(rows).toHaveLength(2);
 
         expect(rows).toEqual([
             {
-                stop_order:
-                    1,
-
-                stop_type:
-                    'pickup',
+                stop_order: 1,
+                stop_type: 'pickup',
             },
             {
-                stop_order:
-                    2,
-
-                stop_type:
-                    'pickup',
-            },
-            {
-                stop_order:
-                    3,
-
-                stop_type:
-                    'dropoff',
+                stop_order: 2,
+                stop_type: 'dropoff',
             },
         ]);
     });
-
     it('should report that not all pickups are completed initially', async () => {
         const completed =
             await shipmentsRepository.areAllPickupsCompleted(
@@ -878,36 +849,21 @@ describe('ShipmentsRepository Integration', () => {
         expect(completed).toBe(false);
     });
 
-    it('should mark pickups as completed and detect when all are completed', async () => {
+    it('should mark pickup as completed and detect when all are completed', async () => {
         await shipmentsRepository.markPickupCompleted(
             tenantA,
             shipmentAId,
             1,
         );
 
-        const afterFirst =
+        const completed =
             await shipmentsRepository.areAllPickupsCompleted(
                 tenantA,
                 shipmentAId,
             );
 
-        expect(afterFirst).toBe(false);
-
-        await shipmentsRepository.markPickupCompleted(
-            tenantA,
-            shipmentAId,
-            2,
-        );
-
-        const afterSecond =
-            await shipmentsRepository.areAllPickupsCompleted(
-                tenantA,
-                shipmentAId,
-            );
-
-        expect(afterSecond).toBe(true);
+        expect(completed).toBe(true);
     });
-
     it('should mark dropoff as completed', async () => {
         await shipmentsRepository.markDropoffCompleted(
             tenantA,

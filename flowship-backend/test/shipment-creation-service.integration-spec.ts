@@ -236,7 +236,7 @@ describe(
         function createPlan(
             checkout: Checkout,
         ): ShipmentPlanCandidate {
-
+            const sourceId = 'integration-source';
             return {
                 id:
                     randomUUID(),
@@ -258,8 +258,7 @@ describe(
 
                             sources: [
                                 {
-                                    id:
-                                        randomUUID(),
+                                    id: sourceId,
 
                                     name:
                                         'Integration Warehouse',
@@ -380,6 +379,32 @@ describe(
                     {
                         groupId:
                             group.groupId,
+                        shipments: [
+                            {
+                                sourceId: 'integration-source',
+                                vehicleIndex: 0,
+                                vehicleType: 'car',
+                                assignedWeightKg: 3,
+                                items: [
+                                    {
+                                        sku: 'SKU-INTEGRATION',
+                                        quantity: 2,
+                                        unitWeightKg: 1.5,
+                                    },
+                                ],
+                                quote: {
+                                    providerId: randomUUID(),
+                                    providerCode: 'integration-provider',
+                                    adapterKey: 'integration-adapter',
+                                    carrierName: 'Integration Carrier',
+                                    serviceName: 'Same Day',
+                                    price: 35,
+                                    currency: 'ILS',
+                                    estimatedDays: 1,
+                                    providerPriority: 0.9,
+                                },
+                            },
+                        ],
 
                         pickupCities: [
                             'Petah Tikva',

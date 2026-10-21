@@ -4782,12 +4782,7 @@ ALTER TABLE ONLY flow_ship_test_a.shipments
     ADD CONSTRAINT shipments_pkey PRIMARY KEY (id);
 
 
---
--- Name: shipments shipments_shipment_group_id_key; Type: CONSTRAINT; Schema: flow_ship_test_a; Owner: -
---
 
-ALTER TABLE ONLY flow_ship_test_a.shipments
-    ADD CONSTRAINT shipments_shipment_group_id_key UNIQUE (shipment_group_id);
 
 
 --
@@ -5108,14 +5103,6 @@ ALTER TABLE ONLY flow_ship_test_b.shipment_stops
 
 ALTER TABLE ONLY flow_ship_test_b.shipments
     ADD CONSTRAINT shipments_pkey PRIMARY KEY (id);
-
-
---
--- Name: shipments shipments_shipment_group_id_key; Type: CONSTRAINT; Schema: flow_ship_test_b; Owner: -
---
-
-ALTER TABLE ONLY flow_ship_test_b.shipments
-    ADD CONSTRAINT shipments_shipment_group_id_key UNIQUE (shipment_group_id);
 
 
 --

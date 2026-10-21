@@ -58,8 +58,14 @@ describe('ShipmentCreationService', () => {
             groupId,
             sources,
 
-            items: [],
-            categories: ['fashion'],
+            items: sources.map((source, index) => ({
+                sku: `SKU-${index + 1}`,
+                name: `Item ${index + 1}`,
+                quantity: 1,
+                unitWeight: 5,
+                unitPrice: 100,
+                sourceId: source.id,
+            })), categories: ['fashion'],
             handlingGroup: 'standard',
 
             totalItems: 1,
@@ -116,28 +122,80 @@ describe('ShipmentCreationService', () => {
             ...overrides,
         }) as any;
 
+    const createSelectedGroupQuote = (
+        groupId: string,
+        sourceId: string,
+        quote = createQuote(),
+    ) => ({
+        groupId,
+        quote,
+        shipments: [
+            {
+                sourceId,
+                vehicleIndex: 0,
+                vehicleType: 'car',
+                quote,
+            },
+        ],
+    });
+
+
     const createDeliveryOption = (
         planId = 'plan-1',
         selectedGroupQuotes: any[] = [
-            {
-                groupId: 'group-1',
-                quote: createQuote(),
-            },
+            createSelectedGroupQuote(
+                'group-1',
+                'source-1',
+            ),
         ],
-    ) =>
-        ({
+    ) => {
+        const normalizedGroups = selectedGroupQuotes.map((group) => {
+            if (group.shipments) {
+                return group;
+            }
+
+            return createSelectedGroupQuote(
+                group.groupId,
+                group.sourceId ?? (
+                    group.groupId === 'group-1'
+                        ? 'source-1'
+                        : 'source-2'
+                ),
+                group.quote,
+            );
+        });
+
+        const shipments = normalizedGroups.flatMap(
+            (group) => group.shipments,
+        );
+
+        return {
             id: `${planId}-delivery-1`,
             planId,
-            selectedGroupQuotes,
-
+            selectedGroupQuotes: normalizedGroups,
             metrics: {
-                totalShippingPrice: 45,
-                estimatedDeliveryDays: 1,
-                averageProviderPriority: 0.8,
-                shipmentCount:
-                    selectedGroupQuotes.length,
+                totalShippingPrice: shipments.reduce(
+                    (sum, shipment) => sum + shipment.quote.price,
+                    0,
+                ),
+                estimatedDeliveryDays: shipments.length
+                    ? Math.max(
+                        ...shipments.map(
+                            (shipment) => shipment.quote.estimatedDays,
+                        ),
+                    )
+                    : 0,
+                averageProviderPriority: shipments.length
+                    ? shipments.reduce(
+                        (sum, shipment) =>
+                            sum + (shipment.quote.providerPriority ?? 0),
+                        0,
+                    ) / shipments.length
+                    : 0,
+                shipmentCount: shipments.length,
             },
-        }) as any;
+        } as any;
+    };
 
     beforeEach(() => {
         createShipmentMock = jest
@@ -303,7 +361,13 @@ describe('ShipmentCreationService', () => {
             {
                 checkoutId:
                     'checkout-123',
-
+                metadata: {
+                    sourceId: 'source-1',
+                    vehicleIndex: 0,
+                    vehicleType: 'car',
+                    assignedWeightKg: undefined,
+                    items: undefined,
+                },
                 orderId:
                     'ORDER-100',
 
@@ -391,8 +455,15 @@ describe('ShipmentCreationService', () => {
                 ],
             );
 
-        const option =
-            createDeliveryOption();
+        const option = createDeliveryOption(
+            'plan-1',
+            [
+                createSelectedGroupQuote(
+                    'group-1',
+                    'warehouse-1',
+                ),
+            ],
+        );
 
         await service.createShipments(
             tenant,
@@ -440,72 +511,74 @@ describe('ShipmentCreationService', () => {
         ]);
     });
 
-    it('should create multiple pickup addresses for a multi-source shipment group', async () => {
-        const sources = [
-            createSource(
-                'warehouse-1',
-                'Netivot',
-            ),
 
-            createSource(
-                'branch-1',
-                'Beer Sheva',
-                {
-                    name:
-                        'Beer Sheva Branch',
-                    type:
-                        'branch',
-                },
-            ),
+    it('creates separate shipments for two pickup sources', async () => {
+        const sources = [
+            createSource('warehouse-1', 'Netivot'),
+            createSource('branch-1', 'Beer Sheva'),
         ];
 
-        const plan =
-            createPlan(
-                'plan-1',
-                [
-                    createGroup(
-                        'group-1',
-                        sources,
-                    ),
-                ],
-            );
+        const plan = createPlan('plan-1', [
+            createGroup('group-1', sources),
+        ]);
 
-        await service.createShipments(
+        const option = createDeliveryOption('plan-1', [
+            {
+                groupId: 'group-1',
+                quote: createQuote({ price: 75 }),
+                shipments: [
+                    {
+                        sourceId: 'warehouse-1',
+                        vehicleIndex: 0,
+                        vehicleType: 'car',
+                        quote: createQuote({ price: 30 }),
+                    },
+                    {
+                        sourceId: 'branch-1',
+                        vehicleIndex: 0,
+                        vehicleType: 'car',
+                        quote: createQuote({ price: 45 }),
+                    },
+                ],
+            },
+        ]);
+
+        createShipmentMock
+            .mockResolvedValueOnce('shipment-1')
+            .mockResolvedValueOnce('shipment-2');
+
+        const result = await service.createShipments(
             tenant,
             'checkout-1',
             checkout,
             plan,
-            createDeliveryOption(),
+            option,
         );
 
-        const pickupAddresses =
-            createShipmentStopsMock
-                .mock.calls[0][2];
+        expect(result).toHaveLength(2);
+        expect(createShipmentMock).toHaveBeenCalledTimes(2);
+        expect(createShipmentStopsMock).toHaveBeenCalledTimes(2);
 
-        expect(
-            pickupAddresses,
-        ).toHaveLength(2);
+        expect(createShipmentStopsMock.mock.calls[0][2])
+            .toHaveLength(1);
 
-        expect(
-            pickupAddresses[0]
-                .sourceId,
-        ).toBe(
-            'warehouse-1',
-        );
+        expect(createShipmentStopsMock.mock.calls[1][2])
+            .toHaveLength(1);
 
-        expect(
-            pickupAddresses[1]
-                .sourceId,
-        ).toBe(
-            'branch-1',
-        );
+        expect(createShipmentStopsMock.mock.calls[0][2][0].sourceId)
+            .toBe('warehouse-1');
 
-        expect(
-            pickupAddresses[1]
-                .city,
-        ).toBe(
-            'Beer Sheva',
-        );
+        expect(createShipmentStopsMock.mock.calls[1][2][0].sourceId)
+            .toBe('branch-1');
+
+        expect(createShipmentMock.mock.calls[0][1].price)
+            .toBe(30);
+
+        expect(createShipmentMock.mock.calls[1][1].price)
+            .toBe(45);
+
+        expect(createShipmentStopsMock.mock.calls[0][3])
+            .toEqual(createShipmentStopsMock.mock.calls[1][3]);
     });
 
     it('should create the dropoff address from checkout destination', async () => {
@@ -958,5 +1031,339 @@ describe('ShipmentCreationService', () => {
         expect(
             createShipmentStopsMock,
         ).not.toHaveBeenCalled();
+    });
+    it('creates separate shipments for two vehicles from the same source', async () => {
+        const plan = createPlan();
+
+        const option = createDeliveryOption('plan-1', [
+            {
+                groupId: 'group-1',
+                quote: createQuote({ price: 80 }),
+                shipments: [
+                    {
+                        sourceId: 'source-1',
+                        vehicleIndex: 0,
+                        vehicleType: 'car',
+                        quote: createQuote({ price: 35 }),
+                    },
+                    {
+                        sourceId: 'source-1',
+                        vehicleIndex: 1,
+                        vehicleType: 'car',
+                        quote: createQuote({ price: 45 }),
+                    },
+                ],
+            },
+        ]);
+
+        createShipmentMock
+            .mockResolvedValueOnce('shipment-1')
+            .mockResolvedValueOnce('shipment-2');
+
+        const result = await service.createShipments(
+            tenant,
+            'checkout-1',
+            checkout,
+            plan,
+            option,
+        );
+
+        expect(result).toHaveLength(2);
+        expect(createShipmentMock).toHaveBeenCalledTimes(2);
+        expect(createShipmentStopsMock).toHaveBeenCalledTimes(2);
+
+        for (const call of createShipmentStopsMock.mock.calls) {
+            expect(call[2]).toHaveLength(1);
+            expect(call[2][0].sourceId).toBe('source-1');
+            expect(call[3].city).toBe('Tel Aviv');
+        }
+
+        expect(createShipmentMock.mock.calls[0][1].price).toBe(35);
+        expect(createShipmentMock.mock.calls[1][1].price).toBe(45);
+    });
+    it('rejects delivery options that omit a required shipment group', async () => {
+        const plan = createPlan('plan-1', [
+            createGroup('group-1'),
+            createGroup('group-2', [
+                createSource('source-2', 'Jerusalem'),
+            ]),
+        ]);
+
+        const option = createDeliveryOption('plan-1', [
+            createSelectedGroupQuote('group-1', 'source-1'),
+        ]);
+
+        await expect(
+            service.createShipments(
+                tenant,
+                'checkout-1',
+                checkout,
+                plan,
+                option,
+            ),
+        ).rejects.toThrow('Incomplete shipment group coverage');
+
+        expect(createShipmentMock).not.toHaveBeenCalled();
+        expect(createShipmentStopsMock).not.toHaveBeenCalled();
+    });
+    it('rejects duplicate physical shipments for the same vehicle', async () => {
+        const quote = createQuote();
+
+        const option = createDeliveryOption('plan-1', [
+            {
+                groupId: 'group-1',
+                quote,
+                shipments: [
+                    {
+                        sourceId: 'source-1',
+                        vehicleIndex: 0,
+                        vehicleType: 'car',
+                        quote,
+                    },
+                    {
+                        sourceId: 'source-1',
+                        vehicleIndex: 0,
+                        vehicleType: 'car',
+                        quote,
+                    },
+                ],
+            },
+        ]);
+
+        await expect(
+            service.createShipments(
+                tenant,
+                'checkout-1',
+                checkout,
+                createPlan(),
+                option,
+            ),
+        ).rejects.toThrow(
+            'Duplicate physical shipment source-1:0 in group group-1',
+        );
+
+        expect(createShipmentMock).not.toHaveBeenCalled();
+        expect(createShipmentStopsMock).not.toHaveBeenCalled();
+    });
+    it('does not write any shipments when a later group has an invalid source', async () => {
+        const plan = createPlan('plan-1', [
+            createGroup('group-1'),
+            createGroup('group-2', [
+                createSource('source-2', 'Jerusalem'),
+            ]),
+        ]);
+
+        const option = createDeliveryOption('plan-1', [
+            createSelectedGroupQuote('group-1', 'source-1'),
+            createSelectedGroupQuote('group-2', 'invalid-source'),
+        ]);
+
+        await expect(
+            service.createShipments(
+                tenant,
+                'checkout-1',
+                checkout,
+                plan,
+                option,
+            ),
+        ).rejects.toThrow(
+            'Incomplete shipment coverage for group group-2',
+        );
+
+        expect(createShipmentMock).not.toHaveBeenCalled();
+        expect(createShipmentStopsMock).not.toHaveBeenCalled();
+    });
+    it('preserves separate items and weights for two vehicles from the same source', async () => {
+        const plan = createPlan();
+
+        const option = createDeliveryOption('plan-1', [
+            {
+                groupId: 'group-1',
+                quote: createQuote({ price: 80 }),
+                shipments: [
+                    {
+                        sourceId: 'source-1',
+                        vehicleIndex: 0,
+                        vehicleType: 'scooter',
+                        assignedWeightKg: 1.608,
+                        items: [
+                            {
+                                sku: 'TEST-SKU',
+                                quantity: 2,
+                                unitWeightKg: 0.804,
+                            },
+                        ],
+                        quote: createQuote({ price: 40 }),
+                    },
+                    {
+                        sourceId: 'source-1',
+                        vehicleIndex: 1,
+                        vehicleType: 'scooter',
+                        assignedWeightKg: 1.608,
+                        items: [
+                            {
+                                sku: 'TEST-SKU',
+                                quantity: 2,
+                                unitWeightKg: 0.804,
+                            },
+                        ],
+                        quote: createQuote({ price: 40 }),
+                    },
+                ],
+            },
+        ]);
+
+        createShipmentMock
+            .mockResolvedValueOnce('shipment-1')
+            .mockResolvedValueOnce('shipment-2');
+
+        const result = await service.createShipments(
+            tenant,
+            'checkout-1',
+            checkout,
+            plan,
+            option,
+        );
+
+        expect(result).toHaveLength(2);
+        expect(createShipmentMock).toHaveBeenCalledTimes(2);
+        expect(createShipmentStopsMock).toHaveBeenCalledTimes(2);
+
+        const first = createShipmentMock.mock.calls[0][1];
+        const second = createShipmentMock.mock.calls[1][1];
+
+        expect(first.metadata).toEqual({
+            sourceId: 'source-1',
+            vehicleIndex: 0,
+            vehicleType: 'scooter',
+            assignedWeightKg: 1.608,
+            items: [
+                {
+                    sku: 'TEST-SKU',
+                    quantity: 2,
+                    unitWeightKg: 0.804,
+                },
+            ],
+        });
+
+        expect(second.metadata).toEqual({
+            sourceId: 'source-1',
+            vehicleIndex: 1,
+            vehicleType: 'scooter',
+            assignedWeightKg: 1.608,
+            items: [
+                {
+                    sku: 'TEST-SKU',
+                    quantity: 2,
+                    unitWeightKg: 0.804,
+                },
+            ],
+        });
+
+        expect(
+            createShipmentStopsMock.mock.calls.map(
+                (call) => call[1],
+            ),
+        ).toEqual(['shipment-1', 'shipment-2']);
+
+        for (const call of createShipmentStopsMock.mock.calls) {
+            expect(call[2]).toHaveLength(1);
+            expect(call[2][0].sourceId).toBe('source-1');
+            expect(call[3]).toEqual(checkout.destination);
+        }
+    });
+    it('creates 3 separate shipments for 2 sources and 3 vehicles', async () => {
+        const plan = createPlan('plan-1', [
+            createGroup('group-1', [
+                createSource('warehouse-A', 'Netivot'),
+                createSource('warehouse-B', 'Beer Sheva'),
+            ]),
+        ]);
+
+        const option = createDeliveryOption('plan-1', [
+            {
+                groupId: 'group-1',
+                quote: createQuote({ price: 120 }),
+                shipments: [
+                    {
+                        sourceId: 'warehouse-A',
+                        vehicleIndex: 0,
+                        vehicleType: 'scooter',
+                        assignedWeightKg: 1.608,
+                        items: [
+                            { sku: 'SHIRT', quantity: 2, unitWeightKg: 0.804 },
+                        ],
+                        quote: createQuote({ price: 30 }),
+                    },
+                    {
+                        sourceId: 'warehouse-A',
+                        vehicleIndex: 1,
+                        vehicleType: 'scooter',
+                        assignedWeightKg: 1.608,
+                        items: [
+                            { sku: 'SHIRT', quantity: 2, unitWeightKg: 0.804 },
+                        ],
+                        quote: createQuote({ price: 30 }),
+                    },
+                    {
+                        sourceId: 'warehouse-B',
+                        vehicleIndex: 0,
+                        vehicleType: 'car',
+                        assignedWeightKg: 4,
+                        items: [
+                            { sku: 'SHOES', quantity: 2, unitWeightKg: 2 },
+                        ],
+                        quote: createQuote({ price: 60 }),
+                    },
+                ],
+            },
+        ]);
+
+        createShipmentMock
+            .mockResolvedValueOnce('shipment-A0')
+            .mockResolvedValueOnce('shipment-A1')
+            .mockResolvedValueOnce('shipment-B0');
+
+        const result = await service.createShipments(
+            tenant, 'checkout-1', checkout, plan, option,
+        );
+
+        expect(result).toHaveLength(3);
+        expect(createShipmentMock).toHaveBeenCalledTimes(3);
+        expect(createShipmentStopsMock).toHaveBeenCalledTimes(3);
+
+        const expected = [
+            { sourceId: 'warehouse-A', vehicleIndex: 0, sku: 'SHIRT', quantity: 2 },
+            { sourceId: 'warehouse-A', vehicleIndex: 1, sku: 'SHIRT', quantity: 2 },
+            { sourceId: 'warehouse-B', vehicleIndex: 0, sku: 'SHOES', quantity: 2 },
+        ];
+
+        expected.forEach((item, index) => {
+            const metadata = createShipmentMock.mock.calls[index][1].metadata;
+            const stops = createShipmentStopsMock.mock.calls[index];
+
+            expect(metadata?.sourceId).toBe(item.sourceId);
+            expect(metadata?.vehicleIndex).toBe(item.vehicleIndex);
+            expect(metadata?.items?.[0]).toEqual(
+                expect.objectContaining({
+                    sku: item.sku,
+                    quantity: item.quantity,
+                }),
+            );
+
+            expect(stops[2]).toHaveLength(1);
+            expect(stops[2][0].sourceId).toBe(item.sourceId);
+            expect(stops[3]).toEqual(checkout.destination);
+        });
+
+        const totalQuantity = createShipmentMock.mock.calls.reduce(
+            (sum, call) =>
+                sum + (call[1].metadata?.items ?? []).reduce(
+                    (n, item) => n + item.quantity, 0,
+                ),
+            0,
+        );
+
+        expect(totalQuantity).toBe(6);
     });
 });

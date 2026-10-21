@@ -72,4 +72,63 @@ describe('ShipmentsRepository tenant security', () => {
         expect(secondSql).toContain('"flow_ship_test".shipments');
         expect(firstSql).not.toEqual(secondSql);
     });
+    it('should reject multiple pickups before writing to database', async () => {
+        const pickups = [
+            { sourceId: 'warehouse-A', city: 'Netivot' },
+            { sourceId: 'warehouse-B', city: 'Beer Sheva' },
+        ];
+
+        await expect(
+            repository.createShipmentStops(
+                createTenant('flow_ship_test'),
+                'shipment-123',
+                pickups,
+                { city: 'Tel Aviv' },
+            ),
+        ).rejects.toThrow(
+            'Shipment shipment-123 must have exactly one pickup; received 2',
+        );
+
+        expect(dbQueryMock).not.toHaveBeenCalled();
+    });
+
+    it('should reject shipments without a pickup before writing to database', async () => {
+        await expect(
+            repository.createShipmentStops(
+                createTenant('flow_ship_test'),
+                'shipment-123',
+                [],
+                { city: 'Tel Aviv' },
+            ),
+        ).rejects.toThrow(
+            'Shipment shipment-123 must have exactly one pickup; received 0',
+        );
+
+        expect(dbQueryMock).not.toHaveBeenCalled();
+    });
+    it('should insert exactly one pickup and one dropoff', async () => {
+        await repository.createShipmentStops(
+            createTenant('flow_ship_test'),
+            'shipment-123',
+            [{ sourceId: 'warehouse-A', city: 'Netivot' }],
+            { city: 'Tel Aviv' },
+        );
+
+        expect(dbQueryMock).toHaveBeenCalledTimes(2);
+
+        const [pickupSql, pickupParams] = dbQueryMock.mock.calls[0];
+        const [dropoffSql, dropoffParams] = dbQueryMock.mock.calls[1];
+
+        expect(pickupSql).toContain("'pickup'");
+        expect(dropoffSql).toContain("'dropoff'");
+
+        expect(pickupSql).toContain('"flow_ship_test".shipment_stops');
+        expect(dropoffSql).toContain('"flow_ship_test".shipment_stops');
+
+        expect(pickupParams[0]).toBe('shipment-123');
+        expect(pickupParams[1]).toBe(1);
+
+        expect(dropoffParams[0]).toBe('shipment-123');
+        expect(dropoffParams[1]).toBe(2);
+    });
 });

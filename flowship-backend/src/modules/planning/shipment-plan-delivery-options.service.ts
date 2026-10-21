@@ -1,9 +1,14 @@
+
 import { Injectable } from '@nestjs/common';
 import { CarrierQuoteOption } from
     '../carriers/interfaces/carrier-adapter.interface';
-import { QuotedShipmentPlan } from './interfaces/shipment-plan-quote.interface';
+import {
+    QuotedShipmentPlan,
+    ProviderVehiclePlanQuoteResult,
+} from './interfaces/shipment-plan-quote.interface';
 import {
     SelectedGroupQuote,
+    SelectedVehicleShipment,
     ShipmentPlanDeliveryOption,
     ShipmentPlanDeliveryOptionsResult,
 } from './interfaces/shipment-plan-delivery-option.interface';
@@ -15,282 +20,242 @@ export class ShipmentPlanDeliveryOptionsService {
     generateForPlans(
         quotedPlans: QuotedShipmentPlan[],
     ): ShipmentPlanDeliveryOptionsResult[] {
-        return quotedPlans.map((quotedPlan) =>
-            this.generateForPlan(quotedPlan),
-        );
+        return quotedPlans.map((plan) => this.generateForPlan(plan));
     }
 
     private generateForPlan(
         quotedPlan: QuotedShipmentPlan,
     ): ShipmentPlanDeliveryOptionsResult {
-        const quotableGroups =
-            quotedPlan.groupQuotes.filter(
-                (groupQuote) =>
-                    groupQuote.quotes.length > 0 ||
-                    groupQuote.vehiclePlans?.some(
-                        (vehiclePlan) =>
-                            (vehiclePlan.alternatives?.length ?? 0) > 0,
-                    ),
-            );
+        const empty = (): ShipmentPlanDeliveryOptionsResult => ({
+            quotedPlan,
+            deliveryOptions: [],
+            statistics: {
+                theoreticalCombinations: 0,
+                generatedCombinations: 0,
+                generationLimitReached: false,
+            },
+        });
 
-        if (
-            quotableGroups.length === 0 ||
-            quotableGroups.length !==
-            quotedPlan.groupQuotes.length
-        ) {
-            return {
-                quotedPlan,
-                deliveryOptions: [],
-                statistics: {
-                    theoreticalCombinations: 0,
-                    generatedCombinations: 0,
-                    generationLimitReached: false,
-                },
-            };
+        const groupChoices: SelectedGroupQuote[][] = [];
+
+        for (const groupQuote of quotedPlan.groupQuotes) {
+            const sourceIds = [
+                ...new Set(
+                    quotedPlan.plan.grouping?.shipmentGroups
+                        .find((group) => group.groupId === groupQuote.groupId)
+                        ?.items.map((item) => item.sourceId) ?? [],
+                ),
+            ];
+
+            if (sourceIds.length === 0) return empty();
+
+
+
+            const choicesBySource = sourceIds.map((sourceId) => {
+                const plans = (groupQuote.vehiclePlans ?? [])
+                    .filter((plan) => plan.sourceId === sourceId);
+
+                const vehicleChoices = plans.flatMap((plan) =>
+                    this.buildSourceChoices(sourceId, plan),
+                );
+
+                const shipmentGroup =
+                    quotedPlan.plan.grouping?.shipmentGroups.find(
+                        (group) => group.groupId === groupQuote.groupId,
+                    );
+
+                const sourceItems = (shipmentGroup?.items ?? [])
+                    .filter((item) => item.sourceId === sourceId)
+                    .map((item) => ({
+                        sku: item.sku,
+                        quantity: item.quantity,
+                        unitWeightKg: item.unitWeight,
+                    }));
+
+                const sourceWeightKg = sourceItems.reduce(
+                    (total, item) =>
+                        total + item.quantity * item.unitWeightKg,
+                    0,
+                );
+
+                const directChoices = (
+                    groupQuote.sourceDirectQuotes ?? []
+                )
+                    .filter((entry) => entry.sourceId === sourceId)
+                    .flatMap((entry) =>
+                        entry.quotes.map((quote) => [
+                            {
+                                sourceId,
+                                vehicleIndex: 0,
+                                assignedWeightKg: sourceWeightKg,
+                                items: sourceItems.map((item) => ({ ...item })),
+                                quote,
+                            },
+                        ]),
+                    );
+                return [...vehicleChoices, ...directChoices];
+            });
+
+            if (choicesBySource.some((choices) => choices.length === 0)) {
+                return empty();
+            }
+
+            let combinations: SelectedVehicleShipment[][] = [[]];
+
+            for (const sourceChoices of choicesBySource) {
+                const next: SelectedVehicleShipment[][] = [];
+
+                for (const combination of combinations) {
+                    for (const choice of sourceChoices) {
+                        next.push([...combination, ...choice]);
+
+                        if (next.length >= this.maxOptionsPerPlan) break;
+                    }
+
+                    if (next.length >= this.maxOptionsPerPlan) break;
+                }
+
+                combinations = next;
+            }
+
+            groupChoices.push(
+                combinations.map((shipments) => {
+                    const price = shipments.reduce(
+                        (sum, shipment) => sum + shipment.quote.price,
+                        0,
+                    );
+
+                    const estimatedDays = Math.max(
+                        ...shipments.map((shipment) =>
+                            shipment.quote.estimatedDays,
+                        ),
+                    );
+
+                    return {
+                        groupId: groupQuote.groupId,
+                        pickupCities: groupQuote.pickupCities,
+                        destinationCity: groupQuote.destinationCity,
+                        weightKg: groupQuote.weightKg,
+                        shipments,
+                        quote: {
+                            carrierName: 'Combined shipment',
+                            serviceName: 'Multi-vehicle delivery',
+                            price,
+                            currency: 'ILS' as const,
+                            estimatedDays,
+                        },
+                    };
+                }),
+            );
         }
 
-        const theoreticalCombinations =
-            quotableGroups.reduce(
-                (total, groupQuote) => {
-                    const vehicleAlternativesCount =
-                        (groupQuote.vehiclePlans ?? [])
-                            .reduce(
-                                (sum, vehiclePlan) =>
-                                    sum +
-                                    (
-                                        vehiclePlan
-                                            .alternatives
-                                            ?.length ?? 0
-                                    ),
-                                0,
-                            );
+        if (groupChoices.length === 0) return empty();
 
-                    const choicesCount =
-                        groupQuote.quotes.length +
-                        vehicleAlternativesCount;
+        let combinations: SelectedGroupQuote[][] = [[]];
 
-                    return total * choicesCount;
-                },
-                1,
-            );
+        for (const choices of groupChoices) {
+            const next: SelectedGroupQuote[][] = [];
 
-        const combinations: SelectedGroupQuote[][] = [];
+            for (const combination of combinations) {
+                for (const choice of choices) {
+                    next.push([...combination, choice]);
 
-        this.buildCombinations(
-            quotableGroups,
-            0,
-            [],
-            combinations,
+                    if (next.length >= this.maxOptionsPerPlan) break;
+                }
+
+                if (next.length >= this.maxOptionsPerPlan) break;
+            }
+
+            combinations = next;
+        }
+
+        const deliveryOptions = combinations.map(
+            (selectedGroupQuotes, index): ShipmentPlanDeliveryOption => {
+                const shipments = selectedGroupQuotes.flatMap(
+                    (group) => group.shipments ?? [],
+                );
+
+                const totalShippingPrice = shipments.reduce(
+                    (sum, shipment) => sum + shipment.quote.price,
+                    0,
+                );
+
+                const averageProviderPriority = shipments.length
+                    ? shipments.reduce(
+                        (sum, shipment) =>
+                            sum + (shipment.quote.providerPriority ?? 0),
+                        0,
+                    ) / shipments.length
+                    : 0;
+
+                return {
+                    id: `${quotedPlan.plan.id}-delivery-${index + 1}`,
+                    planId: quotedPlan.plan.id,
+                    selectedGroupQuotes,
+                    metrics: {
+                        totalShippingPrice,
+                        estimatedDeliveryDays: Math.max(
+                            ...shipments.map((shipment) =>
+                                shipment.quote.estimatedDays,
+                            ),
+                        ),
+                        averageProviderPriority,
+                        shipmentCount: shipments.length,
+                    },
+                };
+            },
         );
-
-        const deliveryOptions =
-            combinations.map(
-                (combination, index) =>
-                    this.buildDeliveryOption(
-                        quotedPlan,
-                        combination,
-                        index,
-                    ),
-            );
 
         return {
             quotedPlan,
-
             deliveryOptions,
-
             statistics: {
-                theoreticalCombinations,
-                generatedCombinations:
-                    deliveryOptions.length,
-                generationLimitReached:
-                    theoreticalCombinations >
-                    this.maxOptionsPerPlan,
-            },
-        };
-    }
-
-    private buildCombinations(
-        groupQuotes: QuotedShipmentPlan['groupQuotes'],
-        groupIndex: number,
-        currentCombination: SelectedGroupQuote[],
-        results: SelectedGroupQuote[][],
-    ): void {
-        if (
-            results.length >=
-            this.maxOptionsPerPlan
-        ) {
-            return;
-        }
-
-        if (
-            groupIndex >= groupQuotes.length
-        ) {
-            results.push([
-                ...currentCombination,
-            ]);
-
-            return;
-        }
-
-        const currentGroup =
-            groupQuotes[groupIndex];
-
-        const quotes = [
-            ...currentGroup.quotes.map((quote) => ({
-                quote,
-                vehiclePlan: undefined,
-            })),
-
-            ...(currentGroup.vehiclePlans ?? [])
-                .flatMap((vehiclePlan) =>
-                    (vehiclePlan.alternatives ?? [])
-                        .map((alternative) => ({
-                            quote: {
-                                carrierName:
-                                    vehiclePlan.providerCode,
-
-                                serviceName:
-                                    `${alternative.urgency} vehicle plan`,
-
-                                price:
-                                    alternative.totalPrice,
-
-                                currency:
-                                    alternative.currency,
-
-                                estimatedDays:
-                                    alternative.estimatedDays,
-
-                                urgency:
-                                    alternative.urgency,
-
-                                providerId:
-                                    vehiclePlan.providerId,
-
-                                providerCode:
-                                    vehiclePlan.providerCode,
-
-                                providerPriority:
-                                    alternative.providerPriority,
-                                vehicleCount:
-                                    alternative.vehicleCount,
-                            },
-
-                            vehiclePlan: {
-                                providerId:
-                                    vehiclePlan.providerId,
-
-                                providerCode:
-                                    vehiclePlan.providerCode,
-
-                                plan:
-                                    vehiclePlan.plan,
-                            },
-                        })),
+                theoreticalCombinations: groupChoices.reduce(
+                    (total, choices) => total * choices.length,
+                    1,
                 ),
-        ];
-
-        for (const choice of quotes) {
-            currentCombination.push({
-                groupId:
-                    currentGroup.groupId,
-
-                pickupCities:
-                    currentGroup.pickupCities,
-
-                destinationCity:
-                    currentGroup.destinationCity,
-
-                weightKg:
-                    currentGroup.weightKg,
-
-                quote:
-                    choice.quote,
-
-                vehiclePlan:
-                    choice.vehiclePlan,
-            });
-
-            this.buildCombinations(
-                groupQuotes,
-                groupIndex + 1,
-                currentCombination,
-                results,
-            );
-
-            currentCombination.pop();
-
-            if (
-                results.length >=
-                this.maxOptionsPerPlan
-            ) {
-                break;
-            }
-        }
-    }
-
-    private buildDeliveryOption(
-        quotedPlan: QuotedShipmentPlan,
-        selectedGroupQuotes: SelectedGroupQuote[],
-        index: number,
-    ): ShipmentPlanDeliveryOption {
-        const totalShippingPrice =
-            selectedGroupQuotes.reduce(
-                (sum, selected) =>
-                    sum + selected.quote.price,
-                0,
-            );
-
-        const estimatedDeliveryDays =
-            selectedGroupQuotes.reduce(
-                (maximumDays, selected) =>
-                    Math.max(
-                        maximumDays,
-                        selected.quote
-                            .estimatedDays,
-                    ),
-                0,
-            );
-
-        const totalProviderPriority =
-            selectedGroupQuotes.reduce(
-                (sum, selected) =>
-                    sum +
-                    (selected.quote.providerPriority ?? 0),
-                0,
-            );
-        const averageProviderPriority =
-            selectedGroupQuotes.length > 0
-                ? totalProviderPriority /
-                selectedGroupQuotes.length
-                : 0;
-        const shipmentCount =
-            selectedGroupQuotes.reduce(
-                (sum, selected) =>
-                    sum +
-                    (
-                        (
-                            selected.quote as
-                            CarrierQuoteOption & {
-                                vehicleCount?: number;
-                            }
-                        ).vehicleCount ?? 1
-                    ),
-                0,
-            );
-        return {
-            id: `${quotedPlan.plan.id}-delivery-${index + 1}`,
-
-            planId: quotedPlan.plan.id,
-
-            selectedGroupQuotes,
-
-            metrics: {
-                totalShippingPrice,
-                estimatedDeliveryDays,
-                averageProviderPriority,
-                shipmentCount,
+                generatedCombinations: deliveryOptions.length,
+                generationLimitReached:
+                    groupChoices.reduce(
+                        (total, choices) => total * choices.length,
+                        1,
+                    ) > this.maxOptionsPerPlan,
             },
         };
+    }
+
+    private buildSourceChoices(
+        sourceId: string,
+        plan: ProviderVehiclePlanQuoteResult,
+    ): SelectedVehicleShipment[][] {
+        const alternatives = plan.alternatives ?? [];
+
+        return alternatives.flatMap((alternative) => {
+            const shipments: SelectedVehicleShipment[] = [];
+
+            for (let index = 0; index < plan.plan.vehicles.length; index++) {
+                const vehicle = plan.plan.vehicles[index];
+                const vehicleQuotes = plan.vehicleQuotes[index];
+
+                if (!vehicleQuotes) return [];
+
+                const quote = vehicleQuotes.quotes.find(
+                    (candidate) => candidate.urgency === alternative.urgency,
+                );
+
+                if (!quote) return [];
+
+                shipments.push({
+                    sourceId,
+                    vehicleIndex: index,
+                    vehicleType: vehicle.vehicleType,
+                    assignedWeightKg: vehicle.assignedWeightKg,
+                    items: vehicle.items.map((item) => ({ ...item })),
+                    quote,
+                });
+            }
+
+            return [shipments];
+        });
     }
 }
