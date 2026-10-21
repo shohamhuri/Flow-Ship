@@ -20,17 +20,20 @@ export interface FailedCarrierQuoteProvider {
     error: string;
 }
 export interface ProviderVehiclePlanQuoteResult {
+    sourceId: string; // חדש
     providerId: string;
     providerCode: string;
     plan: VehiclePlan;
-
     vehicleQuotes: VehicleQuoteResult[];
     alternatives?: VehiclePlanQuoteAlternative[];
-
+}
+export interface SourceDirectQuoteResult {
+    sourceId: string;
+    quotes: CarrierQuoteOption[];
 }
 export interface ShipmentGroupQuoteResult {
     groupId: string;
-
+    sourceDirectQuotes?: SourceDirectQuoteResult[];
     vehiclePlans?: ProviderVehiclePlanQuoteResult[];
 
     capacityPlanningTrace?:

@@ -836,4 +836,56 @@ describe('CapacityPlanningService', () => {
             ),
         ).toBe(false);
     });
+    it('should split 4 units across 2 scooters without losing or duplicating items', () => {
+        const items = Array.from({ length: 4 }, () => ({
+            sku: 'TEST-SKU',
+            quantity: 1,
+            unitWeightKg: 0.804,
+        }));
+
+        const plans = service.planVehicles(
+            3.216,
+            service.getVehicleCapacities(2, 100),
+            items,
+        );
+
+        const scooterPlan = plans.find(
+            (plan) =>
+                plan.parts.length === 1 &&
+                plan.parts[0].vehicleType === 'scooter' &&
+                plan.parts[0].vehicleCount === 2,
+        );
+
+        expect(scooterPlan).toBeDefined();
+        expect(scooterPlan!.vehicles).toHaveLength(2);
+
+        const vehicles = scooterPlan!.vehicles;
+
+        expect(vehicles.map((vehicle) => vehicle.items.length))
+            .toEqual([2, 2]);
+
+        for (const vehicle of vehicles) {
+            expect(vehicle.assignedWeightKg).toBeCloseTo(1.608);
+            expect(vehicle.assignedWeightKg).toBeLessThanOrEqual(2);
+        }
+
+        const allItems = vehicles.flatMap(
+            (vehicle) => vehicle.items,
+        );
+
+        expect(
+            allItems.reduce(
+                (total, item) => total + item.quantity,
+                0,
+            ),
+        ).toBe(4);
+
+        expect(
+            allItems.every(
+                (item) =>
+                    item.sku === 'TEST-SKU' &&
+                    item.unitWeightKg === 0.804,
+            ),
+        ).toBe(true);
+    });
 });

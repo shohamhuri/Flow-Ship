@@ -49,6 +49,17 @@ export interface CreateShipmentData {
     estimatedDeliveryDays: number;
 
     status: string;
+    metadata?: {
+        sourceId: string;
+        vehicleIndex: number;
+        vehicleType?: 'scooter' | 'car' | 'commercial';
+        assignedWeightKg?: number;
+        items?: Array<{
+            sku: string;
+            quantity: number;
+            unitWeightKg: number;
+        }>;
+    };
 }
 export interface ShipmentStatusSummary {
     checkoutId: string;
@@ -96,7 +107,8 @@ export class ShipmentsRepository {
             currency,
             estimated_delivery_days,
 
-            status
+                      status,
+            metadata
         )
         VALUES
         (
@@ -105,7 +117,7 @@ export class ShipmentsRepository {
             $6, $7, $8,
             $9, $10,
             $11, $12, $13,
-            $14
+            $14, $15::jsonb
         )
         RETURNING id
         `,
@@ -129,6 +141,7 @@ export class ShipmentsRepository {
                     shipment.estimatedDeliveryDays,
 
                     shipment.status,
+                    JSON.stringify(shipment.metadata ?? {}),
                 ],
             );
 
@@ -145,12 +158,16 @@ export class ShipmentsRepository {
     async createShipmentStops(
         tenant: CurrentTenant,
         shipmentId: string,
-        pickupAddresses:
-            Record<string, unknown>[],
-        dropoffAddress:
-            Record<string, unknown>,
+        pickupAddresses: Record<string, unknown>[],
+        dropoffAddress: Record<string, unknown>,
         executor: DbExecutor = this.db,
     ): Promise<void> {
+        if (pickupAddresses.length !== 1) {
+            throw new Error(
+                `Shipment ${shipmentId} must have exactly one pickup; received ${pickupAddresses.length}`,
+            );
+        }
+
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 

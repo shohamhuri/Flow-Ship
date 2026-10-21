@@ -7,20 +7,30 @@ describe('ShipmentPlanEvaluatorService', () => {
         service = new ShipmentPlanEvaluatorService();
     });
 
+
     const createPlan = ({
         id,
         status = 'grouped',
         totalGroups = 1,
         sourceScores = [0.8],
         withGrouping = true,
+        groupSourceIds,
     }: {
         id: string;
         status?: string;
         totalGroups?: number;
         sourceScores?: number[];
         withGrouping?: boolean;
-    }) =>
-        ({
+        groupSourceIds?: string[][];
+    }) => {
+        const sourcesByGroup =
+            groupSourceIds ??
+            Array.from(
+                { length: totalGroups },
+                (_, index) => [`source-${index + 1}`],
+            );
+
+        return {
             id,
             status,
             assignments: sourceScores.map((score, index) => ({
@@ -34,11 +44,25 @@ describe('ShipmentPlanEvaluatorService', () => {
             ...(withGrouping
                 ? {
                     grouping: {
-                        totalGroups,
+                        totalGroups: sourcesByGroup.length,
+                        shipmentGroups: sourcesByGroup.map(
+                            (sourceIds, groupIndex) => ({
+                                groupId: `group-${groupIndex + 1}`,
+                                items: sourceIds.map(
+                                    (sourceId, itemIndex) => ({
+                                        sku: `SKU-${groupIndex}-${itemIndex}`,
+                                        sourceId,
+                                        quantity: 1,
+                                        unitWeight: 1,
+                                    }),
+                                ),
+                            }),
+                        ),
                     },
                 }
                 : {}),
-        }) as any;
+        } as any;
+    };
 
     it('should evaluate grouped plans', () => {
         const plan = createPlan({
@@ -220,4 +244,48 @@ describe('ShipmentPlanEvaluatorService', () => {
         expect(result[0].id).toBe('plan-40');
         expect(result[29].id).toBe('plan-11');
     });
+
+    it('should count unique pickup sources per group', () => {
+        const plan = createPlan({
+            id: 'multi-source',
+            groupSourceIds: [
+                ['warehouse-A', 'warehouse-A', 'warehouse-B'],
+                ['warehouse-C'],
+            ],
+        });
+
+        const result = service.evaluateAndSelect([plan]);
+
+        expect(result[0].metrics?.shipmentCount).toBe(3);
+    });
+
+    it('should prefer fewer physical shipments over fewer groups', () => {
+        const fewerGroups = createPlan({
+            id: 'one-group-three-sources',
+            groupSourceIds: [
+                ['warehouse-A', 'warehouse-B', 'warehouse-C'],
+            ],
+            sourceScores: [0.9],
+        });
+
+        const fewerShipments = createPlan({
+            id: 'two-groups-two-sources',
+            groupSourceIds: [
+                ['warehouse-A'],
+                ['warehouse-B'],
+            ],
+            sourceScores: [0.5],
+        });
+
+        const result = service.evaluateAndSelect([
+            fewerGroups,
+            fewerShipments,
+        ]);
+
+        expect(result.map((plan) => plan.id)).toEqual([
+            'two-groups-two-sources',
+            'one-group-three-sources',
+        ]);
+    });
+
 });

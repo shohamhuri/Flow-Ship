@@ -16,28 +16,52 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
             providerPriority,
         }) as any;
 
+
     const createGroupQuote = (
         groupId: string,
         quotes: any[],
-    ) =>
-        ({
+    ) => {
+        const sourceId = `source-${groupId}`;
+
+        return {
             groupId,
             pickupCities: [`Pickup ${groupId}`],
             destinationCity: 'Tel Aviv',
             weightKg: 5,
             quotes,
-        }) as any;
+            sourceDirectQuotes: [
+                {
+                    sourceId,
+                    quotes,
+                },
+            ],
+            vehiclePlans: [],
+        } as any;
+    };
 
     const createQuotedPlan = (
         planId: string,
         groupQuotes: any[],
-    ) =>
-        ({
-            plan: {
-                id: planId,
+    ) => ({
+        plan: {
+            id: planId,
+            grouping: {
+                shipmentGroups: groupQuotes.map((groupQuote) => ({
+                    groupId: groupQuote.groupId,
+                    items: [
+                        {
+                            sku: `SKU-${groupQuote.groupId}`,
+                            sourceId: `source-${groupQuote.groupId}`,
+                            quantity: 1,
+                            unitWeight: 5,
+                        },
+                    ],
+                })),
             },
-            groupQuotes,
-        }) as any;
+        },
+        groupQuotes,
+    }) as any;
+
 
     beforeEach(() => {
         service =
@@ -413,8 +437,13 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
         expect(selected.weightKg)
             .toBe(5);
 
-        expect(selected.quote.providerCode)
+        expect(selected.shipments).toHaveLength(1);
+
+        expect(selected.shipments?.[0].quote.providerCode)
             .toBe('carrier-a');
+
+        expect(selected.shipments?.[0].sourceId)
+            .toBe('source-group-1');
     });
 
     it('should generate sequential delivery option ids', () => {
@@ -624,23 +653,74 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
             [],
         );
 
+
         groupQuote.vehiclePlans = [
             {
+                sourceId: 'source-group-1',
                 providerId: 'provider-1',
                 providerCode: 'delivery-center',
-                vehicleQuotes: [],
-                alternatives: [
+                plan: {
+                    parts: [],
+                    vehicles: [
+                        {
+                            vehicleType: 'car',
+                            maxWeightKg: 10,
+                            assignedWeightKg: 2,
+                            items: [],
+                        },
+                        {
+                            vehicleType: 'car',
+                            maxWeightKg: 10,
+                            assignedWeightKg: 3,
+                            items: [],
+                        },
+                    ],
+                },
+                vehicleQuotes: [
                     {
-                        urgency: 'standard',
-                        totalPrice: 45,
-                        currency: 'ILS',
-                        vehicleCount: 2,
-                        estimatedDays: 1,
-                        providerPriority: 0.9,
+                        vehicleType: 'car',
+                        assignedWeightKg: 2,
+                        failedProviders: [],
+                        quotes: [{
+                            carrierName: 'Delivery Center',
+                            serviceName: 'Standard',
+                            providerId: 'provider-1',
+                            providerCode: 'delivery-center',
+                            price: 20,
+                            currency: 'ILS',
+                            estimatedDays: 1,
+                            urgency: 'standard',
+                            providerPriority: 0.9,
+                        }],
+                    },
+                    {
+                        vehicleType: 'car',
+                        assignedWeightKg: 3,
+                        failedProviders: [],
+                        quotes: [{
+                            carrierName: 'Delivery Center',
+                            serviceName: 'Standard',
+                            providerId: 'provider-1',
+                            providerCode: 'delivery-center',
+                            price: 25,
+                            currency: 'ILS',
+                            estimatedDays: 1,
+                            urgency: 'standard',
+                            providerPriority: 0.9,
+                        }],
                     },
                 ],
+                alternatives: [{
+                    urgency: 'standard',
+                    totalPrice: 45,
+                    currency: 'ILS',
+                    vehicleCount: 2,
+                    estimatedDays: 1,
+                    providerPriority: 0.9,
+                }],
             },
         ];
+
 
         const quotedPlan = createQuotedPlan(
             'plan-1',
@@ -671,21 +751,71 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
             [],
         );
 
+
         groupQuote.vehiclePlans = [
             {
+                sourceId: 'source-group-1',
                 providerId: 'provider-1',
                 providerCode: 'delivery-center',
-                vehicleQuotes: [],
-                alternatives: [
+                plan: {
+                    parts: [],
+                    vehicles: [
+                        {
+                            vehicleType: 'car',
+                            maxWeightKg: 10,
+                            assignedWeightKg: 2,
+                            items: [],
+                        },
+                        {
+                            vehicleType: 'car',
+                            maxWeightKg: 10,
+                            assignedWeightKg: 3,
+                            items: [],
+                        },
+                    ],
+                },
+                vehicleQuotes: [
                     {
-                        urgency: 'standard',
-                        totalPrice: 45,
-                        currency: 'ILS',
-                        vehicleCount: 2,
-                        estimatedDays: 1,
-                        providerPriority: 0.9,
+                        vehicleType: 'car',
+                        assignedWeightKg: 2,
+                        failedProviders: [],
+                        quotes: [{
+                            carrierName: 'Delivery Center',
+                            serviceName: 'Standard',
+                            providerId: 'provider-1',
+                            providerCode: 'delivery-center',
+                            price: 20,
+                            currency: 'ILS',
+                            estimatedDays: 1,
+                            urgency: 'standard',
+                            providerPriority: 0.9,
+                        }],
+                    },
+                    {
+                        vehicleType: 'car',
+                        assignedWeightKg: 3,
+                        failedProviders: [],
+                        quotes: [{
+                            carrierName: 'Delivery Center',
+                            serviceName: 'Standard',
+                            providerId: 'provider-1',
+                            providerCode: 'delivery-center',
+                            price: 25,
+                            currency: 'ILS',
+                            estimatedDays: 1,
+                            urgency: 'standard',
+                            providerPriority: 0.9,
+                        }],
                     },
                 ],
+                alternatives: [{
+                    urgency: 'standard',
+                    totalPrice: 45,
+                    currency: 'ILS',
+                    vehicleCount: 2,
+                    estimatedDays: 1,
+                    providerPriority: 0.9,
+                }],
             },
         ];
 
@@ -703,5 +833,169 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
             result[0].statistics
                 .theoreticalCombinations,
         ).toBe(1);
+    });
+    it('preserves items and weights for each selected vehicle', () => {
+        const groupQuote = createGroupQuote('group-1', []);
+
+        const quote = {
+            ...createQuote('delivery-center', 30, 1),
+            urgency: 'standard',
+        };
+
+        groupQuote.vehiclePlans = [
+            {
+                sourceId: 'source-group-1',
+                plan: {
+                    vehicles: [
+                        {
+                            vehicleType: 'scooter',
+                            assignedWeightKg: 1.608,
+                            items: [
+                                {
+                                    sku: 'SHIRT',
+                                    quantity: 2,
+                                    unitWeightKg: 0.804,
+                                },
+                            ],
+                        },
+                        {
+                            vehicleType: 'scooter',
+                            assignedWeightKg: 1.608,
+                            items: [
+                                {
+                                    sku: 'SHIRT',
+                                    quantity: 2,
+                                    unitWeightKg: 0.804,
+                                },
+                            ],
+                        },
+                    ],
+                },
+                vehicleQuotes: [
+                    { quotes: [quote] },
+                    { quotes: [quote] },
+                ],
+                alternatives: [
+                    { urgency: 'standard' },
+                ],
+            },
+        ];
+
+        const quotedPlan = createQuotedPlan('plan-1', [groupQuote]);
+
+        const result = service.generateForPlans([quotedPlan]);
+
+        const option = result[0].deliveryOptions[0];
+        const shipments = option.selectedGroupQuotes[0].shipments!;
+
+        expect(shipments).toHaveLength(2);
+        expect(option.metrics.shipmentCount).toBe(2);
+
+        expect(shipments.map((shipment) => shipment.vehicleIndex))
+            .toEqual([0, 1]);
+
+        expect(shipments.map((shipment) => shipment.assignedWeightKg))
+            .toEqual([1.608, 1.608]);
+
+        expect(shipments.map((shipment) => shipment.items))
+            .toEqual([
+                [{ sku: 'SHIRT', quantity: 2, unitWeightKg: 0.804 }],
+                [{ sku: 'SHIRT', quantity: 2, unitWeightKg: 0.804 }],
+            ]);
+
+        const totalQuantity = shipments.reduce(
+            (sum, shipment) =>
+                sum + (shipment.items ?? []).reduce(
+                    (total, item) => total + item.quantity,
+                    0,
+                ),
+            0,
+        );
+
+        expect(totalQuantity).toBe(4);
+    });
+    it('preserves separate items and weights for two direct quote sources', () => {
+        const groupQuote = createGroupQuote('group-1', []);
+
+        groupQuote.sourceDirectQuotes = [
+            {
+                sourceId: 'WAREHOUSE-A',
+                quotes: [createQuote('carrier-a', 25, 1)],
+            },
+            {
+                sourceId: 'WAREHOUSE-B',
+                quotes: [createQuote('carrier-b', 35, 2)],
+            },
+        ];
+
+        const quotedPlan = createQuotedPlan('plan-1', [groupQuote]);
+
+        quotedPlan.plan.grouping.shipmentGroups[0].items = [
+            {
+                sku: 'SHIRT',
+                name: 'Shirt',
+                sourceId: 'WAREHOUSE-A',
+                quantity: 4,
+                unitWeight: 0.5,
+                unitPrice: 50,
+            },
+            {
+                sku: 'SHOES',
+                name: 'Shoes',
+                sourceId: 'WAREHOUSE-B',
+                quantity: 2,
+                unitWeight: 1.5,
+                unitPrice: 200,
+            },
+        ];
+
+        const result = service.generateForPlans([quotedPlan]);
+
+        expect(result[0].deliveryOptions).toHaveLength(1);
+
+        const option = result[0].deliveryOptions[0];
+        const shipments = option.selectedGroupQuotes[0].shipments!;
+
+        expect(shipments).toHaveLength(2);
+        expect(option.metrics.shipmentCount).toBe(2);
+        expect(option.metrics.totalShippingPrice).toBe(60);
+
+        expect(shipments).toEqual([
+            expect.objectContaining({
+                sourceId: 'WAREHOUSE-A',
+                vehicleIndex: 0,
+                assignedWeightKg: 2,
+                items: [
+                    {
+                        sku: 'SHIRT',
+                        quantity: 4,
+                        unitWeightKg: 0.5,
+                    },
+                ],
+            }),
+            expect.objectContaining({
+                sourceId: 'WAREHOUSE-B',
+                vehicleIndex: 0,
+                assignedWeightKg: 3,
+                items: [
+                    {
+                        sku: 'SHOES',
+                        quantity: 2,
+                        unitWeightKg: 1.5,
+                    },
+                ],
+            }),
+        ]);
+
+        const totalQuantity = shipments.reduce(
+            (sum, shipment) =>
+                sum + (shipment.items ?? []).reduce(
+                    (total, item) => total + item.quantity,
+                    0,
+                ),
+            0,
+        );
+
+        expect(totalQuantity).toBe(6);
     });
 });

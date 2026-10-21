@@ -250,29 +250,53 @@ describe(
                         (
                             groupId,
                             index,
-                        ) => ({
-                            groupId,
+                        ) => {
+                            const sourceId = `SOURCE-${index + 1}`;
+                            const shipmentQuote = quote(
+                                index === 0 ? 'Carrier A' : 'Carrier B',
+                            );
 
-                            pickupCities: [
-                                index === 0
-                                    ? 'Tel Aviv'
-                                    : 'Haifa',
-                            ],
+                            return {
+                                groupId,
 
-                            destinationCity:
-                                'Jerusalem',
+                                shipments: [
+                                    {
+                                        sourceId,
+                                        vehicleIndex: 0,
+                                        vehicleType: 'car',
+                                        assignedWeightKg: 1,
+                                        items: [
+                                            {
+                                                sku: `SKU-${sourceId}`,
+                                                quantity: 1,
+                                                unitWeightKg: 1,
+                                            },
+                                        ],
+                                        quote: shipmentQuote,
+                                    },
+                                ],
 
-                            weightKg:
-                                1,
-
-                            quote:
-                                quote(
+                                pickupCities: [
                                     index === 0
-                                        ? 'Carrier A'
-                                        : 'Carrier B',
-                                ),
+                                        ? 'Tel Aviv'
+                                        : 'Haifa',
+                                ],
+
+                                destinationCity:
+                                    'Jerusalem',
+
+                                weightKg:
+                                    1,
+
+                                quote:
+                                    quote(
+                                        index === 0
+                                            ? 'Carrier A'
+                                            : 'Carrier B',
+                                    ),
+                            };
                         }),
-                    ),
+
 
                 metrics: {
                     totalShippingPrice:
@@ -873,6 +897,7 @@ describe(
                         shipmentId,
                         pickupAddresses,
                         dropoffAddress,
+                        tx,
                     ) => {
                         stopCallCount++;
 
@@ -891,6 +916,7 @@ describe(
                             shipmentId,
                             pickupAddresses,
                             dropoffAddress,
+                            tx,
                         );
                     },
                 );
@@ -1003,6 +1029,7 @@ describe(
                             shipmentId,
                             pickupAddresses,
                             dropoffAddress,
+                            tx,
                         ) => {
                             stopCallCount++;
 
@@ -1021,6 +1048,7 @@ describe(
                                 shipmentId,
                                 pickupAddresses,
                                 dropoffAddress,
+                                tx,
                             );
                         },
                     );

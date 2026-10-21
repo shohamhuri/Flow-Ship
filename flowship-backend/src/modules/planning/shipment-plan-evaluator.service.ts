@@ -45,7 +45,18 @@ export class ShipmentPlanEvaluatorService {
 
                     metrics: {
                         shipmentCount:
-                            plan.grouping!.totalGroups,
+                            plan.grouping!.shipmentGroups.reduce(
+                                (total, group) => {
+                                    const uniqueSourceIds = new Set(
+                                        group.items.map(
+                                            (item) => item.sourceId,
+                                        ),
+                                    );
+
+                                    return total + uniqueSourceIds.size;
+                                },
+                                0,
+                            ),
 
                         totalSourceScore: Number(
                             totalSourceScore.toFixed(3),

@@ -152,6 +152,7 @@ describe(
         function group(
             groupId: string,
             sources: any[],
+            customItems?: any[],
         ) {
             return {
                 groupId,
@@ -162,26 +163,14 @@ describe(
                     'standard',
                 ],
 
-                items: [
+                items: customItems ?? [
                     {
-                        sku:
-                            'TEST-SKU',
-
-                        name:
-                            'Test Item',
-
-                        quantity:
-                            1,
-
-                        unitWeight:
-                            1,
-
-                        unitPrice:
-                            100,
-
-                        sourceId:
-                            sources[0]?.id ??
-                            'NO-SOURCE',
+                        sku: 'TEST-SKU',
+                        name: 'Test Item',
+                        quantity: 1,
+                        unitWeight: 1,
+                        unitPrice: 100,
+                        sourceId: sources[0]?.id ?? 'NO-SOURCE',
                     },
                 ],
 
@@ -246,6 +235,7 @@ describe(
             entries: {
                 groupId: string;
                 carrierName?: string;
+                shipments?: any[];
             }[],
         ) {
             return {
@@ -259,6 +249,7 @@ describe(
                         (entry) => ({
                             groupId:
                                 entry.groupId,
+                            shipments: entry.shipments ?? [],
 
                             pickupCities: [
                                 'Tel Aviv',
@@ -733,8 +724,23 @@ describe(
                         planId,
                         [
                             {
-                                groupId:
-                                    groupValidId,
+                                groupId: groupValidId,
+                                shipments: [
+                                    {
+                                        sourceId: 'SRC-1',
+                                        vehicleIndex: 0,
+                                        vehicleType: 'car',
+                                        assignedWeightKg: 1,
+                                        items: [
+                                            {
+                                                sku: 'TEST-SKU',
+                                                quantity: 1,
+                                                unitWeightKg: 1,
+                                            },
+                                        ],
+                                        quote: quote(),
+                                    },
+                                ],
                             },
                         ],
                     );
@@ -843,7 +849,7 @@ describe(
          * ==========================================================
          */
         it(
-            'should create one pickup stop per source before dropoff',
+            'should create separate physical shipments for two sources',
             async () => {
                 const planId =
                     'plan-two-sources';
@@ -856,15 +862,26 @@ describe(
                             group(
                                 groupTwoSourcesId,
                                 [
-                                    source(
-                                        'SRC-A',
-                                        'Tel Aviv',
-                                    ),
-
-                                    source(
-                                        'SRC-B',
-                                        'Netanya',
-                                    ),
+                                    source('SRC-A', 'Tel Aviv'),
+                                    source('SRC-B', 'Netanya'),
+                                ],
+                                [
+                                    {
+                                        sku: 'TEST-SKU-A',
+                                        name: 'Test Item A',
+                                        quantity: 1,
+                                        unitWeight: 1,
+                                        unitPrice: 100,
+                                        sourceId: 'SRC-A',
+                                    },
+                                    {
+                                        sku: 'TEST-SKU-B',
+                                        name: 'Test Item B',
+                                        quantity: 1,
+                                        unitWeight: 1,
+                                        unitPrice: 100,
+                                        sourceId: 'SRC-B',
+                                    },
                                 ],
                             ),
                         ],
@@ -881,106 +898,110 @@ describe(
                             planId,
                             [
                                 {
-                                    groupId:
-                                        groupTwoSourcesId,
+                                    groupId: groupTwoSourcesId,
+                                    shipments: [
+                                        {
+                                            sourceId: 'SRC-A',
+                                            vehicleIndex: 0,
+                                            vehicleType: 'car',
+                                            assignedWeightKg: 1,
+                                            items: [
+                                                {
+                                                    sku: 'TEST-SKU-A',
+                                                    quantity: 1,
+                                                    unitWeightKg: 1,
+                                                },
+                                            ],
+                                            quote: quote(),
+                                        },
+                                        {
+                                            sourceId: 'SRC-B',
+                                            vehicleIndex: 0,
+                                            vehicleType: 'car',
+                                            assignedWeightKg: 1,
+                                            items: [
+                                                {
+                                                    sku: 'TEST-SKU-B',
+                                                    quantity: 1,
+                                                    unitWeightKg: 1,
+                                                },
+                                            ],
+                                            quote: quote(),
+                                        },
+                                    ],
                                 },
                             ],
                         ),
                     );
 
 
-                const schema =
-                    qSchema(
-                        tenant.schemaName,
-                    );
+                const schema = qSchema(tenant.schemaName);
 
-
-                const shipment =
-                    await db.query<{
-                        id: string;
-                    }>(
-                        `
-                        select id
-                        from ${schema}.shipments
-                        where shipment_group_id = $1
-                        `,
-                        [
-                            groupTwoSourcesId,
-                        ],
-                    );
-
-
-                expect(
-                    shipment,
-                ).toHaveLength(
-                    1,
+                const shipments = await db.query<{
+                    id: string;
+                    metadata: any;
+                }>(
+                    `
+    select id, metadata
+    from ${schema}.shipments
+    where shipment_group_id = $1
+    order by id
+    `,
+                    [groupTwoSourcesId],
                 );
 
+                expect(shipments).toHaveLength(2);
 
-                const stops =
-                    await db.query<{
+                const expectedCities: Record<string, string> = {
+                    'SRC-A': 'Tel Aviv',
+                    'SRC-B': 'Netanya',
+                };
+
+                const actualSources = new Set<string>();
+
+                for (const shipment of shipments) {
+                    const sourceId = shipment.metadata.sourceId;
+
+                    expect(expectedCities[sourceId]).toBeDefined();
+                    expect(actualSources.has(sourceId)).toBe(false);
+
+                    actualSources.add(sourceId);
+
+                    const stops = await db.query<{
                         stop_order: number;
                         stop_type: string;
                         address: any;
                     }>(
                         `
-                        select
-                            stop_order,
-                            stop_type,
-                            address
-                        from ${schema}.shipment_stops
-                        where shipment_id = $1
-                        order by stop_order
-                        `,
-                        [
-                            shipment[0].id,
-                        ],
+        select stop_order, stop_type, address
+        from ${schema}.shipment_stops
+        where shipment_id = $1
+        order by stop_order
+        `,
+                        [shipment.id],
                     );
 
+                    expect(stops).toHaveLength(2);
 
-                expect(
-                    stops,
-                ).toHaveLength(
-                    3,
-                );
+                    expect(stops.map((stop) => stop.stop_type)).toEqual([
+                        'pickup',
+                        'dropoff',
+                    ]);
 
+                    expect(stops.map((stop) => stop.stop_order)).toEqual([
+                        1,
+                        2,
+                    ]);
 
-                expect(
-                    stops.map(
-                        (stop) =>
-                            stop.stop_type,
-                    ),
-                ).toEqual([
-                    'pickup',
-                    'pickup',
-                    'dropoff',
-                ]);
+                    expect(stops[0].address.city).toBe(
+                        expectedCities[sourceId],
+                    );
 
+                    expect(stops[1].address.city).toBe('Jerusalem');
+                }
 
-                expect(
-                    stops[0]
-                        .address
-                        .city,
-                ).toBe(
-                    'Tel Aviv',
-                );
-
-
-                expect(
-                    stops[1]
-                        .address
-                        .city,
-                ).toBe(
-                    'Netanya',
-                );
-
-
-                expect(
-                    stops[2]
-                        .address
-                        .city,
-                ).toBe(
-                    'Jerusalem',
+                expect(actualSources).toEqual(
+                    new Set(['SRC-A', 'SRC-B']),
                 );
             },
         );
@@ -1270,7 +1291,7 @@ describe(
                             selectedOption,
                         ),
                 ).rejects.toThrow(
-                    'has no supply sources',
+                    'Incomplete shipment coverage',
                 );
 
 

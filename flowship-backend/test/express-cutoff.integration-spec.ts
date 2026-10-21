@@ -102,7 +102,16 @@ describe('Express Cutoff Integration', () => {
                 shipmentGroups: [{
                     groupId: 'group-1',
                     sources: [source],
-                    items: [],
+                    items: [
+                        {
+                            sku: 'TEST-SKU',
+                            name: 'Test Item',
+                            quantity: 1,
+                            unitWeight: 5,
+                            unitPrice: 100,
+                            sourceId: 'source-1',
+                        },
+                    ],
                     totalWeight: 5,
                 }],
                 ungroupedItems: [],

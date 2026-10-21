@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DeliverySettings } from './delivery-settings.service';
+import { splitShipmentGroupBySource } from './utils/split-shipment-group-by-source';
 import type {
     VehicleQuoteResult, VehiclePlanQuoteAlternative,
 } from './interfaces/shipment-plan-quote.interface';
@@ -174,23 +175,58 @@ export class ShipmentPlanQuoteService {
         const getGroupQuotesCount = (
             groupQuote: ShipmentGroupQuoteResult,
         ): number => {
-            if (groupQuote.vehiclePlans?.length) {
-                return groupQuote.vehiclePlans.reduce(
-                    (planSum, vehiclePlan) =>
-                        planSum +
-                        vehiclePlan.vehicleQuotes.reduce(
-                            (vehicleSum, vehicleQuote) =>
-                                vehicleSum +
-                                vehicleQuote.quotes.length,
-                            0,
-                        ),
-                    0,
-                );
+            const group = shipmentGroups.find(
+                (item) => item.groupId === groupQuote.groupId,
+            );
+
+            if (!group) {
+                return 0;
             }
 
-            return groupQuote.quotes.length;
-        };
+            const requiredSourceIds = [
+                ...new Set(group.items.map((item) => item.sourceId)),
+            ];
 
+            if (
+                requiredSourceIds.length === 0 ||
+                requiredSourceIds.some((sourceId) => !sourceId)
+            ) {
+                return 0;
+            }
+
+            const sourceQuotes = groupQuote.sourceDirectQuotes ?? [];
+            const vehiclePlans = groupQuote.vehiclePlans ?? [];
+
+            const allSourcesCovered = requiredSourceIds.every(
+                (sourceId) =>
+                    sourceQuotes.some(
+                        (entry) =>
+                            entry.sourceId === sourceId &&
+                            entry.quotes.length > 0,
+                    ) ||
+                    vehiclePlans.some(
+                        (entry) =>
+                            entry.sourceId === sourceId &&
+                            (entry.alternatives?.length ?? 0) > 0,
+                    ),
+            );
+
+            if (!allSourcesCovered) {
+                return 0;
+            }
+
+            return (
+                sourceQuotes.reduce(
+                    (sum, entry) => sum + entry.quotes.length,
+                    0,
+                ) +
+                vehiclePlans.reduce(
+                    (sum, entry) =>
+                        sum + (entry.alternatives?.length ?? 0),
+                    0,
+                )
+            );
+        };
         const quotedGroupsCount =
             groupQuotes.filter(
                 (groupQuote) =>
@@ -295,38 +331,77 @@ export class ShipmentPlanQuoteService {
                 `Shipment group ${group.groupId} has no supply sources`,
             );
         }
-        const vehiclePlanItems =
-            group.items.flatMap((item) =>
-                Array.from(
-                    { length: item.quantity },
-                    () => ({
-                        sku: item.sku,
-                        quantity: 1,
-                        unitWeightKg: item.unitWeight,
-                    }),
-                ),
-            );
+        const sourceGroups = splitShipmentGroupBySource(group);
+
         const providers =
-            await this.carriersService.getActiveProviders(
-                tenant,
+            await this.carriersService.getActiveProviders(tenant);
+
+        const sourceVehiclePlans = sourceGroups.map((sourceGroup) => {
+            const vehiclePlanItems = sourceGroup.items.flatMap((item) =>
+                Array.from({ length: item.quantity }, () => ({
+                    sku: item.sku,
+                    quantity: 1,
+                    unitWeightKg: item.unitWeight,
+                })),
             );
 
-        const providerVehiclePlans =
-            this.capacityPlanningService
-                .planVehiclesForProviders(
+            const providerVehiclePlans =
+                this.capacityPlanningService.planVehiclesForProviders(
                     providers,
-                    group.totalWeight,
+                    sourceGroup.totalWeight,
                     vehiclePlanItems,
                 );
-        const capacityPlanningTrace =
-            providers.map((provider) =>
-                this.capacityPlanningService
-                    .planVehicleTraceForProvider(
-                        provider,
-                        group.totalWeight,
-                        vehiclePlanItems,
-                    ),
+
+            for (const providerPlan of providerVehiclePlans) {
+                const expected = new Map<string, number>();
+
+                for (const item of sourceGroup.items) {
+                    expected.set(
+                        item.sku,
+                        (expected.get(item.sku) ?? 0) + item.quantity,
+                    );
+                }
+
+                const actual = new Map<string, number>();
+
+                for (const vehicle of providerPlan.plan.vehicles) {
+                    for (const item of vehicle.items) {
+                        actual.set(
+                            item.sku,
+                            (actual.get(item.sku) ?? 0) + item.quantity,
+                        );
+                    }
+                }
+
+                if (
+                    expected.size !== actual.size ||
+                    [...expected].some(
+                        ([sku, quantity]) => actual.get(sku) !== quantity,
+                    )
+                ) {
+                    throw new Error(
+                        `Vehicle plan does not cover all items for source ${sourceGroup.sourceId}`,
+                    );
+                }
+            }
+
+            const traces = providers.map((provider) =>
+                this.capacityPlanningService.planVehicleTraceForProvider(
+                    provider,
+                    sourceGroup.totalWeight,
+                    vehiclePlanItems,
+                ),
             );
+
+            return {
+                sourceGroup,
+                providerVehiclePlans,
+                traces,
+            };
+        });
+
+        const capacityPlanningTrace =
+            sourceVehiclePlans.flatMap((entry) => entry.traces);
         const pickupSources = group.sources.map((source) => {
             const sourceConfirmation =
                 confirmation?.confirmations.find(
@@ -352,207 +427,196 @@ export class ShipmentPlanQuoteService {
                 );
             }
 
+            const confirmedAtMs = new Date(confirmedAt).getTime();
+
+            if (!Number.isFinite(confirmedAtMs)) {
+                throw new Error(
+                    `Invalid confirmation date for source ${source.id}`,
+                );
+            }
+
             const readyAt = new Date(
-                new Date(confirmedAt).getTime() +
-                preparationMinutes * 60_000,
-            );
+                confirmedAtMs + preparationMinutes * 60_000,
+            ).toISOString();
 
             return {
                 sourceId: source.id,
-                address:
-                    `${source.location.street} ` +
-                    `${source.location.houseNumber}, ` +
-                    source.location.city,
-                readyAt: readyAt.toISOString(),
+                address: `${source.location.street} ${source.location.houseNumber}, ${source.location.city}`,
+                readyAt,
             };
         });
 
-        const readyAt = new Date(
-            Math.max(
-                ...pickupSources.map(
-                    (source) => new Date(source.readyAt).getTime(),
-                ),
-            ),
-        ).toISOString();
-        // מועד המסירה האחרון לפי הגדרות הטננט
-        // מועד המסירה האחרון למשלוח מהיר
-        const expressDeadline = orderCreatedAt
-            ? new Date(
-                new Date(orderCreatedAt).getTime() +
-                expressMaxMinutes * 60_000,
-            )
-            : null;
 
-        // מועד המסירה האחרון למשלוח מהיום להיום
-        const sameDayDeadline = orderCreatedAt
-            ? new Date(
-                new Date(orderCreatedAt).getTime() +
-                sameDayMaxMinutes * 60_000,
-            )
-            : null;
-
-        // הזמן שנותר למשלוח מהיר מרגע שכל המקורות מוכנים
-        const expressRemainingMinutes = expressDeadline
-            ? Math.floor(
-                (
-                    expressDeadline.getTime() -
-                    new Date(readyAt).getTime()
-                ) / 60_000,
-            )
-            : null;
-
-        // הזמן שנותר למשלוח מהיום להיום
-        // מרגע שכל המקורות מוכנים
-        const sameDayRemainingMinutes = sameDayDeadline
-            ? Math.floor(
-                (
-                    sameDayDeadline.getTime() -
-                    new Date(readyAt).getTime()
-                ) / 60_000,
-            )
-            : null;
-        let estimatedTravelMinutes: number | undefined;
-
-        // צריך זמן נסיעה אם לפחות אחד משני חלונות
-        // המשלוח עדיין פתוח.
-        const shouldEstimateTravelTime =
-            (
-                expressRemainingMinutes !== null &&
-                expressRemainingMinutes > 0
-            ) ||
-            (
-                sameDayRemainingMinutes !== null &&
-                sameDayRemainingMinutes > 0
-            );
-
-        if (
-            shouldEstimateTravelTime &&
-            group.sources.length === 1
-        ) {
-            try {
-                const distance =
-                    await this.distanceProvider.getDistance(
-                        group.sources[0].location,
-                        destination,
-                    );
-
-                if (
-                    distance.durationMinutes !== undefined &&
-                    Number.isFinite(distance.durationMinutes) &&
-                    distance.durationMinutes >= 0
-                ) {
-                    estimatedTravelMinutes = Math.ceil(
-                        distance.durationMinutes,
-                    );
-                }
-            } catch {
-                // זמן הנסיעה אינו ידוע.
-                // לא נאשר שירות מוגבל בזמן ללא הערכה תקינה.
-            }
-        }
-
-        const canOfferExpress =
-            expressRemainingMinutes !== null &&
-            expressRemainingMinutes > 0 &&
-            estimatedTravelMinutes !== undefined &&
-            estimatedTravelMinutes <= expressRemainingMinutes;
-
-        const canOfferSameDay =
-            sameDayRemainingMinutes !== null &&
-            sameDayRemainingMinutes > 0 &&
-            estimatedTravelMinutes !== undefined &&
-            estimatedTravelMinutes <= sameDayRemainingMinutes;
-
-        const pickupCities =
-            group.sources.map(
-                (source) =>
-                    source.location.city,
-            );
-        const pickupAddress =
-            group.sources
-                .map(
-                    (source) =>
-                        `${source.location.street} ${source.location.houseNumber}, ${source.location.city}`,
-                )
-                .join(' | ');
 
         const destinationAddress =
             `${destination.street} ${destination.houseNumber}, ${destination.city}`;
-        const quoteRequest: CarrierQuoteRequest = {
-            pickupCities,
-            destinationCity: destination.city,
-            weightKg: group.totalWeight,
-            pickupAddress,
-            destinationAddress,
-            readyAt,
-            pickupSources,
-            allowedUrgencies: [
-                ...(canOfferExpress
-                    ? (['urgent'] as const)
-                    : []),
-                ...(canOfferSameDay
-                    ? (['express'] as const)
-                    : []),
-                'standard' as const,
-            ],
-        };
-        const result =
-            providerVehiclePlans.length === 0
-                ? await this.carriersService.getQuotes(
-                    quoteRequest,
-                    tenant,
-                )
-                : {
-                    quotes: [],
-                    failedProviders: [],
+
+        const sourceResults = await Promise.all(
+            sourceVehiclePlans.map(async ({
+                sourceGroup,
+                providerVehiclePlans,
+            }) => {
+                const pickupSource = pickupSources.find(
+                    (source) => source.sourceId === sourceGroup.sourceId,
+                );
+
+                if (!pickupSource) {
+                    throw new Error(
+                        `Missing pickup source ${sourceGroup.sourceId}`,
+                    );
+                }
+
+                const readyAtMs = new Date(pickupSource.readyAt).getTime();
+                const orderCreatedAtMs = orderCreatedAt
+                    ? new Date(orderCreatedAt).getTime()
+                    : NaN;
+
+                if (!Number.isFinite(readyAtMs)) {
+                    throw new Error(
+                        `Invalid readyAt for source ${sourceGroup.sourceId}`,
+                    );
+                }
+
+                let travelMinutes: number | undefined;
+
+                try {
+                    const distance = await this.distanceProvider.getDistance(
+                        sourceGroup.source.location,
+                        destination,
+                    );
+
+                    if (
+                        Number.isFinite(distance.durationMinutes) &&
+                        distance.durationMinutes !== undefined &&
+                        distance.durationMinutes >= 0
+                    ) {
+                        travelMinutes = Math.ceil(distance.durationMinutes);
+                    }
+                } catch {
+                    // No reliable travel estimate: disable time-sensitive delivery.
+                }
+
+                const remainingMinutes = (
+                    maxMinutes: number,
+                ): number | null => {
+                    if (
+                        !Number.isFinite(orderCreatedAtMs) ||
+                        !Number.isFinite(maxMinutes) ||
+                        maxMinutes <= 0
+                    ) {
+                        return null;
+                    }
+
+                    return (
+                        orderCreatedAtMs +
+                        maxMinutes * 60_000 -
+                        readyAtMs
+                    ) / 60_000;
                 };
 
-        const vehiclePlans =
-            await Promise.all(
-                providerVehiclePlans.map(
-                    async (providerVehiclePlan) => {
+                const expressRemainingMinutes =
+                    remainingMinutes(expressMaxMinutes);
+
+                const sameDayRemainingMinutes =
+                    remainingMinutes(sameDayMaxMinutes);
+
+                const canOfferExpress =
+                    expressRemainingMinutes !== null &&
+                    expressRemainingMinutes > 0 &&
+                    travelMinutes !== undefined &&
+                    travelMinutes <= expressRemainingMinutes;
+
+                const canOfferSameDay =
+                    sameDayRemainingMinutes !== null &&
+                    sameDayRemainingMinutes > 0 &&
+                    travelMinutes !== undefined &&
+                    travelMinutes <= sameDayRemainingMinutes;
+
+
+                const sourceQuoteRequest: CarrierQuoteRequest = {
+                    pickupCities: [sourceGroup.source.location.city],
+                    destinationCity: destination.city,
+                    weightKg: sourceGroup.totalWeight,
+                    pickupAddress: pickupSource.address,
+                    destinationAddress,
+                    readyAt: pickupSource.readyAt,
+                    pickupSources: [pickupSource],
+                    allowedUrgencies: [
+                        ...(canOfferExpress ? (['urgent'] as const) : []),
+                        ...(canOfferSameDay ? (['express'] as const) : []),
+                        'standard' as const,
+                    ],
+                };
+
+                const result =
+                    providerVehiclePlans.length === 0
+                        ? await this.carriersService.getQuotes(
+                            sourceQuoteRequest,
+                            tenant,
+                        )
+                        : {
+                            quotes: [],
+                            failedProviders: [],
+                        };
+
+                const vehiclePlans = await Promise.all(
+                    providerVehiclePlans.map(async (providerVehiclePlan) => {
                         const vehicleQuotes =
                             await this.getQuotesForVehiclePlan(
                                 providerVehiclePlan,
-                                quoteRequest,
+                                sourceQuoteRequest,
                                 tenant,
                             );
 
                         return {
-                            providerId:
-                                providerVehiclePlan.providerId,
-
-                            providerCode:
-                                providerVehiclePlan.providerCode,
-                            plan:
-                                providerVehiclePlan.plan,
+                            sourceId: sourceGroup.sourceId,
+                            providerId: providerVehiclePlan.providerId,
+                            providerCode: providerVehiclePlan.providerCode,
+                            plan: providerVehiclePlan.plan,
                             vehicleQuotes,
-
                             alternatives:
-                                this.buildVehiclePlanAlternatives(
-                                    vehicleQuotes,
-                                ),
+                                this.buildVehiclePlanAlternatives(vehicleQuotes),
                         };
-                    },
-                ),
-            );
+                    }),
+                );
+
+                return {
+                    sourceId: sourceGroup.sourceId,
+                    result,
+                    vehiclePlans,
+                };
+            }),
+        );
+
         return {
             groupId: group.groupId,
-
-            pickupCities,
+            pickupCities: sourceGroups.map(
+                (entry) => entry.source.location.city,
+            ),
             destinationCity: destination.city,
             weightKg: group.totalWeight,
-
-            quotes: result.quotes,
-            failedProviders: result.failedProviders,
-            vehiclePlans,
+            quotes: sourceResults.flatMap((entry) => entry.result.quotes),
+            sourceDirectQuotes: sourceResults.map((entry) => ({
+                sourceId: entry.sourceId,
+                quotes: entry.result.quotes,
+            })),
+            failedProviders: sourceResults.flatMap(
+                (entry) => entry.result.failedProviders,
+            ),
+            vehiclePlans: sourceResults.flatMap(
+                (entry) => entry.vehiclePlans,
+            ),
             capacityPlanningTrace,
-
         };
     }
     private buildVehiclePlanAlternatives(
+
         vehicleQuotes: VehicleQuoteResult[],
     ): VehiclePlanQuoteAlternative[] {
+
+        if (vehicleQuotes.length === 0) {
+            return [];
+        }
         const urgencies = [
             'urgent',
             'express',
