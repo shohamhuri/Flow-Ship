@@ -57,6 +57,7 @@ export interface StoreSettings {
   expressCutoffTime: string | null;
   expressAfterCutoffMode: 'extended' | 'disabled';
   expressAfterCutoffMaxMinutes: number | null;
+  pickupLeadTimeMinutes: number;
 }
 
 export interface StoreSettingsResponse {
@@ -71,6 +72,7 @@ export interface UpdateStoreSettingsPayload {
   expressCutoffTime?: string | null;
   expressAfterCutoffMode?: 'extended' | 'disabled';
   expressAfterCutoffMaxMinutes?: number | null;
+  pickupLeadTimeMinutes?: number;
 }
 export type AdminProvider = {
   id: string;
