@@ -104,6 +104,7 @@ export class ShipmentPlanQuoteService {
     ): Promise<QuotedShipmentPlan[]> {
         let expressMaxMinutes = 0;
         let sameDayMaxMinutes = 0;
+        let pickupLeadTimeMinutes = 0;
 
         try {
             const settings =
@@ -116,6 +117,7 @@ export class ShipmentPlanQuoteService {
             );
 
             sameDayMaxMinutes = settings.sameDayMaxMinutes;
+            pickupLeadTimeMinutes = settings.pickupLeadTimeMinutes;
         } catch (error) {
             // כשל בקריאת ההגדרות:
             // חוסמים אקספרס, אך ממשיכים לבקש הצעות רגילות.
@@ -139,6 +141,7 @@ export class ShipmentPlanQuoteService {
                     tenant,
                     expressMaxMinutes,
                     sameDayMaxMinutes,
+                    pickupLeadTimeMinutes,
                     confirmation,
                     orderCreatedAt,
                 );
@@ -151,6 +154,7 @@ export class ShipmentPlanQuoteService {
         tenant: CurrentTenant,
         expressMaxMinutes: number,
         sameDayMaxMinutes: number,
+        pickupLeadTimeMinutes: number,
         confirmation?: ConfirmedShipmentPlan,
         orderCreatedAt?: Date,
     ): Promise<QuotedShipmentPlan> {
@@ -165,6 +169,7 @@ export class ShipmentPlanQuoteService {
                     tenant,
                     expressMaxMinutes,
                     sameDayMaxMinutes,
+                    pickupLeadTimeMinutes,
                     confirmation,
                     orderCreatedAt,
                 )
@@ -323,6 +328,7 @@ export class ShipmentPlanQuoteService {
         tenant: CurrentTenant,
         expressMaxMinutes: number,
         sameDayMaxMinutes: number,
+        pickupLeadTimeMinutes: number,
         confirmation?: ConfirmedShipmentPlan,
         orderCreatedAt?: Date,
     ): Promise<ShipmentGroupQuoteResult> {
@@ -511,7 +517,7 @@ export class ShipmentPlanQuoteService {
                         orderCreatedAtMs +
                         maxMinutes * 60_000 -
                         readyAtMs
-                    ) / 60_000;
+                    ) / 60_000 - pickupLeadTimeMinutes;
                 };
 
                 const expressRemainingMinutes =
