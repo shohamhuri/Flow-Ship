@@ -30,6 +30,9 @@ export interface ProviderVehiclePlanQuoteResult {
 export interface SourceDirectQuoteResult {
     sourceId: string;
     quotes: CarrierQuoteOption[];
+
+    travelMinutes?: number;
+    estimatedDeliveryAt?: string;
 }
 export interface ShipmentGroupQuoteResult {
     groupId: string;
@@ -64,6 +67,8 @@ export interface VehiclePlanQuoteAlternative {
 }
 export interface QuotedShipmentPlan {
     plan: ShipmentPlanCandidate;
+
+    pickupLeadTimeMinutes: number;
 
     groupQuotes: ShipmentGroupQuoteResult[];
 

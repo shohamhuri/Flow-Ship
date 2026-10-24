@@ -10,6 +10,9 @@ export interface SelectedVehicleShipment {
     assignedWeightKg?: number;
     items?: VehiclePlanItem[];
     quote: CarrierQuoteOption;
+
+    travelMinutes?: number;
+    estimatedDeliveryAt?: string;
 }
 export interface SelectedGroupQuote {
     groupId: string;
@@ -34,8 +37,10 @@ export interface ShipmentPlanDeliveryOption {
     selectedGroupQuotes: SelectedGroupQuote[]; //איזו הצעת מחיר נבחרה לכל משלוח.
 
     metrics: {
-        totalShippingPrice: number; //סכום המחירים של כל המשלוחים.
-        estimatedDeliveryDays: number;//מספר הימים עד שכל ההזמנה תגיע.
+        totalShippingPrice: number;
+        estimatedDeliveryDays: number;
+        pickupLeadTimeMinutes: number;
+        estimatedDeliveryAt?: string;
         averageProviderPriority: number;
         shipmentCount: number;
     };

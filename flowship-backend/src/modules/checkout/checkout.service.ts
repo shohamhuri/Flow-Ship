@@ -459,10 +459,13 @@ export class CheckoutService {
                                             option.metrics
                                                 .estimatedDeliveryDays,
 
+                                        pickupLeadTimeMinutes:
+                                            option.metrics
+                                                .pickupLeadTimeMinutes,
+
                                         averageProviderPriority:
                                             option.metrics
                                                 .averageProviderPriority,
-
                                         shipmentCount:
                                             option.metrics
                                                 .shipmentCount,

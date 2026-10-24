@@ -265,6 +265,8 @@ export class ShipmentPlanQuoteService {
         return {
             plan,
 
+            pickupLeadTimeMinutes,
+
             groupQuotes,
 
             quoteMetrics: {
@@ -501,7 +503,13 @@ export class ShipmentPlanQuoteService {
                 } catch {
                     // No reliable travel estimate: disable time-sensitive delivery.
                 }
-
+                const estimatedDeliveryAt =
+                    travelMinutes !== undefined
+                        ? new Date(
+                            readyAtMs +
+                            (pickupLeadTimeMinutes + travelMinutes) * 60_000,
+                        ).toISOString()
+                        : undefined;
                 const remainingMinutes = (
                     maxMinutes: number,
                 ): number | null => {
@@ -590,6 +598,8 @@ export class ShipmentPlanQuoteService {
                     sourceId: sourceGroup.sourceId,
                     result,
                     vehiclePlans,
+                    travelMinutes,
+                    estimatedDeliveryAt,
                 };
             }),
         );
@@ -605,6 +615,8 @@ export class ShipmentPlanQuoteService {
             sourceDirectQuotes: sourceResults.map((entry) => ({
                 sourceId: entry.sourceId,
                 quotes: entry.result.quotes,
+                travelMinutes: entry.travelMinutes,
+                estimatedDeliveryAt: entry.estimatedDeliveryAt,
             })),
             failedProviders: sourceResults.flatMap(
                 (entry) => entry.result.failedProviders,
