@@ -17,7 +17,10 @@ CREATE TABLE IF NOT EXISTS flow_ship_test.delivery_settings (
     express_after_cutoff_max_minutes integer,
     updated_at timestamptz DEFAULT now()
 );
-
+ALTER TABLE flow_ship_test.delivery_settings
+ADD COLUMN IF NOT EXISTS pickup_lead_time_minutes
+INTEGER NOT NULL DEFAULT 0
+CHECK (pickup_lead_time_minutes >= 0);
 INSERT INTO flow_ship_test.delivery_settings (
     id,
     express_max_minutes,

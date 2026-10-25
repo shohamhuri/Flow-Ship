@@ -27,6 +27,7 @@ describe('DeliverySettingsService', () => {
         dbMock.queryOne.mockResolvedValue({
             express_max_minutes: 120,
             same_day_max_minutes: 1440,
+            pickup_lead_time_minutes: 0,
             express_cutoff_time: null,
             express_after_cutoff_mode: 'extended',
             express_after_cutoff_max_minutes: null,
@@ -40,6 +41,7 @@ describe('DeliverySettingsService', () => {
             expressCutoffTime: null,
             expressAfterCutoffMode: 'extended',
             expressAfterCutoffMaxMinutes: null,
+            pickupLeadTimeMinutes: 0,
         });
 
         expect(dbMock.queryOne).toHaveBeenCalledWith(
@@ -58,6 +60,7 @@ describe('DeliverySettingsService', () => {
             express_cutoff_time: '12:00:00',
             express_after_cutoff_mode: 'extended',
             express_after_cutoff_max_minutes: 300,
+            pickup_lead_time_minutes: 20,
         });
 
         const result = await service.getSettings(tenant);
@@ -68,6 +71,7 @@ describe('DeliverySettingsService', () => {
             expressCutoffTime: '12:00:00',
             expressAfterCutoffMode: 'extended',
             expressAfterCutoffMaxMinutes: 300,
+            pickupLeadTimeMinutes: 20,
         });
     });
 
@@ -79,6 +83,7 @@ describe('DeliverySettingsService', () => {
             express_cutoff_time: '12:00:00',
             express_after_cutoff_mode: 'disabled',
             express_after_cutoff_max_minutes: null,
+            pickup_lead_time_minutes: 0,
         });
 
         const result = await service.getSettings(tenant);

@@ -164,6 +164,7 @@ describe('ShipmentPlanQuoteService', () => {
             getSettings: jest.fn().mockResolvedValue({
                 expressMaxMinutes: 180,
                 sameDayMaxMinutes: 1440,
+                pickupLeadTimeMinutes: 0,
                 expressCutoffTime: null,
                 expressAfterCutoffMode: 'extended',
                 expressAfterCutoffMaxMinutes: null,
@@ -959,6 +960,132 @@ describe('ShipmentPlanQuoteService', () => {
             tenant,
         );
     });
+    it('should reject urgent when pickup lead time exceeds the limit', async () => {
+        jest.spyOn(
+            service['deliverySettingsService'],
+            'getSettings',
+        ).mockResolvedValue({
+            expressMaxMinutes: 180,
+            sameDayMaxMinutes: 1440,
+            pickupLeadTimeMinutes: 60,
+            expressCutoffTime: null,
+            expressAfterCutoffMode: 'extended',
+            expressAfterCutoffMaxMinutes: null,
+        });
+
+        jest.spyOn(
+            service['distanceProvider'],
+            'getDistance',
+        ).mockResolvedValue({
+            distanceKm: 15,
+            durationMinutes: 40,
+        });
+
+        const group = createGroup({
+            groupId: 'group-1',
+            sources: [createSource('source-1', 'Jerusalem')],
+            totalWeight: 3,
+        });
+
+        const plan = createPlan('plan-1', [group]);
+
+        const confirmations = [{
+            plan,
+            confirmed: true,
+            confirmations: [{
+                sourceId: 'source-1',
+                available: true,
+                preparationMinutes: 100,
+                confirmedAt: '2026-09-27T07:00:00.000Z',
+                items: [],
+            }],
+        }];
+
+        carriersServiceMock.getQuotes.mockResolvedValue({
+            quotes: [createQuote('Mock', 25)],
+            failedProviders: [],
+        });
+
+        await service.getQuotesForPlans(
+            [plan],
+            destination,
+            tenant,
+            confirmations,
+            new Date('2026-09-27T07:00:00.000Z'),
+        );
+
+        expect(carriersServiceMock.getQuotes).toHaveBeenCalledWith(
+            expect.objectContaining({
+                allowedUrgencies: ['express', 'standard'],
+            }),
+            tenant,
+        );
+    });
+    it('should include pickup lead time and travel in estimated delivery ETA', async () => {
+        jest.spyOn(
+            service['deliverySettingsService'],
+            'getSettings',
+        ).mockResolvedValue({
+            expressMaxMinutes: 180,
+            sameDayMaxMinutes: 1440,
+            pickupLeadTimeMinutes: 60,
+            expressCutoffTime: null,
+            expressAfterCutoffMode: 'extended',
+            expressAfterCutoffMaxMinutes: null,
+        });
+
+        jest.spyOn(
+            service['distanceProvider'],
+            'getDistance',
+        ).mockResolvedValue({
+            distanceKm: 15,
+            durationMinutes: 40,
+        });
+
+        const group = createGroup({
+            groupId: 'group-1',
+            sources: [createSource('source-1', 'Jerusalem')],
+            totalWeight: 3,
+        });
+
+        const plan = createPlan('plan-1', [group]);
+
+        const confirmations = [{
+            plan,
+            confirmed: true,
+            confirmations: [{
+                sourceId: 'source-1',
+                available: true,
+                preparationMinutes: 100,
+                confirmedAt: '2026-09-27T07:00:00.000Z',
+                items: [],
+            }],
+        }];
+
+        carriersServiceMock.getQuotes.mockResolvedValue({
+            quotes: [createQuote('Mock', 25)],
+            failedProviders: [],
+        });
+
+        const result = await service.getQuotesForPlans(
+            [plan],
+            destination,
+            tenant,
+            confirmations,
+            new Date('2026-09-27T07:00:00.000Z'),
+        );
+
+        expect(result[0].pickupLeadTimeMinutes).toBe(60);
+
+        expect(
+            result[0].groupQuotes[0].sourceDirectQuotes?.[0],
+        ).toEqual(
+            expect.objectContaining({
+                travelMinutes: 40,
+                estimatedDeliveryAt: '2026-09-27T10:20:00.000Z',
+            }),
+        );
+    });
     it('should allow express delivery when preparation and travel fit within 3 hours', async () => {
         jest.spyOn(
             service['distanceProvider'],
@@ -1084,6 +1211,7 @@ describe('ShipmentPlanQuoteService', () => {
             .mockResolvedValue({
                 expressMaxMinutes: 120,
                 sameDayMaxMinutes: 1440,
+                pickupLeadTimeMinutes: 0,
                 expressCutoffTime: null,
                 expressAfterCutoffMode: 'extended',
                 expressAfterCutoffMaxMinutes: null,
@@ -1916,14 +2044,16 @@ describe('ShipmentPlanQuoteService', () => {
             jest.spyOn(
                 service['deliverySettingsService'],
                 'getSettings',
-            ).mockResolvedValue({
-                expressMaxMinutes: 180,
-                sameDayMaxMinutes: 1440,
-                expressCutoffTime: '12:00',
-                expressAfterCutoffMode: mode,
-                expressAfterCutoffMaxMinutes:
-                    mode === 'extended' ? 300 : null,
-            });
+            )
+                .mockResolvedValue({
+                    expressMaxMinutes: 180,
+                    sameDayMaxMinutes: 1440,
+                    pickupLeadTimeMinutes: 0,
+                    expressCutoffTime: '12:00',
+                    expressAfterCutoffMode: mode,
+                    expressAfterCutoffMaxMinutes:
+                        mode === 'extended' ? 300 : null,
+                });
         };
 
         const getAllowedUrgencies = async (
