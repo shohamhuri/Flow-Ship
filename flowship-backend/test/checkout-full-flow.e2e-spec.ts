@@ -14,7 +14,7 @@ import request from 'supertest';
 import { randomUUID } from 'crypto';
 
 import { AppModule } from '../src/app.module';
-
+import { DISTANCE_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
 import {
     DbService,
 } from '../src/infrastructure/database/db.service';
@@ -82,8 +82,14 @@ describe(
                                 AppModule,
                             ],
                         })
+                        .overrideProvider(DISTANCE_PROVIDER)
+                        .useValue({
+                            getDistance: jest.fn().mockResolvedValue({
+                                distanceKm: 10,
+                                durationMinutes: 20,
+                            }),
+                        })
                         .compile();
-
                 app =
                     moduleRef
                         .createNestApplication();
