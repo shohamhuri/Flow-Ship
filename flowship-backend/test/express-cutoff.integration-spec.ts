@@ -53,6 +53,7 @@ describe('Express Cutoff Integration', () => {
             expressCutoffTime: '12:00:00',
             expressAfterCutoffMode: 'extended',
             expressAfterCutoffMaxMinutes: 300,
+            pickupLeadTimeMinutes: 0,
         });
     });
     it('uses real tenant cutoff settings to filter carrier urgencies', async () => {

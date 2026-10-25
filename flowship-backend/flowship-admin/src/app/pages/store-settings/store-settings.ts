@@ -25,6 +25,7 @@ import {
 export class StoreSettings implements OnInit {
   expressMaxMinutes: number | null = null;
   sameDayMaxMinutes: number | null = null;
+  pickupLeadTimeMinutes: number | null = null;
   expressCutoffTime: string | null = null;
 
   expressAfterCutoffMode: 'extended' | 'disabled' = 'extended';
@@ -74,6 +75,8 @@ export class StoreSettings implements OnInit {
           response.settings.expressMaxMinutes;
         this.sameDayMaxMinutes =
           response.settings.sameDayMaxMinutes;
+        this.pickupLeadTimeMinutes =
+          response.settings.pickupLeadTimeMinutes;
         this.expressCutoffTime =
           response.settings.expressCutoffTime?.slice(0, 5) ?? null;
 
@@ -143,6 +146,15 @@ export class StoreSettings implements OnInit {
         'יש להזין מספר דקות תקין לחלון המורחב.';
       return;
     }
+    if (
+      this.pickupLeadTimeMinutes === null ||
+      !Number.isSafeInteger(this.pickupLeadTimeMinutes) ||
+      this.pickupLeadTimeMinutes < 0
+    ) {
+      this.errorMessage =
+        'זמן ההמתנה לאיסוף חייב להיות מספר שלם שאינו שלילי.';
+      return;
+    }
     this.isSaving = true;
 
     this.adminApiService.updateStoreSettings({
@@ -150,6 +162,7 @@ export class StoreSettings implements OnInit {
       sameDayMaxMinutes: sameDayMinutes,
       expressCutoffTime: cutoffTime,
       expressAfterCutoffMode: this.expressAfterCutoffMode,
+      pickupLeadTimeMinutes: this.pickupLeadTimeMinutes,
       expressAfterCutoffMaxMinutes:
         cutoffTime !== null &&
           this.expressAfterCutoffMode === 'extended'
@@ -164,6 +177,8 @@ export class StoreSettings implements OnInit {
             response.settings.sameDayMaxMinutes;
           this.expressCutoffTime =
             response.settings.expressCutoffTime?.slice(0, 5) ?? null;
+          this.pickupLeadTimeMinutes =
+            response.settings.pickupLeadTimeMinutes;
 
           this.expressAfterCutoffMode =
             response.settings.expressAfterCutoffMode;

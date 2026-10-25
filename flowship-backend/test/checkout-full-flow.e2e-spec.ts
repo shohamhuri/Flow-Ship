@@ -14,7 +14,7 @@ import request from 'supertest';
 import { randomUUID } from 'crypto';
 
 import { AppModule } from '../src/app.module';
-
+import { DISTANCE_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
 import {
     DbService,
 } from '../src/infrastructure/database/db.service';
@@ -64,7 +64,8 @@ describe(
         let previouslyActiveDecisionCardIdsA: string[] = [];
 
         let previouslyEnabledGroupingStrategyIdsA: string[] = [];
-
+        let createdDeliverySettingsA = false;
+        let originalPickupLeadTimeMinutesA: number | null = null;
 
         beforeAll(
             async () => {
@@ -81,8 +82,14 @@ describe(
                                 AppModule,
                             ],
                         })
+                        .overrideProvider(DISTANCE_PROVIDER)
+                        .useValue({
+                            getDistance: jest.fn().mockResolvedValue({
+                                distanceKm: 10,
+                                durationMinutes: 20,
+                            }),
+                        })
                         .compile();
-
                 app =
                     moduleRef
                         .createNestApplication();
@@ -159,7 +166,37 @@ describe(
                         .findByApiKey(
                             tenantBApiKey,
                         );
+                const existingDeliverySettingsA = await db.query(
+                    `
+    SELECT id, pickup_lead_time_minutes
+    FROM flow_ship_test_a.delivery_settings
+    WHERE id = 1
+    `,
+                );
 
+                if (existingDeliverySettingsA.length > 0) {
+                    originalPickupLeadTimeMinutesA =
+                        existingDeliverySettingsA[0].pickup_lead_time_minutes;
+
+                    await db.query(
+                        `
+        UPDATE flow_ship_test_a.delivery_settings
+        SET pickup_lead_time_minutes = 20
+        WHERE id = 1
+        `,
+                    );
+                }
+                if (existingDeliverySettingsA.length === 0) {
+                    await db.query(
+                        `
+        INSERT INTO flow_ship_test_a.delivery_settings
+            (id, pickup_lead_time_minutes)
+        VALUES (1, 20)
+        `,
+                    );
+
+                    createdDeliverySettingsA = true;
+                }
 
                 providerMockId =
                     randomUUID();
@@ -404,7 +441,9 @@ describe(
         afterAll(
             async () => {
                 if (!db) {
+
                     if (app) {
+
                         await app.close();
                     }
 
@@ -688,8 +727,24 @@ describe(
                         ],
                     );
                 }
-
-
+                if (createdDeliverySettingsA) {
+                    await db.query(
+                        `
+        DELETE FROM flow_ship_test_a.delivery_settings
+        WHERE id = 1
+        `,
+                    );
+                }
+                if (originalPickupLeadTimeMinutesA !== null) {
+                    await db.query(
+                        `
+        UPDATE flow_ship_test_a.delivery_settings
+        SET pickup_lead_time_minutes = $1
+        WHERE id = 1
+        `,
+                        [originalPickupLeadTimeMinutesA],
+                    );
+                }
                 await app.close();
             },
             60000,
@@ -977,8 +1032,41 @@ describe(
                 ).toBeGreaterThan(
                     0,
                 );
+                const generatedDeliveryOptions =
+                    result.planning.deliveryOptions.flatMap(
+                        (planResult) => planResult.deliveryOptions,
+                    );
 
+                expect(generatedDeliveryOptions.length).toBeGreaterThan(0);
 
+                for (const option of generatedDeliveryOptions) {
+                    expect(option.metrics.pickupLeadTimeMinutes).toBe(20);
+                }
+                for (const option of generatedDeliveryOptions) {
+                    const shipments = option.selectedGroupQuotes.flatMap(
+                        (group) => group.shipments ?? [],
+                    );
+
+                    expect(shipments.length).toBeGreaterThan(0);
+
+                    for (const shipment of shipments) {
+                        expect(shipment.travelMinutes).toBeGreaterThanOrEqual(0);
+                        expect(shipment.estimatedDeliveryAt).toBeDefined();
+                        expect(
+                            Number.isNaN(Date.parse(shipment.estimatedDeliveryAt)),
+                        ).toBe(false);
+                    }
+
+                    const latestShipmentEta = Math.max(
+                        ...shipments.map((shipment) =>
+                            Date.parse(shipment.estimatedDeliveryAt),
+                        ),
+                    );
+
+                    expect(option.metrics.estimatedDeliveryAt).toBe(
+                        new Date(latestShipmentEta).toISOString(),
+                    );
+                }
                 /*
                  * Decision
                  */

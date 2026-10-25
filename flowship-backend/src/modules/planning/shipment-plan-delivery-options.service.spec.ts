@@ -156,7 +156,42 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
                 .generatedCombinations,
         ).toBe(4);
     });
+    it('should use the latest ETA across multiple shipment sources', () => {
+        const firstGroup = createGroupQuote('group-1', [
+            createQuote('carrier-a', 25, 1),
+        ]);
 
+        firstGroup.sourceDirectQuotes[0].estimatedDeliveryAt =
+            '2026-09-27T10:20:00.000Z';
+
+        const secondGroup = createGroupQuote('group-2', [
+            createQuote('carrier-b', 30, 1),
+        ]);
+
+        secondGroup.sourceDirectQuotes[0].estimatedDeliveryAt =
+            '2026-09-27T11:45:00.000Z';
+
+        const quotedPlan = createQuotedPlan(
+            'plan-1',
+            [firstGroup, secondGroup],
+        );
+
+        quotedPlan.pickupLeadTimeMinutes = 60;
+
+        const result = service.generateForPlans([quotedPlan]);
+
+        expect(result[0].deliveryOptions).toHaveLength(1);
+
+        expect(
+            result[0].deliveryOptions[0].metrics,
+        ).toEqual(
+            expect.objectContaining({
+                pickupLeadTimeMinutes: 60,
+                estimatedDeliveryAt: '2026-09-27T11:45:00.000Z',
+                shipmentCount: 2,
+            }),
+        );
+    });
     it('should return no delivery options when one group has no quotes', () => {
         const quotedPlan = createQuotedPlan(
             'plan-1',
@@ -193,7 +228,35 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
             generationLimitReached: false,
         });
     });
+    it('should not provide overall ETA when one shipment has no ETA', () => {
+        const firstGroup = createGroupQuote('group-1', [
+            createQuote('carrier-a', 25, 1),
+        ]);
 
+        firstGroup.sourceDirectQuotes[0].estimatedDeliveryAt =
+            '2026-09-27T10:20:00.000Z';
+
+        const secondGroup = createGroupQuote('group-2', [
+            createQuote('carrier-b', 30, 1),
+        ]);
+
+        const quotedPlan = createQuotedPlan(
+            'plan-1',
+            [firstGroup, secondGroup],
+        );
+
+        const result = service.generateForPlans([quotedPlan]);
+
+        expect(result[0].deliveryOptions).toHaveLength(1);
+
+        expect(
+            result[0].deliveryOptions[0].metrics.estimatedDeliveryAt,
+        ).toBeUndefined();
+
+        expect(
+            result[0].deliveryOptions[0].metrics.shipmentCount,
+        ).toBe(2);
+    });
     it('should return no delivery options when there are no quotable groups', () => {
         const quotedPlan = createQuotedPlan(
             'plan-1',

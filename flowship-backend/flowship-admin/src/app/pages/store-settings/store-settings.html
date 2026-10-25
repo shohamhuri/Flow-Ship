@@ -129,7 +129,30 @@
                     </div>
 
                 </div>
+                <!-- Store Pickup Lead Time -->
+                <div class="setting-row setting-row-separated">
+                    <div class="setting-info">
+                        <h3>זמן המתנה לאיסוף</h3>
+                        <p>
+                            הזמן המשוער מרגע שליחת בקשת המשלוח לחברת
+                            השילוח ועד לאיסוף החבילה מהחנות.
+                            זמן זה יתווסף לזמן האספקה המשוער.
+                        </p>
+                    </div>
 
+                    <div class="setting-control">
+                        <label for="pickupLeadTimeMinutes">
+                            זמן המתנה לאיסוף
+                        </label>
+
+                        <div class="input-wrapper">
+                            <input id="pickupLeadTimeMinutes" name="pickupLeadTimeMinutes" type="number" min="0"
+                                step="1" required [(ngModel)]="pickupLeadTimeMinutes" [disabled]="isSaving" />
+
+                            <span>דקות</span>
+                        </div>
+                    </div>
+                </div>
                 <!-- Express Cutoff Time -->
                 <div class="setting-row setting-row-separated">
                     <div class="setting-info">

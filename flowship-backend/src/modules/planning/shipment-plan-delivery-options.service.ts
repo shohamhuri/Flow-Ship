@@ -55,8 +55,17 @@ export class ShipmentPlanDeliveryOptionsService {
                 const plans = (groupQuote.vehiclePlans ?? [])
                     .filter((plan) => plan.sourceId === sourceId);
 
+                const sourceTiming = (groupQuote.sourceDirectQuotes ?? []).find(
+                    (entry) => entry.sourceId === sourceId,
+                );
+
                 const vehicleChoices = plans.flatMap((plan) =>
-                    this.buildSourceChoices(sourceId, plan),
+                    this.buildSourceChoices(
+                        sourceId,
+                        plan,
+                        sourceTiming?.travelMinutes,
+                        sourceTiming?.estimatedDeliveryAt,
+                    ),
                 );
 
                 const shipmentGroup =
@@ -90,6 +99,8 @@ export class ShipmentPlanDeliveryOptionsService {
                                 assignedWeightKg: sourceWeightKg,
                                 items: sourceItems.map((item) => ({ ...item })),
                                 quote,
+                                travelMinutes: entry.travelMinutes,
+                                estimatedDeliveryAt: entry.estimatedDeliveryAt,
                             },
                         ]),
                     );
@@ -179,7 +190,17 @@ export class ShipmentPlanDeliveryOptionsService {
                     (sum, shipment) => sum + shipment.quote.price,
                     0,
                 );
-
+                const estimatedDeliveryAt =
+                    shipments.length > 0 &&
+                        shipments.every((shipment) => shipment.estimatedDeliveryAt)
+                        ? new Date(
+                            Math.max(
+                                ...shipments.map((shipment) =>
+                                    new Date(shipment.estimatedDeliveryAt!).getTime(),
+                                ),
+                            ),
+                        ).toISOString()
+                        : undefined;
                 const averageProviderPriority = shipments.length
                     ? shipments.reduce(
                         (sum, shipment) =>
@@ -199,6 +220,8 @@ export class ShipmentPlanDeliveryOptionsService {
                                 shipment.quote.estimatedDays,
                             ),
                         ),
+                        pickupLeadTimeMinutes: quotedPlan.pickupLeadTimeMinutes,
+                        estimatedDeliveryAt,
                         averageProviderPriority,
                         shipmentCount: shipments.length,
                     },
@@ -227,6 +250,8 @@ export class ShipmentPlanDeliveryOptionsService {
     private buildSourceChoices(
         sourceId: string,
         plan: ProviderVehiclePlanQuoteResult,
+        travelMinutes?: number,
+        estimatedDeliveryAt?: string,
     ): SelectedVehicleShipment[][] {
         const alternatives = plan.alternatives ?? [];
 
@@ -252,6 +277,8 @@ export class ShipmentPlanDeliveryOptionsService {
                     assignedWeightKg: vehicle.assignedWeightKg,
                     items: vehicle.items.map((item) => ({ ...item })),
                     quote,
+                    travelMinutes,
+                    estimatedDeliveryAt,
                 });
             }
 

@@ -29,4 +29,8 @@ export class UpdateStoreSettingsDto {
     @IsInt()
     @Min(1)
     expressAfterCutoffMaxMinutes?: number | null;
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    pickupLeadTimeMinutes?: number;
 }

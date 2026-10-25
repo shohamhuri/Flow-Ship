@@ -670,13 +670,16 @@ CREATE TABLE flow_ship_test_a.delivery_settings (
     express_cutoff_time time without time zone,
     express_after_cutoff_mode text DEFAULT 'extended'::text NOT NULL,
     express_after_cutoff_max_minutes integer,
+    pickup_lead_time_minutes integer DEFAULT 0 NOT NULL,
+    CONSTRAINT delivery_settings_pickup_lead_time_check CHECK (pickup_lead_time_minutes >= 0),
     CONSTRAINT delivery_settings_after_cutoff_minutes_check CHECK (((express_after_cutoff_max_minutes IS NULL) OR (express_after_cutoff_max_minutes > 0))),
     CONSTRAINT delivery_settings_after_cutoff_mode_check CHECK ((express_after_cutoff_mode = ANY (ARRAY['extended'::text, 'disabled'::text]))),
     CONSTRAINT delivery_settings_express_max_minutes_check CHECK ((express_max_minutes > 0)),
     CONSTRAINT delivery_settings_id_check CHECK ((id = 1)),
     CONSTRAINT delivery_settings_same_day_max_minutes_check CHECK ((same_day_max_minutes > 0))
 );
-
+INSERT INTO flow_ship_test_a.delivery_settings (id)
+VALUES (1);
 
 --
 -- Name: grouping_strategy_settings; Type: TABLE; Schema: flow_ship_test_a; Owner: -
@@ -2851,6 +2854,8 @@ CREATE TABLE flow_ship_test_b.delivery_settings (
     express_cutoff_time time without time zone,
     express_after_cutoff_mode text DEFAULT 'extended'::text NOT NULL,
     express_after_cutoff_max_minutes integer,
+    pickup_lead_time_minutes integer DEFAULT 0 NOT NULL,
+    CONSTRAINT delivery_settings_pickup_lead_time_check CHECK (pickup_lead_time_minutes >= 0),
     CONSTRAINT delivery_settings_after_cutoff_minutes_check CHECK (((express_after_cutoff_max_minutes IS NULL) OR (express_after_cutoff_max_minutes > 0))),
     CONSTRAINT delivery_settings_after_cutoff_mode_check CHECK ((express_after_cutoff_mode = ANY (ARRAY['extended'::text, 'disabled'::text]))),
     CONSTRAINT delivery_settings_express_max_minutes_check CHECK ((express_max_minutes > 0)),
@@ -2858,7 +2863,8 @@ CREATE TABLE flow_ship_test_b.delivery_settings (
     CONSTRAINT delivery_settings_same_day_max_minutes_check CHECK ((same_day_max_minutes > 0))
 );
 
-
+INSERT INTO flow_ship_test_b.delivery_settings (id)
+VALUES (1);
 --
 -- Name: grouping_strategy_settings; Type: TABLE; Schema: flow_ship_test_b; Owner: -
 --

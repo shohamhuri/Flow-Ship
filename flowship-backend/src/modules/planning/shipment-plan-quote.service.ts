@@ -104,6 +104,7 @@ export class ShipmentPlanQuoteService {
     ): Promise<QuotedShipmentPlan[]> {
         let expressMaxMinutes = 0;
         let sameDayMaxMinutes = 0;
+        let pickupLeadTimeMinutes = 0;
 
         try {
             const settings =
@@ -116,6 +117,7 @@ export class ShipmentPlanQuoteService {
             );
 
             sameDayMaxMinutes = settings.sameDayMaxMinutes;
+            pickupLeadTimeMinutes = settings.pickupLeadTimeMinutes;
         } catch (error) {
             // כשל בקריאת ההגדרות:
             // חוסמים אקספרס, אך ממשיכים לבקש הצעות רגילות.
@@ -139,6 +141,7 @@ export class ShipmentPlanQuoteService {
                     tenant,
                     expressMaxMinutes,
                     sameDayMaxMinutes,
+                    pickupLeadTimeMinutes,
                     confirmation,
                     orderCreatedAt,
                 );
@@ -151,6 +154,7 @@ export class ShipmentPlanQuoteService {
         tenant: CurrentTenant,
         expressMaxMinutes: number,
         sameDayMaxMinutes: number,
+        pickupLeadTimeMinutes: number,
         confirmation?: ConfirmedShipmentPlan,
         orderCreatedAt?: Date,
     ): Promise<QuotedShipmentPlan> {
@@ -165,6 +169,7 @@ export class ShipmentPlanQuoteService {
                     tenant,
                     expressMaxMinutes,
                     sameDayMaxMinutes,
+                    pickupLeadTimeMinutes,
                     confirmation,
                     orderCreatedAt,
                 )
@@ -260,6 +265,8 @@ export class ShipmentPlanQuoteService {
         return {
             plan,
 
+            pickupLeadTimeMinutes,
+
             groupQuotes,
 
             quoteMetrics: {
@@ -323,6 +330,7 @@ export class ShipmentPlanQuoteService {
         tenant: CurrentTenant,
         expressMaxMinutes: number,
         sameDayMaxMinutes: number,
+        pickupLeadTimeMinutes: number,
         confirmation?: ConfirmedShipmentPlan,
         orderCreatedAt?: Date,
     ): Promise<ShipmentGroupQuoteResult> {
@@ -495,7 +503,13 @@ export class ShipmentPlanQuoteService {
                 } catch {
                     // No reliable travel estimate: disable time-sensitive delivery.
                 }
-
+                const estimatedDeliveryAt =
+                    travelMinutes !== undefined
+                        ? new Date(
+                            readyAtMs +
+                            (pickupLeadTimeMinutes + travelMinutes) * 60_000,
+                        ).toISOString()
+                        : undefined;
                 const remainingMinutes = (
                     maxMinutes: number,
                 ): number | null => {
@@ -511,7 +525,7 @@ export class ShipmentPlanQuoteService {
                         orderCreatedAtMs +
                         maxMinutes * 60_000 -
                         readyAtMs
-                    ) / 60_000;
+                    ) / 60_000 - pickupLeadTimeMinutes;
                 };
 
                 const expressRemainingMinutes =
@@ -584,6 +598,8 @@ export class ShipmentPlanQuoteService {
                     sourceId: sourceGroup.sourceId,
                     result,
                     vehiclePlans,
+                    travelMinutes,
+                    estimatedDeliveryAt,
                 };
             }),
         );
@@ -599,6 +615,8 @@ export class ShipmentPlanQuoteService {
             sourceDirectQuotes: sourceResults.map((entry) => ({
                 sourceId: entry.sourceId,
                 quotes: entry.result.quotes,
+                travelMinutes: entry.travelMinutes,
+                estimatedDeliveryAt: entry.estimatedDeliveryAt,
             })),
             failedProviders: sourceResults.flatMap(
                 (entry) => entry.result.failedProviders,

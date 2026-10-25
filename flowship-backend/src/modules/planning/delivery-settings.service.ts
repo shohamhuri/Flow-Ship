@@ -20,6 +20,7 @@ export interface DeliverySettings {
     expressCutoffTime: string | null;
     expressAfterCutoffMode: ExpressAfterCutoffMode;
     expressAfterCutoffMaxMinutes: number | null;
+    pickupLeadTimeMinutes: number;
 }
 
 export interface UpdateDeliverySettingsInput {
@@ -28,6 +29,7 @@ export interface UpdateDeliverySettingsInput {
     expressCutoffTime?: string | null;
     expressAfterCutoffMode?: ExpressAfterCutoffMode;
     expressAfterCutoffMaxMinutes?: number | null;
+    pickupLeadTimeMinutes?: number;
 }
 
 interface DeliverySettingsRow {
@@ -36,6 +38,7 @@ interface DeliverySettingsRow {
     express_cutoff_time: string | null;
     express_after_cutoff_mode: string;
     express_after_cutoff_max_minutes: number | null;
+    pickup_lead_time_minutes: number;
 }
 
 @Injectable()
@@ -55,7 +58,8 @@ export class DeliverySettingsService {
                 same_day_max_minutes,
                 express_cutoff_time::text AS express_cutoff_time,
                 express_after_cutoff_mode,
-                express_after_cutoff_max_minutes
+           express_after_cutoff_max_minutes,
+pickup_lead_time_minutes
              FROM "${schema}".delivery_settings
              WHERE id = $1`,
             [1],
@@ -85,6 +89,8 @@ export class DeliverySettingsService {
                 input.expressAfterCutoffMaxMinutes === undefined
                     ? current.expressAfterCutoffMaxMinutes
                     : input.expressAfterCutoffMaxMinutes,
+            pickupLeadTimeMinutes:
+                input.pickupLeadTimeMinutes ?? current.pickupLeadTimeMinutes,
         };
 
         this.validateSettings(updated);
@@ -93,35 +99,45 @@ export class DeliverySettingsService {
 
         const row = await this.db.queryOne<DeliverySettingsRow>(
             `UPDATE "${schema}".delivery_settings
-             SET express_max_minutes = $1,
-                 same_day_max_minutes = $2,
-                 express_cutoff_time = $3::time,
-                 express_after_cutoff_mode = $4,
-                 express_after_cutoff_max_minutes = $5,
-                 updated_at = NOW()
-             WHERE id = $6
-             RETURNING
-                 express_max_minutes,
-                 same_day_max_minutes,
-                 express_cutoff_time::text AS express_cutoff_time,
-                 express_after_cutoff_mode,
-                 express_after_cutoff_max_minutes`,
+     SET express_max_minutes = $1,
+         same_day_max_minutes = $2,
+         express_cutoff_time = $3::time,
+         express_after_cutoff_mode = $4,
+         express_after_cutoff_max_minutes = $5,
+         pickup_lead_time_minutes = $6,
+         updated_at = NOW()
+     WHERE id = $7
+     RETURNING
+         express_max_minutes,
+         same_day_max_minutes,
+         express_cutoff_time::text AS express_cutoff_time,
+         express_after_cutoff_mode,
+         express_after_cutoff_max_minutes,
+         pickup_lead_time_minutes`,
             [
                 updated.expressMaxMinutes,
                 updated.sameDayMaxMinutes,
                 updated.expressCutoffTime,
                 updated.expressAfterCutoffMode,
                 updated.expressAfterCutoffMaxMinutes,
+                updated.pickupLeadTimeMinutes,
                 1,
             ],
         );
-
         return this.mapSettings(row);
     }
 
     private validateSettings(
         settings: DeliverySettings,
     ): void {
+        if (
+            !Number.isSafeInteger(settings.pickupLeadTimeMinutes) ||
+            settings.pickupLeadTimeMinutes < 0
+        ) {
+            throw new BadRequestException(
+                'pickupLeadTimeMinutes must be a non-negative integer',
+            );
+        }
         if (!this.isValidMinutes(settings.expressMaxMinutes)) {
             throw new BadRequestException(
                 'expressMaxMinutes must be a positive integer',
@@ -197,7 +213,9 @@ export class DeliverySettingsService {
                 )) ||
             (row.express_cutoff_time !== null &&
                 row.express_after_cutoff_mode === 'extended' &&
-                row.express_after_cutoff_max_minutes === null)
+                row.express_after_cutoff_max_minutes === null) ||
+            !Number.isSafeInteger(row.pickup_lead_time_minutes) ||
+            row.pickup_lead_time_minutes < 0
         ) {
             throw new InternalServerErrorException(
                 'Tenant delivery settings are missing or invalid',
@@ -212,6 +230,7 @@ export class DeliverySettingsService {
                 row.express_after_cutoff_mode as ExpressAfterCutoffMode,
             expressAfterCutoffMaxMinutes:
                 row.express_after_cutoff_max_minutes,
+            pickupLeadTimeMinutes: row.pickup_lead_time_minutes,
         };
     }
 
