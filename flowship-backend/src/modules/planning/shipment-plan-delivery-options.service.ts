@@ -95,6 +95,7 @@ export class ShipmentPlanDeliveryOptionsService {
                         entry.quotes.map((quote) => [
                             {
                                 sourceId,
+                                deliveryMethod: 'carrier' as const,
                                 vehicleIndex: 0,
                                 assignedWeightKg: sourceWeightKg,
                                 items: sourceItems.map((item) => ({ ...item })),
@@ -104,7 +105,48 @@ export class ShipmentPlanDeliveryOptionsService {
                             },
                         ]),
                     );
-                return [...vehicleChoices, ...directChoices];
+                const selfDeliveryChoices =
+                    sourceTiming?.selfDeliveryQuote?.accepted === true &&
+                        sourceTiming.selfDeliveryQuote.price !== null &&
+                        sourceTiming.selfDeliveryQuote.price >= 0 &&
+                        sourceTiming.selfDeliveryQuote.estimatedDeliveryAt &&
+                        Number.isFinite(
+                            Date.parse(sourceTiming.selfDeliveryQuote.estimatedDeliveryAt),
+                        ) &&
+                        Date.parse(
+                            sourceTiming.selfDeliveryQuote.estimatedDeliveryAt,
+                        ) > Date.now()
+                        ? [
+                            [
+                                {
+                                    sourceId,
+                                    deliveryMethod: 'self_delivery' as const,
+                                    vehicleIndex: 0,
+                                    assignedWeightKg: sourceWeightKg,
+                                    items: sourceItems.map((item) => ({ ...item })),
+                                    quote: {
+                                        carrierName: 'Source Self Delivery',
+                                        serviceName: 'Self Delivery',
+                                        price: sourceTiming.selfDeliveryQuote.price,
+                                        currency: 'ILS' as const,
+                                        estimatedDays: Math.max(
+                                            0,
+                                            Math.ceil(
+                                                (new Date(
+                                                    sourceTiming.selfDeliveryQuote.estimatedDeliveryAt,
+                                                ).getTime() - Date.now()) /
+                                                (24 * 60 * 60 * 1000),
+                                            ),
+                                        ),
+                                    },
+                                    estimatedDeliveryAt:
+                                        sourceTiming.selfDeliveryQuote.estimatedDeliveryAt,
+                                },
+                            ],
+                        ]
+                        : [];
+
+                return [...vehicleChoices, ...directChoices, ...selfDeliveryChoices];
             });
 
             if (choicesBySource.some((choices) => choices.length === 0)) {
@@ -272,6 +314,8 @@ export class ShipmentPlanDeliveryOptionsService {
 
                 shipments.push({
                     sourceId,
+                    deliveryMethod: 'carrier',
+
                     vehicleIndex: index,
                     vehicleType: vehicle.vehicleType,
                     assignedWeightKg: vehicle.assignedWeightKg,

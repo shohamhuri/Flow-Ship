@@ -47,11 +47,13 @@ describe('SourcingService', () => {
         city = 'Tel Aviv',
         priority = 0.5,
         isActive = true,
+        selfDeliveryEnabled,
     }: {
         id: string;
         city?: string;
         priority?: number;
         isActive?: boolean;
+        selfDeliveryEnabled?: boolean;
     }) =>
         ({
             id,
@@ -59,11 +61,11 @@ describe('SourcingService', () => {
             type: 'warehouse',
             isActive,
             priority,
+            selfDeliveryEnabled,
             location: {
                 city,
             },
         }) as any;
-
     const createInventory = (
         sourceId: string,
         sku: string,
@@ -1059,4 +1061,64 @@ describe('SourcingService', () => {
             }),
         );
     });
+    it('should preserve self-delivery capability of selected source', async () => {
+        const checkout = createCheckout([
+            createItem('SKU-1'),
+        ]);
+
+        const source = createSource({
+            id: 'source-1',
+            selfDeliveryEnabled: true,
+        });
+
+        inventoryProviderMock.getSources.mockResolvedValue([
+            source,
+        ]);
+
+        inventoryProviderMock.getInventory.mockResolvedValue([
+            createInventory('source-1', 'SKU-1', 10),
+        ]);
+
+        const result = await service.findSourcesForCheckout(
+            checkout,
+            tenant,
+        );
+
+        expect(
+            result[0].selectedSource?.source.selfDeliveryEnabled,
+        ).toBe(true);
+    });
+    it.each([
+        ['explicitly disabled', false],
+        ['not provided', undefined],
+    ])(
+        'should preserve self-delivery capability when %s',
+        async (_, selfDeliveryEnabled) => {
+            const checkout = createCheckout([
+                createItem('SKU-1'),
+            ]);
+
+            const source = createSource({
+                id: 'source-1',
+                selfDeliveryEnabled,
+            });
+
+            inventoryProviderMock.getSources.mockResolvedValue([
+                source,
+            ]);
+
+            inventoryProviderMock.getInventory.mockResolvedValue([
+                createInventory('source-1', 'SKU-1', 10),
+            ]);
+
+            const result = await service.findSourcesForCheckout(
+                checkout,
+                tenant,
+            );
+
+            expect(
+                result[0].selectedSource?.source.selfDeliveryEnabled,
+            ).toBe(selfDeliveryEnabled);
+        },
+    );
 });

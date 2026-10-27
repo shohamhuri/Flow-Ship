@@ -107,6 +107,7 @@ export interface CheckoutShipment {
     providerId: string | null;
     providerCode: string | null;
     adapterKey: string | null;
+    deliveryMethod: 'carrier' | 'self_delivery';
     carrierName: string;
     serviceName: string;
     price: number;
@@ -648,6 +649,10 @@ values (
                 currency: string;
                 estimated_delivery_days: number;
                 status: string;
+                metadata: {
+                    deliveryMethod?: 'carrier' | 'self_delivery';
+                    [key: string]: unknown;
+                } | null;
                 created_at: Date;
                 updated_at: Date | null;
             }>(
@@ -665,10 +670,11 @@ values (
                     service_name,
                     price,
                     currency,
-                    estimated_delivery_days,
-                    status,
-                    created_at,
-                    updated_at
+                  estimated_delivery_days,
+status,
+metadata,
+created_at,
+updated_at
                 from "${schemaName}".shipments
                 where checkout_id = $1
                 order by created_at asc
@@ -925,6 +931,8 @@ values (
                     providerId: shipment.provider_id,
                     providerCode: shipment.provider_code,
                     adapterKey: shipment.adapter_key,
+                    deliveryMethod:
+                        shipment.metadata?.deliveryMethod ?? 'carrier',
                     carrierName: shipment.carrier_name,
                     serviceName: shipment.service_name,
                     price: shipment.price,

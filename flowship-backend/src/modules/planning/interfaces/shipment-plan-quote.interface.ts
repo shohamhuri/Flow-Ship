@@ -1,6 +1,8 @@
 import { CarrierQuoteOption } from '../../carriers/interfaces/carrier-adapter.interface';
 import { ProviderCapacityPlanningTrace, VehiclePlan } from '../../checkout/capacity-planning.service';
 import { ShipmentPlanCandidate } from './shipment-plan.interface';
+import type { SelfDeliveryQuoteResponse } from
+    '../../sourcing/interfaces/self-delivery-provider.interface';
 export interface VehicleQuoteResult {
     vehicleType:
     | 'scooter'
@@ -33,6 +35,7 @@ export interface SourceDirectQuoteResult {
 
     travelMinutes?: number;
     estimatedDeliveryAt?: string;
+    selfDeliveryQuote?: SelfDeliveryQuoteResponse | null;
 }
 export interface ShipmentGroupQuoteResult {
     groupId: string;

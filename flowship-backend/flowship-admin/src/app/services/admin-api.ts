@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+﻿import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 export type ProviderLogStatus = 'success' | 'failed';
 import { environment } from '../../environments/environment';
@@ -73,6 +73,42 @@ export interface UpdateStoreSettingsPayload {
   expressAfterCutoffMode?: 'extended' | 'disabled';
   expressAfterCutoffMaxMinutes?: number | null;
   pickupLeadTimeMinutes?: number;
+}
+export interface SourceDeliveryPermission {
+  sourceId: string;
+  selfDeliveryEnabled: boolean;
+  selfDeliveryAllowed: boolean;
+  selfDeliveryPrice: number | null;
+}
+
+export interface SourceDeliveryPermissionsResponse {
+  ok: boolean;
+  permissions: SourceDeliveryPermission[];
+}
+
+export interface UpdateSourceDeliveryPermissionPayload {
+  storeId: string;
+  selfDeliveryAllowed: boolean;
+  selfDeliveryPrice?: number | null;
+}
+
+export interface UpdateSourceDeliveryPermissionResponse {
+  ok: boolean;
+  permission: {
+    storeId: string;
+    sourceId: string;
+    selfDeliveryAllowed: boolean;
+    selfDeliveryPrice: number | null;
+  };
+}
+export interface AdminStore {
+  id: string;
+  external_store_id: string;
+}
+
+export interface AdminStoresResponse {
+  ok: boolean;
+  stores: AdminStore[];
 }
 export type AdminProvider = {
   id: string;
@@ -1299,10 +1335,32 @@ export class AdminApiService {
       `${this.baseUrl}/admin/store-settings`,
     );
   }
-
+  getStores() {
+    return this.http.get<AdminStoresResponse>(
+      `${this.baseUrl}/admin/stores`,
+    );
+  }
   updateStoreSettings(body: UpdateStoreSettingsPayload) {
     return this.http.patch<StoreSettingsResponse>(
       `${this.baseUrl}/admin/store-settings`,
+      body,
+    );
+  }
+  getSourceDeliveryPermissions(storeId: string) {
+    return this.http.get<SourceDeliveryPermissionsResponse>(
+      `${this.baseUrl}/admin/source-delivery-permissions`,
+      {
+        params: { storeId },
+      },
+    );
+  }
+
+  updateSourceDeliveryPermission(
+    sourceId: string,
+    body: UpdateSourceDeliveryPermissionPayload,
+  ) {
+    return this.http.patch<UpdateSourceDeliveryPermissionResponse>(
+      `${this.baseUrl}/admin/source-delivery-permissions/${encodeURIComponent(sourceId)}`,
       body,
     );
   }
@@ -1331,3 +1389,4 @@ export class AdminApiService {
     );
   }
 }
+

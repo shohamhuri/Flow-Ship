@@ -18,6 +18,7 @@ export class MockInventoryProvider implements InventoryProvider {
                 street: 'Industrial Area',
                 houseNumber: '1',
             },
+            selfDeliveryEnabled: true,
         },
         {
             id: 'WAREHOUSE-CENTER',
@@ -31,6 +32,8 @@ export class MockInventoryProvider implements InventoryProvider {
                 street: 'Moshe Dayan',
                 houseNumber: '10',
             },
+            selfDeliveryEnabled: false,
+
         },
         {
             id: 'BRANCH-BEER-SHEVA',
@@ -44,6 +47,8 @@ export class MockInventoryProvider implements InventoryProvider {
                 street: 'HaAtzmaut',
                 houseNumber: '25',
             },
+            selfDeliveryEnabled: true,
+
         },
         {
             id: 'BRANCH-TEL-AVIV',
@@ -57,6 +62,8 @@ export class MockInventoryProvider implements InventoryProvider {
                 street: 'Ibn Gabirol',
                 houseNumber: '50',
             },
+            selfDeliveryEnabled: false,
+
         },
 
     ];
@@ -120,17 +127,46 @@ export class MockInventoryProvider implements InventoryProvider {
     ];
 
     async getSources(
-        _storeId: string,
+        storeId: string,
     ): Promise<SupplySource[]> {
-        return this.sources;
+        const sourceIdsByStore: Record<string, string[]> = {
+            'store-1': [
+                'WAREHOUSE-SOUTH',
+                'WAREHOUSE-CENTER',
+                'BRANCH-BEER-SHEVA',
+                'BRANCH-TEL-AVIV',
+            ],
+            'store-2': [
+                'WAREHOUSE-CENTER',
+                'BRANCH-TEL-AVIV',
+            ],
+            'local-self-delivery-test': [
+                'WAREHOUSE-SOUTH',
+                'WAREHOUSE-CENTER',
+                'BRANCH-BEER-SHEVA',
+            ],
+        };
+        const allowedSourceIds = sourceIdsByStore[storeId] ?? [];
+
+        return this.sources.filter((source) =>
+            allowedSourceIds.includes(source.id),
+        );
     }
 
     async getInventory(
-        _storeId: string,
+        storeId: string,
         skus: string[],
     ): Promise<SourceInventory[]> {
-        return this.inventory.filter((record) =>
-            skus.includes(record.sku),
+        const sources = await this.getSources(storeId);
+
+        const allowedSourceIds = new Set(
+            sources.map((source) => source.id),
+        );
+
+        return this.inventory.filter(
+            (record) =>
+                skus.includes(record.sku) &&
+                allowedSourceIds.has(record.sourceId),
         );
     }
 }

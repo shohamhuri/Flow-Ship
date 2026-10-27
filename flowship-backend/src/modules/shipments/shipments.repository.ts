@@ -51,6 +51,7 @@ export interface CreateShipmentData {
     status: string;
     metadata?: {
         sourceId: string;
+        deliveryMethod?: 'carrier' | 'self_delivery';
         vehicleIndex: number;
         vehicleType?: 'scooter' | 'car' | 'commercial';
         assignedWeightKg?: number;

@@ -188,6 +188,7 @@ describe('DecisionService', () => {
                     estimatedDeliveryDays: 1,
                     averageProviderPriority: 0.9,
                     shipmentCount: 1,
+                    pickupLeadTimeMinutes: 0,
                 },
             };
 
@@ -200,6 +201,7 @@ describe('DecisionService', () => {
                     estimatedDeliveryDays: 1,
                     averageProviderPriority: 0.9,
                     shipmentCount: 2,
+                    pickupLeadTimeMinutes: 0,
                 },
             };
 
@@ -238,6 +240,7 @@ describe('DecisionService', () => {
                     estimatedDeliveryDays: 1,
                     averageProviderPriority: 0.2,
                     shipmentCount: 2,
+                    pickupLeadTimeMinutes: 0,
                 },
             };
 
@@ -250,6 +253,7 @@ describe('DecisionService', () => {
                     estimatedDeliveryDays: 1,
                     averageProviderPriority: 0.9,
                     shipmentCount: 2,
+                    pickupLeadTimeMinutes: 0,
                 },
             };
 

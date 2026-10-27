@@ -1,4 +1,4 @@
-import {
+﻿import {
     INestApplication,
     ValidationPipe,
 } from '@nestjs/common';
@@ -56,8 +56,8 @@ describe(
         let failedCheckoutId: string;
 
         /*
-         * נשמור את המצב שהיה קיים לפני הטסט,
-         * כדי להחזיר את סביבת הבדיקות למצבה המקורי.
+         * ׳ ׳©׳׳•׳¨ ׳׳× ׳”׳׳¦׳‘ ׳©׳”׳™׳” ׳§׳™׳™׳ ׳׳₪׳ ׳™ ׳”׳˜׳¡׳˜,
+         * ׳›׳“׳™ ׳׳”׳—׳–׳™׳¨ ׳׳× ׳¡׳‘׳™׳‘׳× ׳”׳‘׳“׳™׳§׳•׳× ׳׳׳¦׳‘׳” ׳”׳׳§׳•׳¨׳™.
          */
         let previouslyActiveProviderIdsA: string[] = [];
 
@@ -96,7 +96,7 @@ describe(
                         .createNestApplication();
 
                 /*
-                 * זהה ל-main.ts.
+                 * ׳–׳”׳” ׳-main.ts.
                  */
                 app.useGlobalPipes(
                     new ValidationPipe({
@@ -362,7 +362,7 @@ describe(
                  * Price = rank 1
                  * Speed = rank 2
                  *
-                 * לכן האפשרות הזולה אמורה לנצח.
+                 * ׳׳›׳ ׳”׳׳₪׳©׳¨׳•׳× ׳”׳–׳•׳׳” ׳׳׳•׳¨׳” ׳׳ ׳¦׳—.
                  */
 
                 await db.query(
@@ -758,7 +758,7 @@ describe(
                     successOrderId,
 
                 storeId:
-                    'E2E-STORE',
+                    'store-1',
 
                 destination: {
                     country:
@@ -808,7 +808,7 @@ describe(
                     failedOrderId,
 
                 storeId:
-                    'E2E-STORE',
+                    'store-1',
 
                 destination: {
                     country:
@@ -886,7 +886,7 @@ describe(
         /*
          * =============================================================
          * TEST 1
-         * HTTP → Complete Checkout Pipeline
+         * HTTP ג†’ Complete Checkout Pipeline
          * =============================================================
          */
 
@@ -1655,8 +1655,8 @@ describe(
 
 
                 /*
-                 * Price היא העדיפות הראשונה,
-                 * לכן Mock הזול אמור לנצח.
+                 * Price ׳”׳™׳ ׳”׳¢׳“׳™׳₪׳•׳× ׳”׳¨׳׳©׳•׳ ׳”,
+                 * ׳׳›׳ Mock ׳”׳–׳•׳ ׳׳׳•׳¨ ׳׳ ׳¦׳—.
                  */
                 expect(
                     shipments[0],
@@ -1956,8 +1956,8 @@ describe(
             'should keep the complete checkout flow isolated from Tenant B',
             async () => {
                 /*
-                 * tenantB נפתר דרך ה-API key האמיתי שלו.
-                 * בנוסף נוודא שהוא באמת schema אחר.
+                 * tenantB ׳ ׳₪׳×׳¨ ׳“׳¨׳ ׳”-API key ׳”׳׳׳™׳×׳™ ׳©׳׳•.
+                 * ׳‘׳ ׳•׳¡׳£ ׳ ׳•׳•׳“׳ ׳©׳”׳•׳ ׳‘׳׳׳× schema ׳׳—׳¨.
                  */
                 expect(
                     tenantB.schemaName,

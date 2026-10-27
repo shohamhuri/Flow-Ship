@@ -238,6 +238,7 @@ export class ShipmentCreationService {
                             status: 'created',
                             metadata: {
                                 sourceId: shipment.sourceId,
+                                deliveryMethod: shipment.deliveryMethod ?? 'carrier',
                                 vehicleIndex: shipment.vehicleIndex,
                                 vehicleType: shipment.vehicleType,
                                 assignedWeightKg: shipment.assignedWeightKg,

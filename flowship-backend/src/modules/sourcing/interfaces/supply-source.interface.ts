@@ -18,4 +18,5 @@ export interface SupplySource {
     isActive: boolean;
     priority: number;
     location: SupplySourceLocation;
+    selfDeliveryEnabled?: boolean;
 }
