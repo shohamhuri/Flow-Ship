@@ -33,6 +33,9 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
                 {
                     sourceId,
                     quotes,
+                    readyAt: new Date(
+                        Date.now() + 25 * 60 * 1000,
+                    ).toISOString(),
                 },
             ],
             vehiclePlans: [],
@@ -224,6 +227,41 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
 
         expect(options).toHaveLength(1);
 
+        const shipment = options[0].selectedGroupQuotes[0].shipments![0];
+
+        expect(shipment.deliveryMethod).toBe('carrier');
+        expect(shipment.quote.price).toBe(40);
+    });
+    it('should reject self-delivery when ETA is before source readyAt', () => {
+        const groupQuote = createGroupQuote('group-1', [
+            createQuote('carrier-a', 40, 2, 0.8),
+        ]);
+
+        const now = Date.now();
+
+        // Products will only be ready in 3 hours.
+        groupQuote.sourceDirectQuotes[0].readyAt =
+            new Date(now + 3 * 60 * 60 * 1000).toISOString();
+
+        // Self-delivery promises arrival in 2 hours.
+        groupQuote.sourceDirectQuotes[0].selfDeliveryQuote = {
+            sourceId: 'source-group-1',
+            accepted: true,
+            price: 25,
+            currency: 'ILS',
+            estimatedDeliveryAt:
+                new Date(now + 2 * 60 * 60 * 1000).toISOString(),
+        };
+
+        const quotedPlan = createQuotedPlan('plan-1', [groupQuote]);
+        const result = service.generateForPlans([quotedPlan]);
+
+        const options = result[0].deliveryOptions;
+
+        // Invalid self-delivery must be excluded.
+        expect(options).toHaveLength(1);
+
+        // Carrier delivery must remain available.
         const shipment = options[0].selectedGroupQuotes[0].shipments![0];
 
         expect(shipment.deliveryMethod).toBe('carrier');

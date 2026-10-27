@@ -34,6 +34,7 @@ export interface SourceDirectQuoteResult {
     quotes: CarrierQuoteOption[];
 
     travelMinutes?: number;
+    readyAt?: string;
     estimatedDeliveryAt?: string;
     selfDeliveryQuote?: SelfDeliveryQuoteResponse | null;
 }

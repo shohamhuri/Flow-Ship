@@ -693,6 +693,7 @@ export class ShipmentPlanQuoteService {
                     result,
                     vehiclePlans,
                     travelMinutes,
+                    readyAt: pickupSource.readyAt,
                     estimatedDeliveryAt,
                     selfDeliveryQuote,
                 };
@@ -711,6 +712,7 @@ export class ShipmentPlanQuoteService {
                 sourceId: entry.sourceId,
                 quotes: entry.result.quotes,
                 travelMinutes: entry.travelMinutes,
+                readyAt: entry.readyAt,
                 estimatedDeliveryAt: entry.estimatedDeliveryAt,
                 selfDeliveryQuote: entry.selfDeliveryQuote,
             })),

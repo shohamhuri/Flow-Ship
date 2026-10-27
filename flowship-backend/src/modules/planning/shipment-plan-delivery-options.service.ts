@@ -115,8 +115,15 @@ export class ShipmentPlanDeliveryOptionsService {
                         ) &&
                         Date.parse(
                             sourceTiming.selfDeliveryQuote.estimatedDeliveryAt,
-                        ) > Date.now()
+                        ) > Date.now() &&
+                        (
+                            typeof sourceTiming.readyAt === 'string' &&
+                            Number.isFinite(Date.parse(sourceTiming.readyAt)) &&
+                            Date.parse(sourceTiming.selfDeliveryQuote.estimatedDeliveryAt) >=
+                            Date.parse(sourceTiming.readyAt)
+                        )
                         ? [
+
                             [
                                 {
                                     sourceId,
