@@ -274,6 +274,15 @@ describe('ShipmentPlanQuoteService', () => {
             accepted: true,
             price: 40, currency: 'ILS',
         }));
+        expect(carriersServiceMock.getQuotes).not.toHaveBeenCalled();
+
+        expect(
+            results[0]?.groupQuotes[0]?.sourceDirectQuotes?.[0]?.quotes,
+        ).toEqual([]);
+
+        expect(
+            results[0]?.groupQuotes[0]?.vehiclePlans,
+        ).toEqual([]);
     });
     it('should allow free self-delivery with configured zero price', async () => {
         const source = {
@@ -518,6 +527,106 @@ describe('ShipmentPlanQuoteService', () => {
             tenant,
         );
     });
+
+    it('should route mixed self-delivery and carrier sources independently', async () => {
+        const selfDeliverySource = {
+            ...createSource('source-self', 'Netivot'),
+            selfDeliveryEnabled: true,
+        };
+
+        const carrierSource = {
+            ...createSource('source-carrier', 'Beer Sheva'),
+            selfDeliveryEnabled: false,
+        };
+
+        getSettingsForStoreMock.mockResolvedValue(
+            new Map([
+                ['source-self', {
+                    selfDeliveryAllowed: true,
+                    selfDeliveryPrice: 25,
+                }],
+            ]),
+        );
+
+        selfDeliveryGetQuoteMock.mockResolvedValue({
+            sourceId: 'source-self',
+            accepted: true,
+            price: 25,
+            currency: 'ILS',
+            estimatedDeliveryAt: '2026-10-26T12:00:00.000Z',
+        });
+
+        carriersServiceMock.getQuotes.mockResolvedValue({
+            quotes: [createQuote('MockCarrier', 40)],
+            failedProviders: [],
+        });
+
+        const plan = createPlan('plan-mixed', [
+            createGroup({
+                groupId: 'group-mixed',
+                sources: [selfDeliverySource, carrierSource],
+                totalWeight: 12,
+            }),
+        ]);
+
+        const results = await service.getQuotesForPlans(
+            [plan],
+            destination,
+            tenant,
+            createConfirmations([plan]),
+            undefined,
+            'store-1',
+        );
+
+        expect(selfDeliveryGetQuoteMock).toHaveBeenCalledTimes(1);
+        expect(selfDeliveryGetQuoteMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sourceId: 'source-self',
+            }),
+        );
+
+        expect(carriersServiceMock.getQuotes).toHaveBeenCalledTimes(1);
+        expect(carriersServiceMock.getQuotes).toHaveBeenCalledWith(
+            expect.objectContaining({
+                pickupCities: ['Beer Sheva'],
+                pickupSources: [
+                    expect.objectContaining({
+                        sourceId: 'source-carrier',
+                    }),
+                ],
+                weightKg: 6,
+            }),
+            tenant,
+        );
+
+        const sourceQuotes =
+            results[0]?.groupQuotes[0]?.sourceDirectQuotes ?? [];
+
+        const selfResult = sourceQuotes.find(
+            (entry) => entry.sourceId === 'source-self',
+        );
+        const carrierResult = sourceQuotes.find(
+            (entry) => entry.sourceId === 'source-carrier',
+        );
+
+        expect(selfResult?.selfDeliveryQuote).toEqual(
+            expect.objectContaining({
+                accepted: true,
+                price: 25,
+                currency: 'ILS',
+            }),
+        );
+        expect(selfResult?.quotes).toEqual([]);
+
+        expect(carrierResult?.quotes).toEqual([
+            expect.objectContaining({
+                carrierName: 'MockCarrier',
+                price: 40,
+            }),
+        ]);
+        expect(carrierResult?.selfDeliveryQuote).toBeNull();
+    });
+
     it('should not request self-delivery quote when store denies permission', async () => {
         const source = {
             ...createSource('WAREHOUSE-SOUTH', 'Ashdod'),

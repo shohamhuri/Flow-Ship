@@ -640,7 +640,8 @@ export class ShipmentPlanQuoteService {
                         currency: 'ILS',
                     };
                 }
-
+                const useSelfDeliveryExclusively =
+                    selfDeliveryQuote?.accepted === true;
                 const sourceQuoteRequest: CarrierQuoteRequest = {
                     pickupCities: [sourceGroup.source.location.city],
                     destinationCity: destination.city,
@@ -657,37 +658,43 @@ export class ShipmentPlanQuoteService {
                 };
 
                 const result =
-                    providerVehiclePlans.length === 0
-                        ? await this.carriersService.getQuotes(
-                            sourceQuoteRequest,
-                            tenant,
-                        )
-                        : {
+                    useSelfDeliveryExclusively
+                        ? {
                             quotes: [],
                             failedProviders: [],
-                        };
-
-                const vehiclePlans = await Promise.all(
-                    providerVehiclePlans.map(async (providerVehiclePlan) => {
-                        const vehicleQuotes =
-                            await this.getQuotesForVehiclePlan(
-                                providerVehiclePlan,
+                        }
+                        : providerVehiclePlans.length === 0
+                            ? await this.carriersService.getQuotes(
                                 sourceQuoteRequest,
                                 tenant,
-                            );
+                            )
+                            : {
+                                quotes: [],
+                                failedProviders: [],
+                            };
 
-                        return {
-                            sourceId: sourceGroup.sourceId,
-                            providerId: providerVehiclePlan.providerId,
-                            providerCode: providerVehiclePlan.providerCode,
-                            plan: providerVehiclePlan.plan,
-                            vehicleQuotes,
-                            alternatives:
-                                this.buildVehiclePlanAlternatives(vehicleQuotes),
-                        };
-                    }),
-                );
+                const vehiclePlans = useSelfDeliveryExclusively
+                    ? []
+                    : await Promise.all(
+                        providerVehiclePlans.map(async (providerVehiclePlan) => {
+                            const vehicleQuotes =
+                                await this.getQuotesForVehiclePlan(
+                                    providerVehiclePlan,
+                                    sourceQuoteRequest,
+                                    tenant,
+                                );
 
+                            return {
+                                sourceId: sourceGroup.sourceId,
+                                providerId: providerVehiclePlan.providerId,
+                                providerCode: providerVehiclePlan.providerCode,
+                                plan: providerVehiclePlan.plan,
+                                vehicleQuotes,
+                                alternatives:
+                                    this.buildVehiclePlanAlternatives(vehicleQuotes),
+                            };
+                        }),
+                    );
                 return {
                     sourceId: sourceGroup.sourceId,
                     result,
