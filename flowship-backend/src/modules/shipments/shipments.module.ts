@@ -6,6 +6,11 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { ShipmentStatusService } from './shipment-status.service';
 import { ShipmentsController } from './shipments.controller';
 import { TenantsModule } from '../tenants/tenants.module';
+import { SourcingModule } from '../sourcing/sourcing.module';
+import { SelfDeliveryFulfillmentService }
+    from './self-delivery-fulfillment.service';
+import { SelfDeliveryFulfillmentRepository }
+    from './self-delivery-fulfillment.repository';
 import {
     ShipmentHistoryController,
 } from './shipment-history.controller';
@@ -21,6 +26,8 @@ import {
     imports: [
         DatabaseModule,
         TenantsModule,
+        SourcingModule,
+
     ],
     providers: [
         ShipmentsRepository,
@@ -28,11 +35,16 @@ import {
         ShipmentStatusService,
         ShipmentHistoryRepository,
         ShipmentHistoryService,
+        SelfDeliveryFulfillmentRepository,
+        SelfDeliveryFulfillmentService,
     ],
     exports: [
         ShipmentsRepository,
         ShipmentCreationService,
-        ShipmentHistoryService
+        ShipmentHistoryService,
+        SelfDeliveryFulfillmentRepository,
+        SelfDeliveryFulfillmentService,
+
     ],
     controllers: [
         ShipmentsController,

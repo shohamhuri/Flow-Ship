@@ -518,4 +518,43 @@ where shipment_id = $2
             );
         }
     }
+
+    async findSelfDeliveryShipmentsByCheckoutId(
+        tenant: CurrentTenant,
+        checkoutId: string,
+    ): Promise<Array<{
+        id: string;
+        order_id: string;
+        checkout_id: string;
+        selected_plan_id: string;
+        metadata: {
+            sourceId: string;
+            deliveryMethod: 'self_delivery';
+            items: Array<{
+                sku: string;
+                quantity: number;
+                unitWeightKg?: number;
+            }>;
+        };
+    }>> {
+        const schemaName =
+            this.safeSchemaName(tenant.schemaName);
+
+        return this.db.query(
+            `
+        SELECT
+            id,
+            order_id,
+            checkout_id,
+            selected_plan_id,
+            metadata
+        FROM "${schemaName}".shipments
+        WHERE checkout_id = $1
+          AND metadata->>'deliveryMethod' = 'self_delivery'
+        ORDER BY id
+        `,
+            [checkoutId],
+        );
+    }
+
 }

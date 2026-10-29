@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 
 import { DatabaseModule } from '../../infrastructure/database/database.module';
-
+import { CheckoutConfirmationService } from './checkout-confirmation.service';
+import { CheckoutPaymentSignatureService } from './checkout-payment-signature.service';
 import { GroupingModule } from '../grouping/grouping.module';
 import { PlanningModule } from '../planning/planning.module';
 import { SourcingModule } from '../sourcing/sourcing.module';
@@ -18,6 +19,7 @@ import { DecisionModule } from '../decision/decision.module';
 import { ShipmentsModule } from '../shipments/shipments.module';
 import { WeightEstimationRepository } from './weight-estimation.repository';
 import { WeightEstimationService } from './weight-estimation.service';
+import { CheckoutPaymentWebhookRepository } from './checkout-payment-webhook.repository';
 @Module({
   imports: [
     SourcingModule,
@@ -43,6 +45,9 @@ import { WeightEstimationService } from './weight-estimation.service';
     WeightEstimationRepository,
     WeightEstimationService,
     CapacityPlanningService,
+    CheckoutConfirmationService,
+    CheckoutPaymentSignatureService,
+    CheckoutPaymentWebhookRepository,
   ],
 })
 export class CheckoutModule { }

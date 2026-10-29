@@ -7,8 +7,14 @@ import {
     Param,
     Post,
     UseGuards,
+    BadRequestException,
 } from '@nestjs/common';
+import { Req } from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
+import type { Request } from 'express';
 
+import { CheckoutConfirmationService } from './checkout-confirmation.service';
+import { ConfirmCheckoutDto } from './dto/confirm-checkout.dto';
 import {
     CurrentFlowShipAuth,
 } from '../auth/current-auth.decorator';
@@ -44,6 +50,8 @@ export class CheckoutController {
 
         private readonly tenantsService:
             TenantsService,
+        private readonly checkoutConfirmationService:
+            CheckoutConfirmationService,
     ) { }
 
     /**
@@ -113,5 +121,44 @@ export class CheckoutController {
                 createCheckoutDto,
                 tenant,
             );
+    }
+    @Post(':checkoutId/confirm')
+    async confirmCheckout(
+        @Param('checkoutId')
+        checkoutId: string,
+
+        @Body()
+        dto: ConfirmCheckoutDto,
+
+        @Headers('x-api-key')
+        apiKey: string | undefined,
+
+        @Headers('x-payment-signature')
+        signature: string | undefined,
+
+        @Headers('x-payment-timestamp')
+        timestamp: string | undefined,
+
+        @Req()
+        req: RawBodyRequest<Request>,
+    ): Promise<{ status: string }> {
+        const tenant = await this.tenantsService.findByApiKey(apiKey);
+
+        if (!req.rawBody) {
+            throw new BadRequestException(
+                'Raw request body is required',
+            );
+        }
+
+        await this.checkoutConfirmationService.confirm(
+            tenant,
+            checkoutId,
+            dto,
+            req.rawBody,
+            signature,
+            timestamp,
+        );
+
+        return { status: 'validated' };
     }
 }

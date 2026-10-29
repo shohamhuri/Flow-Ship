@@ -3,20 +3,21 @@ import {
     INestApplication,
     ValidationPipe,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
-import { Test, TestingModule } from '@nestjs/testing';
+import { createHmac, randomUUID } from 'crypto'; import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
+import { SelfDeliveryProviderError } from '../src/modules/sourcing/interfaces/self-delivery-provider.interface';
 
 import { AppModule } from '../src/app.module';
+import { CheckoutRepository } from
+    '../src/modules/checkout/checkout.repository';
 import { DbService } from '../src/infrastructure/database/db.service';
 import {
     CurrentTenant,
     TenantsService,
 } from '../src/modules/tenants/tenants.service';
-import { DISTANCE_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
 import type { InventoryProvider } from '../src/modules/sourcing/interfaces/inventory-provider.interface';
-import { INVENTORY_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
+import { INVENTORY_PROVIDER, SELF_DELIVERY_PROVIDER, DISTANCE_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
 
 describe('Checkout Self Delivery E2E', () => {
     let app: INestApplication;
@@ -24,6 +25,8 @@ describe('Checkout Self Delivery E2E', () => {
     let db: DbService;
     let tenantA: CurrentTenant;
     let tenantAApiKey: string;
+    let tenantB: CurrentTenant;
+    let tenantBApiKey: string;
 
     const storeId = `e2e-self-delivery-${randomUUID()}`;
     const orderId = `E2E-SELF-DELIVERY-${randomUUID()}`;
@@ -36,7 +39,28 @@ describe('Checkout Self Delivery E2E', () => {
     const priceCardId = randomUUID();
     const speedCardId = randomUUID();
     const groupingStrategyId = randomUUID();
+    const failedDeliveryOrderId = `E2E-FAILED-DELIVERY-${randomUUID()}`;
+    const invalidSignatureOrderId =
+        `E2E-INVALID-SIGNATURE-${randomUUID()}`;
 
+    const selfDeliveryProviderMock = {
+        getQuote: jest.fn().mockImplementation(async (quoteRequest) => ({
+            sourceId: quoteRequest.sourceId,
+            accepted: true,
+            price: 40,
+            currency: 'ILS',
+            estimatedDeliveryAt: new Date(
+                Date.now() + 24 * 60 * 60 * 1000,
+            ).toISOString(),
+        })),
+
+        createDelivery: jest.fn().mockImplementation(async (deliveryRequest) => ({
+            requestId: deliveryRequest.requestId,
+            sourceId: deliveryRequest.sourceId,
+            sourceOrderId: `e2e-supplier-${deliveryRequest.requestId}`,
+            status: 'confirmed',
+        })),
+    };
     let originalConfigurationSaved = false;
     let configurationModified = false;
     let previouslyActiveProviderIds: string[] = [];
@@ -84,6 +108,8 @@ describe('Checkout Self Delivery E2E', () => {
         moduleRef = await Test.createTestingModule({
             imports: [AppModule],
         })
+            .overrideProvider(SELF_DELIVERY_PROVIDER)
+            .useValue(selfDeliveryProviderMock)
             .overrideProvider(DISTANCE_PROVIDER)
             .useValue({
                 getDistance: jest.fn().mockResolvedValue({
@@ -93,8 +119,9 @@ describe('Checkout Self Delivery E2E', () => {
             })
             .compile();
 
-        app = moduleRef.createNestApplication();
-
+        app = moduleRef.createNestApplication({
+            rawBody: true,
+        });
         app.useGlobalPipes(
             new ValidationPipe({
                 whitelist: true,
@@ -139,7 +166,20 @@ describe('Checkout Self Delivery E2E', () => {
         );
 
         expect(tenantA.schemaName).toBe('flow_ship_test_a');
+        tenantBApiKey = config.get<string>(
+            'TEST_FLOW_SHIP_B_API_KEY',
+        ) ?? '';
 
+        if (!tenantBApiKey) {
+            throw new Error('Missing E2E tenant B API key');
+        }
+
+        tenantB = await tenantsService.findByApiKey(
+            tenantBApiKey,
+        );
+
+        expect(tenantB.schemaName).toBe('flow_ship_test_b');
+        expect(tenantB.schemaName).not.toBe(tenantA.schemaName);
         const activeProviders = await db.query<{ id: string }>(
             `SELECT id FROM flow_ship_test_a.providers WHERE is_active = true`,
         );
@@ -192,23 +232,27 @@ describe('Checkout Self Delivery E2E', () => {
              ($1, 'group_by_source', 'E2E Group By Source', true, 1, 100, '{}'::jsonb)`,
             [groupingStrategyId],
         );
+
         await db.query(
             `
-            INSERT INTO flow_ship_test_a.stores (
-                name,
-                platform,
-                external_store_id,
-                is_active
-            )
-            VALUES ($1, $2, $3, $4)
-            `,
+    INSERT INTO flow_ship_test_a.stores (
+        name,
+        platform,
+        external_store_id,
+        is_active,
+        payment_webhook_secret
+    )
+    VALUES ($1, $2, $3, $4, $5)
+    `,
             [
                 'E2E Self Delivery Store',
                 'manual',
                 storeId,
                 true,
+                'e2e-self-delivery-payment-secret',
             ],
         );
+
 
         await db.query(
             `
@@ -264,8 +308,29 @@ describe('Checkout Self Delivery E2E', () => {
 
         expect(selfDeliveryOptions).toHaveLength(1);
         expect(selfDeliveryOptions[0].metrics.totalShippingPrice).toBe(40);
-        expect(result.planning.decision.winner).not.toBeNull();
+        const savedCheckout = await moduleRef
+            .get(CheckoutRepository)
+            .getCheckoutById(tenantA, checkoutId!);
 
+        expect(savedCheckout?.decision).not.toBeNull();
+
+        expect(savedCheckout?.decision?.selectedDeliveryOptionId)
+            .toBe(selfDeliveryOptions[0].id);
+        expect(result.planning.decision.winner).not.toBeNull();
+        expect(selfDeliveryProviderMock.createDelivery).not.toHaveBeenCalled();
+
+        const fulfillmentsBeforePayment = await db.query(
+            `
+    SELECT f.id
+    FROM flow_ship_test_a.self_delivery_fulfillments f
+    JOIN flow_ship_test_a.shipments s
+        ON s.id = f.shipment_id
+    WHERE s.checkout_id = $1
+    `,
+            [checkoutId],
+        );
+
+        expect(fulfillmentsBeforePayment).toHaveLength(0);
         const shipments = await db.query<{
             id: string;
             provider_id: string | null;
@@ -311,6 +376,192 @@ describe('Checkout Self Delivery E2E', () => {
             expect(stops[0].stop_order).toBe(1);
             expect(stops[1].stop_order).toBe(2);
         }
+    }, 60000);
+    it('should create supplier delivery only after signed payment and prevent duplicates', async () => {
+        expect(checkoutId).toBeDefined();
+
+        const savedCheckout = await moduleRef
+            .get(CheckoutRepository)
+            .getCheckoutById(tenantA, checkoutId!);
+
+        const selectedDeliveryOptionId =
+            savedCheckout?.decision?.selectedDeliveryOptionId;
+
+        expect(selectedDeliveryOptionId).toBeTruthy();
+
+        const payload = {
+            orderId,
+            storeId,
+            paymentReference: `e2e-payment-${randomUUID()}`,
+            selectedDeliveryOptionId,
+            recipient: {
+                name: 'E2E Customer',
+                phone: '0501234567',
+                email: 'e2e@example.com',
+            },
+        };
+
+        const rawBody = JSON.stringify(payload);
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+
+        const signature = createHmac(
+            'sha256',
+            'e2e-self-delivery-payment-secret',
+        )
+            .update(timestamp)
+            .update('.')
+            .update(rawBody)
+            .digest('hex');
+
+        const sendConfirmation = () =>
+            request(app.getHttpServer())
+                .post(`/checkout/${checkoutId}/confirm`)
+                .set('x-api-key', tenantAApiKey)
+                .set('x-payment-signature', signature)
+                .set('x-payment-timestamp', timestamp)
+                .set('Content-Type', 'application/json')
+                .send(rawBody);
+
+        expect(selfDeliveryProviderMock.createDelivery)
+            .not.toHaveBeenCalled();
+
+        const firstResponse = await sendConfirmation().expect(201);
+
+        expect(firstResponse.body).toEqual({
+            status: 'validated',
+        });
+
+        expect(selfDeliveryProviderMock.createDelivery)
+            .toHaveBeenCalledTimes(1);
+
+        const supplierRequest =
+            selfDeliveryProviderMock.createDelivery.mock.calls[0][0];
+
+        expect(supplierRequest.requestId).toBeTruthy();
+        expect(supplierRequest.sourceId).toBe('WAREHOUSE-SOUTH');
+
+        const fulfillments = await db.query<{
+            shipment_id: string;
+            request_id: string;
+            source_order_id: string | null;
+            status: string;
+        }>(
+            `SELECT
+            f.shipment_id,
+            f.request_id,
+            f.source_order_id,
+            f.status
+         FROM flow_ship_test_a.self_delivery_fulfillments f
+         JOIN flow_ship_test_a.shipments s
+           ON s.id = f.shipment_id
+         WHERE s.checkout_id = $1`,
+            [checkoutId],
+        );
+
+        expect(fulfillments).toHaveLength(1);
+        expect(fulfillments[0].status).toBe('confirmed');
+        expect(fulfillments[0].request_id)
+            .toBe(supplierRequest.requestId);
+        expect(fulfillments[0].source_order_id)
+            .toBe(`e2e-supplier-${supplierRequest.requestId}`);
+
+        const replayResponse = await sendConfirmation().expect(201);
+        expect(replayResponse.body).toEqual({
+            status: 'validated',
+        });
+
+        expect(selfDeliveryProviderMock.createDelivery)
+            .toHaveBeenCalledTimes(1);
+
+        const fulfillmentsAfterReplay = await db.query<{
+            id: string;
+        }>(
+            `SELECT f.id
+         FROM flow_ship_test_a.self_delivery_fulfillments f
+         JOIN flow_ship_test_a.shipments s
+           ON s.id = f.shipment_id
+         WHERE s.checkout_id = $1`,
+            [checkoutId],
+        );
+
+        expect(fulfillmentsAfterReplay).toHaveLength(1);
+    }, 60000);
+    it('should reject invalid payment signature without creating supplier delivery', async () => {
+
+
+        const checkoutResponse = await request(app.getHttpServer())
+            .post('/checkout')
+            .set('x-api-key', tenantAApiKey)
+            .send({
+                ...createSelfDeliveryCheckoutDto(),
+                orderId: invalidSignatureOrderId,
+            })
+            .expect(201);
+
+        const invalidCheckoutId =
+            checkoutResponse.body.checkoutId ??
+            await findCheckoutIdByOrderId(invalidSignatureOrderId);
+
+        expect(invalidCheckoutId).toBeTruthy();
+
+        const savedCheckout = await moduleRef
+            .get(CheckoutRepository)
+            .getCheckoutById(tenantA, invalidCheckoutId);
+
+        expect(savedCheckout?.decision?.selectedDeliveryOptionId)
+            .toBeTruthy();
+        const payload = {
+            orderId: invalidSignatureOrderId,
+            storeId,
+            paymentReference: `e2e-invalid-payment-${randomUUID()}`,
+            selectedDeliveryOptionId:
+                savedCheckout!.decision!.selectedDeliveryOptionId,
+            recipient: {
+                name: 'E2E Customer',
+                phone: '0501234567',
+                email: 'e2e@example.com',
+            },
+        };
+
+        const createDeliveryCallsBefore =
+            selfDeliveryProviderMock.createDelivery.mock.calls.length;
+
+        const response = await request(app.getHttpServer())
+            .post(`/checkout/${invalidCheckoutId}/confirm`)
+            .set('x-api-key', tenantAApiKey)
+            .set('x-payment-signature', '0'.repeat(64))
+            .set('x-payment-timestamp',
+                Math.floor(Date.now() / 1000).toString())
+            .send(payload)
+            .expect(401);
+
+        expect(response.body.message)
+            .toBe('Invalid payment signature');
+
+        expect(selfDeliveryProviderMock.createDelivery)
+            .toHaveBeenCalledTimes(createDeliveryCallsBefore);
+
+        const fulfillments = await db.query<{ id: string }>(
+            `SELECT f.id
+         FROM flow_ship_test_a.self_delivery_fulfillments f
+         JOIN flow_ship_test_a.shipments s
+           ON s.id = f.shipment_id
+         WHERE s.checkout_id = $1`,
+            [invalidCheckoutId],
+        );
+
+        expect(fulfillments).toHaveLength(0);
+
+        const webhookEvents = await db.query<{ id: string }>(
+            `SELECT id
+         FROM flow_ship_test_a.webhook_logs
+         WHERE source = $1
+           AND event_type = 'payment_confirmed'
+           AND idempotency_key = $2`,
+            [`checkout_payment:${storeId}`, invalidCheckoutId],
+        );
+
+        expect(webhookEvents).toHaveLength(0);
     }, 60000);
     it('should not offer self-delivery when price is null', async () => {
         await db.query(
@@ -388,80 +639,192 @@ describe('Checkout Self Delivery E2E', () => {
         expect(freeOptions.length).toBeGreaterThan(0);
         expect(freeOptions[0].metrics.totalShippingPrice).toBe(0);
     }, 60000);
+
+    it('should persist supplier rejection as failed', async () => {
+        await db.query(
+            `UPDATE flow_ship_test_a.source_delivery_permissions
+             SET self_delivery_price = 40
+             WHERE store_id = $1 AND source_id = $2`,
+            [storeId, 'WAREHOUSE-SOUTH'],
+        );
+
+        const checkoutResponse = await request(app.getHttpServer())
+            .post('/checkout')
+            .set('x-api-key', tenantAApiKey)
+            .send({
+                ...createSelfDeliveryCheckoutDto(),
+                orderId: failedDeliveryOrderId,
+            })
+            .expect(201);
+
+        const failedCheckoutId =
+            checkoutResponse.body.checkoutId ??
+            await findCheckoutIdByOrderId(failedDeliveryOrderId);
+
+        expect(failedCheckoutId).toBeTruthy();
+
+        const savedCheckout = await moduleRef.get(CheckoutRepository)
+            .getCheckoutById(tenantA, failedCheckoutId);
+
+        const selectedDeliveryOptionId =
+            savedCheckout?.decision?.selectedDeliveryOptionId;
+
+        expect(selectedDeliveryOptionId).toBeTruthy();
+
+        const payload = {
+            orderId: failedDeliveryOrderId,
+            storeId,
+            paymentReference: `e2e-failed-payment-${randomUUID()}`,
+            selectedDeliveryOptionId,
+            recipient: {
+                name: 'E2E Customer',
+                phone: '0501234567',
+                email: 'e2e@example.com',
+            },
+        };
+
+        const rawBody = JSON.stringify(payload);
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        const signature = createHmac(
+            'sha256',
+            'e2e-self-delivery-payment-secret',
+        ).update(timestamp).update('.').update(rawBody).digest('hex');
+
+        const callsBefore =
+            selfDeliveryProviderMock.createDelivery.mock.calls.length;
+
+
+        selfDeliveryProviderMock.createDelivery.mockRejectedValueOnce(
+            new SelfDeliveryProviderError(
+                'INVALID_REQUEST',
+                'E2E supplier rejected delivery',
+            ),
+        );
+
+        const response = await request(app.getHttpServer())
+            .post(`/checkout/${failedCheckoutId}/confirm`)
+            .set('x-api-key', tenantAApiKey)
+            .set('x-payment-signature', signature)
+            .set('x-payment-timestamp', timestamp)
+            .set('Content-Type', 'application/json')
+            .send(rawBody);
+
+        expect(response.status).toBeGreaterThanOrEqual(400);
+        expect(selfDeliveryProviderMock.createDelivery)
+            .toHaveBeenCalledTimes(callsBefore + 1);
+
+        const rows = await db.query<{ status: string }>(
+            `SELECT f.status
+             FROM flow_ship_test_a.self_delivery_fulfillments f
+             JOIN flow_ship_test_a.shipments s ON s.id = f.shipment_id
+             WHERE s.checkout_id = $1`,
+            [failedCheckoutId],
+        );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0].status).toBe('failed');
+    }, 60000);
+
     afterAll(async () => {
         try {
             if (db) {
                 try {
-                checkoutId = await findCheckoutIdByOrderId();
-                const nullPriceCheckoutId =
-                    await findCheckoutIdByOrderId(nullPriceOrderId);
+                    checkoutId = await findCheckoutIdByOrderId();
+                    const nullPriceCheckoutId =
+                        await findCheckoutIdByOrderId(nullPriceOrderId);
 
-                const freeDeliveryCheckoutId =
-                    await findCheckoutIdByOrderId(freeDeliveryOrderId);
+                    const freeDeliveryCheckoutId =
+                        await findCheckoutIdByOrderId(freeDeliveryOrderId);
+                    const failedDeliveryCheckoutId =
+                        await findCheckoutIdByOrderId(failedDeliveryOrderId);
+                    const invalidSignatureCheckoutId =
+                        await findCheckoutIdByOrderId(invalidSignatureOrderId);
+                    const checkoutIds = [
+                        freeDeliveryCheckoutId,
+                        checkoutId,
+                        nullPriceCheckoutId,
+                        invalidSignatureCheckoutId,
+                        failedDeliveryCheckoutId,
+                    ].filter((id): id is string => Boolean(id));
 
-                const checkoutIds = [
-                    freeDeliveryCheckoutId,
-                    checkoutId,
-                    nullPriceCheckoutId,
-                ].filter((id): id is string => Boolean(id));
+                    if (checkoutIds.length > 0) {
 
-                if (checkoutIds.length > 0) {
-
-                    const cleanupQueries = [
-                        `DELETE FROM flow_ship_test_a.shipment_stops
+                        const cleanupQueries = [
+                            `DELETE FROM flow_ship_test_a.webhook_logs
+ WHERE source = 'checkout_payment:' || $1
+   AND event_type = 'payment_confirmed'
+   AND idempotency_key = ANY($2::text[])`,
+                            `DELETE FROM flow_ship_test_a.self_delivery_fulfillments
+ WHERE shipment_id IN (
+     SELECT id
+     FROM flow_ship_test_a.shipments
+     WHERE checkout_id = ANY($1::uuid[])
+ )`,
+                            `DELETE FROM flow_ship_test_a.shipment_stops
                          WHERE shipment_id IN (
                              SELECT id FROM flow_ship_test_a.shipments
                              WHERE checkout_id = ANY($1::uuid[])
                          )`,
-                        `DELETE FROM flow_ship_test_a.shipments
+                            `DELETE FROM flow_ship_test_a.shipments
                          WHERE checkout_id = ANY($1::uuid[])`,
-                        `DELETE FROM flow_ship_test_a.shipment_group_items
+                            `DELETE FROM flow_ship_test_a.shipment_group_items
                          WHERE shipment_group_id IN (
                              SELECT id FROM flow_ship_test_a.shipment_groups
                              WHERE checkout_id = ANY($1::uuid[])
                          )`,
-                        `DELETE FROM flow_ship_test_a.shipment_group_sources
+                            `DELETE FROM flow_ship_test_a.shipment_group_sources
                          WHERE shipment_group_id IN (
                              SELECT id FROM flow_ship_test_a.shipment_groups
                              WHERE checkout_id = ANY($1::uuid[])
                          )`,
-                        `DELETE FROM flow_ship_test_a.shipment_groups
+                            `DELETE FROM flow_ship_test_a.shipment_groups
                          WHERE checkout_id = ANY($1::uuid[])`,
-                        `DELETE FROM flow_ship_test_a.shipment_decisions
+                            `DELETE FROM flow_ship_test_a.shipment_decisions
                          WHERE checkout_id = ANY($1::uuid[])`,
-                        `DELETE FROM flow_ship_test_a.checkout_processing
+                            `DELETE FROM flow_ship_test_a.checkout_processing
                          WHERE checkout_id = ANY($1::uuid[])`,
-                        `DELETE FROM flow_ship_test_a.checkout_sourcing_results
+                            `DELETE FROM flow_ship_test_a.checkout_sourcing_results
                          WHERE checkout_id = ANY($1::uuid[])`,
-                        `DELETE FROM flow_ship_test_a.checkout_items
+                            `DELETE FROM flow_ship_test_a.checkout_items
                          WHERE checkout_id = ANY($1::uuid[])`,
-                        `DELETE FROM flow_ship_test_a.checkouts
+                            `DELETE FROM flow_ship_test_a.checkouts
                          WHERE id = ANY($1::uuid[])`,
-                    ];
+                        ];
 
-                    const cleanupErrors: unknown[] = [];
+                        const cleanupErrors: unknown[] = [];
 
-                    for (const query of cleanupQueries) {
-                        try {
-                            await db.query(query, [checkoutIds]);
-                        } catch (error) {
-                            cleanupErrors.push(error);
+                        for (const query of cleanupQueries) {
+                            try {
+                                await db.query(
+                                    query,
+                                    query.includes('flow_ship_test_a.webhook_logs')
+                                        ? [storeId, checkoutIds]
+                                        : [checkoutIds],
+                                );
+                            } catch (error) {
+                                console.error('E2E CLEANUP FAILED:', {
+                                    query,
+                                    error,
+                                });
+
+                                cleanupErrors.push(error);
+                            }
+                        }
+
+                        if (cleanupErrors.length > 0) {
+                            throw new AggregateError(
+                                cleanupErrors,
+                                'Checkout cleanup failed',
+                            );
                         }
                     }
-
-                    if (cleanupErrors.length > 0) {
-                        throw new AggregateError(
-                            cleanupErrors,
-                            'Checkout cleanup failed',
-                        );
-                    }
-                }
                 } finally {
                     const storeCleanupQueries = [
                         {
                             sql: `DELETE FROM flow_ship_test_a.audit_logs
                                   WHERE entity_id = ANY($1::text[])`,
-                            params: [[orderId, nullPriceOrderId, freeDeliveryOrderId]],
+                            params: [[orderId, nullPriceOrderId, freeDeliveryOrderId, invalidSignatureOrderId, failedDeliveryOrderId,
+                            ]],
                         },
                         {
                             sql: `DELETE FROM flow_ship_test_a.source_delivery_permissions
@@ -503,57 +866,57 @@ describe('Checkout Self Delivery E2E', () => {
                         sql: string;
                         params?: unknown[];
                     }> = [
-                        {
-                            sql: `DELETE FROM flow_ship_test_a.provider_call_logs
+                            {
+                                sql: `DELETE FROM flow_ship_test_a.provider_call_logs
                                   WHERE provider_id = ANY($1::uuid[])`,
-                            params: [[providerMockId, providerYangoId]],
-                        },
-                        {
-                            sql: `DELETE FROM flow_ship_test_a.decision_priority_cards
+                                params: [[providerMockId, providerYangoId]],
+                            },
+                            {
+                                sql: `DELETE FROM flow_ship_test_a.decision_priority_cards
                                   WHERE id = ANY($1::uuid[])`,
-                            params: [[priceCardId, speedCardId]],
-                        },
-                        {
-                            sql: `DELETE FROM flow_ship_test_a.grouping_strategy_settings
+                                params: [[priceCardId, speedCardId]],
+                            },
+                            {
+                                sql: `DELETE FROM flow_ship_test_a.grouping_strategy_settings
                                   WHERE id = $1`,
-                            params: [groupingStrategyId],
-                        },
-                        {
-                            sql: `DELETE FROM flow_ship_test_a.providers
+                                params: [groupingStrategyId],
+                            },
+                            {
+                                sql: `DELETE FROM flow_ship_test_a.providers
                                   WHERE id = ANY($1::uuid[])`,
-                            params: [[providerMockId, providerYangoId]],
-                        },
-                        {
-                            sql: `UPDATE flow_ship_test_a.providers
+                                params: [[providerMockId, providerYangoId]],
+                            },
+                            {
+                                sql: `UPDATE flow_ship_test_a.providers
                                   SET is_active = false`,
-                        },
-                        {
-                            sql: `UPDATE flow_ship_test_a.decision_priority_cards
+                            },
+                            {
+                                sql: `UPDATE flow_ship_test_a.decision_priority_cards
                                   SET is_active = false`,
-                        },
-                        {
-                            sql: `UPDATE flow_ship_test_a.grouping_strategy_settings
+                            },
+                            {
+                                sql: `UPDATE flow_ship_test_a.grouping_strategy_settings
                                   SET is_enabled = false`,
-                        },
-                        {
-                            sql: `UPDATE flow_ship_test_a.providers
+                            },
+                            {
+                                sql: `UPDATE flow_ship_test_a.providers
                                   SET is_active = true
                                   WHERE id = ANY($1::uuid[])`,
-                            params: [previouslyActiveProviderIds],
-                        },
-                        {
-                            sql: `UPDATE flow_ship_test_a.decision_priority_cards
+                                params: [previouslyActiveProviderIds],
+                            },
+                            {
+                                sql: `UPDATE flow_ship_test_a.decision_priority_cards
                                   SET is_active = true
                                   WHERE id = ANY($1::uuid[])`,
-                            params: [previouslyActiveDecisionCardIds],
-                        },
-                        {
-                            sql: `UPDATE flow_ship_test_a.grouping_strategy_settings
+                                params: [previouslyActiveDecisionCardIds],
+                            },
+                            {
+                                sql: `UPDATE flow_ship_test_a.grouping_strategy_settings
                                   SET is_enabled = true
                                   WHERE id = ANY($1::uuid[])`,
-                            params: [previouslyEnabledGroupingStrategyIds],
-                        },
-                    ];
+                                params: [previouslyEnabledGroupingStrategyIds],
+                            },
+                        ];
 
                     for (const { sql, params } of restoreQueries) {
                         try {
@@ -579,6 +942,63 @@ describe('Checkout Self Delivery E2E', () => {
             }
         }
     });
+    it('should prevent tenant B from confirming tenant A checkout', async () => {
+        expect(checkoutId).toBeDefined();
+
+        const savedCheckout = await moduleRef
+            .get(CheckoutRepository)
+            .getCheckoutById(tenantA, checkoutId!);
+
+        expect(savedCheckout?.decision?.selectedDeliveryOptionId)
+            .toBeTruthy();
+
+        const payload = {
+            orderId,
+            storeId,
+            paymentReference: `e2e-cross-tenant-${randomUUID()}`,
+            selectedDeliveryOptionId:
+                savedCheckout!.decision!.selectedDeliveryOptionId,
+            recipient: {
+                name: 'E2E Customer',
+                phone: '0501234567',
+                email: 'e2e@example.com',
+            },
+        };
+
+        const rawBody = JSON.stringify(payload);
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+
+        const signature = createHmac(
+            'sha256',
+            'e2e-self-delivery-payment-secret',
+        )
+            .update(timestamp)
+            .update('.')
+            .update(rawBody)
+            .digest('hex');
+
+        const callsBefore =
+            selfDeliveryProviderMock.createDelivery.mock.calls.length;
+
+        const response = await request(app.getHttpServer())
+            .post(`/checkout/${checkoutId}/confirm`)
+            .set('x-api-key', tenantBApiKey)
+            .set('x-payment-signature', signature)
+            .set('x-payment-timestamp', timestamp)
+            .set('Content-Type', 'application/json')
+            .send(rawBody);
+
+        expect([401, 404]).toContain(response.status);
+
+        expect(selfDeliveryProviderMock.createDelivery)
+            .toHaveBeenCalledTimes(callsBefore);
+
+        const tenantBCheckout = await moduleRef
+            .get(CheckoutRepository)
+            .getCheckoutById(tenantB, checkoutId!);
+
+        expect(tenantBCheckout).toBeNull();
+    }, 60000);
 });
 
 

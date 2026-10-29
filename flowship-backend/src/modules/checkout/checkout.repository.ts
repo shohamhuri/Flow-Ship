@@ -1023,5 +1023,27 @@ updated_at
             );
         }
     }
+    async getStorePaymentWebhookSecret(
+        tenant: CurrentTenant,
+        storeId: string,
+    ): Promise<string | null> {
+        const schemaName = this.safeSchemaName(tenant.schemaName);
+
+        const rows = await this.databaseService.query<{
+            payment_webhook_secret: string | null;
+        }>(
+            `
+        SELECT payment_webhook_secret
+        FROM "${schemaName}".stores
+        WHERE external_store_id = $1
+          AND platform = 'manual'
+          AND is_active = true
+        LIMIT 1
+        `,
+            [storeId],
+        );
+
+        return rows[0]?.payment_webhook_secret ?? null;
+    }
 
 }
