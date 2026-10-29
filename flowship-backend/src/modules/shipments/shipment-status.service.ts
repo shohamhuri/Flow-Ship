@@ -27,55 +27,98 @@ export class ShipmentStatusService {
             ShipmentsRepository,
         private readonly db: DbService,
     ) { }
+
     async markPickedUp(
         tenant: CurrentTenant,
         shipmentId: string,
         stopOrder: number,
         occurredAt: Date = new Date(),
     ): Promise<void> {
-        await this.shipmentsRepository.markPickupCompleted(
-            tenant,
-            shipmentId,
-            stopOrder,
-            occurredAt,
-        );
-
-        const allPickupsCompleted =
-            await this.shipmentsRepository
-                .areAllPickupsCompleted(
-                    tenant,
-                    shipmentId,
-                );
-
-        if (allPickupsCompleted) {
-            await this.shipmentsRepository.updateStatus(
+        await this.db.transaction(async (tx) => {
+            await this.shipmentsRepository.markPickupCompleted(
                 tenant,
                 shipmentId,
-                'picked_up',
+                stopOrder,
+                occurredAt,
+                tx,
             );
-        }
 
-        await this.synchronizeCheckoutStatus(
-            tenant,
-            shipmentId,
-        );
+            const allPickupsCompleted =
+                await this.shipmentsRepository.areAllPickupsCompleted(
+                    tenant,
+                    shipmentId,
+                    tx,
+                );
+
+            if (allPickupsCompleted) {
+                const previousStatus =
+                    await this.shipmentsRepository.updateStatus(
+                        tenant,
+                        shipmentId,
+                        'picked_up',
+                        tx,
+                    );
+
+                if (previousStatus !== null) {
+                    await this.shipmentsRepository.recordShipmentEvent(
+                        tenant,
+                        {
+                            shipmentId,
+                            eventType: 'PICKED_UP',
+                            previousStatus,
+                            newStatus: 'picked_up',
+                            occurredAt,
+                        },
+                        tx,
+                    );
+                }
+            }
+
+            await this.synchronizeCheckoutStatus(
+                tenant,
+                shipmentId,
+                tx,
+            );
+        });
     }
+
 
     async markInTransit(
         tenant: CurrentTenant,
         shipmentId: string,
+        occurredAt: Date = new Date(),
     ): Promise<void> {
-        await this.shipmentsRepository.updateStatus(
-            tenant,
-            shipmentId,
-            'in_transit',
-        );
+        await this.db.transaction(async (tx) => {
+            const previousStatus =
+                await this.shipmentsRepository.updateStatus(
+                    tenant,
+                    shipmentId,
+                    'in_transit',
+                    tx,
+                );
 
-        await this.synchronizeCheckoutStatus(
-            tenant,
-            shipmentId,
-        );
+            if (previousStatus !== null) {
+                await this.shipmentsRepository.recordShipmentEvent(
+                    tenant,
+                    {
+                        shipmentId,
+                        eventType: 'IN_TRANSIT',
+                        previousStatus,
+                        newStatus: 'in_transit',
+                        occurredAt,
+                    },
+                    tx,
+                );
+            }
+
+            await this.synchronizeCheckoutStatus(
+                tenant,
+                shipmentId,
+                tx,
+            );
+        });
     }
+
 
 
     async markDelivered(
@@ -84,6 +127,7 @@ export class ShipmentStatusService {
         occurredAt: Date = new Date(),
     ): Promise<void> {
         await this.db.transaction(async (tx) => {
+            // Complete the single dropoff before setting terminal status
             await this.shipmentsRepository.markDropoffCompleted(
                 tenant,
                 shipmentId,
@@ -91,12 +135,27 @@ export class ShipmentStatusService {
                 tx,
             );
 
-            await this.shipmentsRepository.markDelivered(
-                tenant,
-                shipmentId,
-                occurredAt,
-                tx,
-            );
+            const previousStatus =
+                await this.shipmentsRepository.markDelivered(
+                    tenant,
+                    shipmentId,
+                    occurredAt,
+                    tx,
+                );
+
+            if (previousStatus !== null) {
+                await this.shipmentsRepository.recordShipmentEvent(
+                    tenant,
+                    {
+                        shipmentId,
+                        eventType: 'DELIVERED',
+                        previousStatus,
+                        newStatus: 'delivered',
+                        occurredAt,
+                    },
+                    tx,
+                );
+            }
 
             await this.synchronizeCheckoutStatus(
                 tenant,
@@ -120,17 +179,37 @@ export class ShipmentStatusService {
             );
         }
 
-        await this.shipmentsRepository.markFailed(
-            tenant,
-            shipmentId,
-            normalizedReason,
-            occurredAt,
-        );
+        await this.db.transaction(async (tx) => {
+            const previousStatus =
+                await this.shipmentsRepository.markFailed(
+                    tenant,
+                    shipmentId,
+                    normalizedReason,
+                    occurredAt,
+                    tx,
+                );
 
-        await this.synchronizeCheckoutStatus(
-            tenant,
-            shipmentId,
-        );
+            if (previousStatus !== null) {
+                await this.shipmentsRepository.recordShipmentEvent(
+                    tenant,
+                    {
+                        shipmentId,
+                        eventType: 'FAILED',
+                        previousStatus,
+                        newStatus: 'failed',
+                        occurredAt,
+                        errorMessage: normalizedReason,
+                    },
+                    tx,
+                );
+            }
+
+            await this.synchronizeCheckoutStatus(
+                tenant,
+                shipmentId,
+                tx,
+            );
+        });
     }
 
     async handleEvent(

@@ -242,7 +242,19 @@ describe('Self-Delivery Idempotency Integration', () => {
             expect(confirmed?.status).toBe('confirmed');
             expect(confirmed?.source_order_id).toBe(sourceOrderId);
             expect(confirmed?.error_message).toBeNull();
+            const shipmentAfterConfirmation = await db.queryOne<{
+                external_shipment_id: string | null;
+            }>(
+                `
+    SELECT external_shipment_id
+    FROM "flow_ship_test_a".shipments
+    WHERE id = $1
+    `,
+                [confirmationShipmentId],
+            );
 
+            expect(shipmentAfterConfirmation?.external_shipment_id)
+                .toBe(sourceOrderId);
             await expect(
                 repository.markConfirmed(
                     tenant,
@@ -271,6 +283,74 @@ describe('Self-Delivery Idempotency Integration', () => {
                 `DELETE FROM "flow_ship_test_a".shipments
              WHERE id = $1`,
                 [confirmationShipmentId],
+            );
+        }
+    });
+
+    it('rolls back confirmation when shipment has a different external ID', async () => {
+        const shipmentId = randomUUID();
+        const existingExternalId = `existing-${shipmentId}`;
+        const newExternalId = `new-${shipmentId}`;
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".shipments
+            (id, order_id, external_shipment_id)
+         VALUES ($1, $2, $3)`,
+            [shipmentId, `test-order-${shipmentId}`, existingExternalId],
+        );
+
+        try {
+            await repository.createPending(tenant, shipmentId, {
+                orderId: `test-order-${shipmentId}`,
+                storeId: 'test-store',
+                sourceId: 'test-source',
+                recipient: {
+                    name: 'Test Customer',
+                    phone: '0501234567',
+                },
+                destination: {
+                    country: 'IL',
+                    city: 'Tel Aviv',
+                    street: 'Herzl',
+                    houseNumber: '10',
+                },
+                items: [{ sku: 'SKU-1', quantity: 1 }],
+            });
+
+            await repository.claimPending(tenant, shipmentId);
+
+            await expect(
+                repository.markConfirmed(tenant, shipmentId, newExternalId),
+            ).rejects.toThrow('Shipment external ID update failed');
+
+            const fulfillment = await repository.findByShipmentId(
+                tenant,
+                shipmentId,
+            );
+
+            expect(fulfillment?.status).toBe('processing');
+            expect(fulfillment?.source_order_id).toBeNull();
+
+            const shipment = await db.queryOne<{
+                external_shipment_id: string | null;
+            }>(
+                `SELECT external_shipment_id
+             FROM "flow_ship_test_a".shipments
+             WHERE id = $1`,
+                [shipmentId],
+            );
+
+            expect(shipment?.external_shipment_id).toBe(existingExternalId);
+        } finally {
+            await db.query(
+                `DELETE FROM "flow_ship_test_a".self_delivery_fulfillments
+             WHERE shipment_id = $1`,
+                [shipmentId],
+            );
+
+            await db.query(
+                `DELETE FROM "flow_ship_test_a".shipments WHERE id = $1`,
+                [shipmentId],
             );
         }
     });

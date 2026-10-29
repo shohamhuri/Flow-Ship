@@ -1,186 +1,186 @@
 import { Injectable } from '@nestjs/common';
 
 import {
-    DbService,
+  DbService,
 } from '../../infrastructure/database/db.service';
 
 import {
-    CurrentTenant,
+  CurrentTenant,
 } from '../tenants/tenants.service';
 
 export interface ShipmentHistoryShipment {
-    id: string;
+  id: string;
 
-    externalShipmentId: string | null;
-    shipmentGroupId: string | null;
+  externalShipmentId: string | null;
+  shipmentGroupId: string | null;
 
-    status: string;
+  status: string;
 
-    carrierName: string | null;
-    serviceName: string | null;
+  carrierName: string | null;
+  serviceName: string | null;
 
-    price: number | null;
-    currency: string;
+  price: number | null;
+  currency: string;
 
-    trackingNumber: string | null;
-    trackingUrl: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
 
-    pickup: Record<string, unknown> | null;
-    dropoff: Record<string, unknown> | null;
+  pickup: Record<string, unknown> | null;
+  dropoff: Record<string, unknown> | null;
 
-    failureReason: string | null;
-    deliveredAt: Date | string | null;
-    failedAt: Date | string | null;
+  failureReason: string | null;
+  deliveredAt: Date | string | null;
+  failedAt: Date | string | null;
 
-    createdAt: Date | string;
+  createdAt: Date | string;
 }
 export interface ShipmentHistoryFilters {
-    resultStatus?: 'delivered' | 'failed';
+  resultStatus?: 'delivered' | 'failed';
 
-    carrierName?: string;
-    search?: string;
+  carrierName?: string;
+  search?: string;
 
-    fromDate?: string;
-    toDate?: string;
+  fromDate?: string;
+  toDate?: string;
 
-    sortBy?:
-    | 'completedAt'
-    | 'createdAt'
-    | 'totalShippingPrice'
-    | 'totalShipments';
+  sortBy?:
+  | 'completedAt'
+  | 'createdAt'
+  | 'totalShippingPrice'
+  | 'totalShipments';
 
-    sortDirection?: 'asc' | 'desc';
+  sortDirection?: 'asc' | 'desc';
 }
 
 export interface ShipmentHistoryItem {
-    checkoutId: string;
-    orderId: string;
-    platform: string;
+  checkoutId: string;
+  orderId: string;
+  platform: string;
 
-    resultStatus:
-    | 'delivered'
-    | 'failed';
+  resultStatus:
+  | 'delivered'
+  | 'failed';
 
-    checkoutStatus: string;
-    failureStage: string | null;
-    failureReason: string | null;
+  checkoutStatus: string;
+  failureStage: string | null;
+  failureReason: string | null;
 
-    destination:
-    Record<string, unknown>;
+  destination:
+  Record<string, unknown>;
 
-    totalShipments: number;
-    deliveredShipments: number;
-    failedShipments: number;
+  totalShipments: number;
+  deliveredShipments: number;
+  failedShipments: number;
 
-    totalShippingPrice: number;
-    currency: string;
+  totalShippingPrice: number;
+  currency: string;
 
-    createdAt: Date;
-    completedAt: Date | null;
+  createdAt: Date;
+  completedAt: Date | null;
 
-    shipments:
-    ShipmentHistoryShipment[];
+  shipments:
+  ShipmentHistoryShipment[];
 }
 
 interface ShipmentHistoryRow {
-    checkout_id: string;
-    order_id: string;
-    platform: string;
+  checkout_id: string;
+  order_id: string;
+  platform: string;
 
-    result_status:
-    | 'delivered'
-    | 'failed';
+  result_status:
+  | 'delivered'
+  | 'failed';
 
-    checkout_status: string;
-    failure_stage: string | null;
-    failure_reason: string | null;
+  checkout_status: string;
+  failure_stage: string | null;
+  failure_reason: string | null;
 
-    destination:
-    Record<string, unknown>;
+  destination:
+  Record<string, unknown>;
 
-    total_shipments:
-    string | number;
+  total_shipments:
+  string | number;
 
-    delivered_shipments:
-    string | number;
+  delivered_shipments:
+  string | number;
 
-    failed_shipments:
-    string | number;
+  failed_shipments:
+  string | number;
 
-    total_shipping_price:
-    string | number;
+  total_shipping_price:
+  string | number;
 
-    currency: string;
+  currency: string;
 
-    created_at:
-    Date | string;
+  created_at:
+  Date | string;
 
-    completed_at:
-    Date | string | null;
+  completed_at:
+  Date | string | null;
 
-    shipments:
-    ShipmentHistoryShipment[];
+  shipments:
+  ShipmentHistoryShipment[];
 }
 
 @Injectable()
 export class ShipmentHistoryRepository {
-    constructor(
-        private readonly db: DbService,
-    ) { }
+  constructor(
+    private readonly db: DbService,
+  ) { }
 
-    async findFinalOrders(
-        tenant: CurrentTenant,
-        filters: ShipmentHistoryFilters = {},
-    ): Promise<ShipmentHistoryItem[]> {
-        const schemaName =
-            this.safeSchemaName(
-                tenant.schemaName,
-            );
+  async findFinalOrders(
+    tenant: CurrentTenant,
+    filters: ShipmentHistoryFilters = {},
+  ): Promise<ShipmentHistoryItem[]> {
+    const schemaName =
+      this.safeSchemaName(
+        tenant.schemaName,
+      );
 
-        const resultStatus =
-            filters.resultStatus ?? null;
+    const resultStatus =
+      filters.resultStatus ?? null;
 
-        const carrierName =
-            filters.carrierName?.trim() || null;
+    const carrierName =
+      filters.carrierName?.trim() || null;
 
-        const search =
-            filters.search?.trim() || null;
+    const search =
+      filters.search?.trim() || null;
 
-        const fromDate =
-            filters.fromDate ?? null;
+    const fromDate =
+      filters.fromDate ?? null;
 
-        const toDate =
-            filters.toDate ?? null;
+    const toDate =
+      filters.toDate ?? null;
 
-        const sortDirection =
-            filters.sortDirection === 'asc'
-                ? 'asc'
-                : 'desc';
+    const sortDirection =
+      filters.sortDirection === 'asc'
+        ? 'asc'
+        : 'desc';
 
-        const sortColumnMap: Record<
-            NonNullable<
-                ShipmentHistoryFilters['sortBy']
-            >,
-            string
-        > = {
-            completedAt: 'final_order.completed_at',
-            createdAt: 'final_order.created_at',
-            totalShippingPrice:
-                'final_order.total_shipping_price',
-            totalShipments:
-                'final_order.total_shipments',
-        };
+    const sortColumnMap: Record<
+      NonNullable<
+        ShipmentHistoryFilters['sortBy']
+      >,
+      string
+    > = {
+      completedAt: 'final_order.completed_at',
+      createdAt: 'final_order.created_at',
+      totalShippingPrice:
+        'final_order.total_shipping_price',
+      totalShipments:
+        'final_order.total_shipments',
+    };
 
-        const sortBy =
-            filters.sortBy ?? 'completedAt';
+    const sortBy =
+      filters.sortBy ?? 'completedAt';
 
-        const sortColumn =
-            sortColumnMap[sortBy] ??
-            sortColumnMap.completedAt;
+    const sortColumn =
+      sortColumnMap[sortBy] ??
+      sortColumnMap.completedAt;
 
-        const rows =
-            await this.db.query<ShipmentHistoryRow>(
-                `
+    const rows =
+      await this.db.query<ShipmentHistoryRow>(
+        `
       with shipment_summary as (
         select
           shipment.checkout_id,
@@ -549,89 +549,144 @@ export class ShipmentHistoryRepository {
 
         final_order.created_at desc
       `,
-                [
-                    resultStatus,
-                    carrierName,
-                    search,
-                    fromDate,
-                    toDate,
-                ],
-            );
+        [
+          resultStatus,
+          carrierName,
+          search,
+          fromDate,
+          toDate,
+        ],
+      );
 
-        return rows.map(
-            (row): ShipmentHistoryItem => ({
-                checkoutId:
-                    row.checkout_id,
+    return rows.map(
+      (row): ShipmentHistoryItem => ({
+        checkoutId:
+          row.checkout_id,
 
-                orderId:
-                    row.order_id,
+        orderId:
+          row.order_id,
 
-                platform:
-                    row.platform,
+        platform:
+          row.platform,
 
-                resultStatus:
-                    row.result_status,
+        resultStatus:
+          row.result_status,
 
-                checkoutStatus:
-                    row.checkout_status,
+        checkoutStatus:
+          row.checkout_status,
 
-                failureStage:
-                    row.failure_stage,
+        failureStage:
+          row.failure_stage,
 
-                failureReason:
-                    row.failure_reason,
+        failureReason:
+          row.failure_reason,
 
-                destination:
-                    row.destination ?? {},
+        destination:
+          row.destination ?? {},
 
-                totalShipments:
-                    Number(row.total_shipments),
+        totalShipments:
+          Number(row.total_shipments),
 
-                deliveredShipments:
-                    Number(
-                        row.delivered_shipments,
-                    ),
+        deliveredShipments:
+          Number(
+            row.delivered_shipments,
+          ),
 
-                failedShipments:
-                    Number(
-                        row.failed_shipments,
-                    ),
+        failedShipments:
+          Number(
+            row.failed_shipments,
+          ),
 
-                totalShippingPrice:
-                    Number(
-                        row.total_shipping_price,
-                    ),
+        totalShippingPrice:
+          Number(
+            row.total_shipping_price,
+          ),
 
-                currency:
-                    row.currency,
+        currency:
+          row.currency,
 
-                createdAt:
-                    new Date(row.created_at),
+        createdAt:
+          new Date(row.created_at),
 
-                completedAt:
-                    row.completed_at
-                        ? new Date(row.completed_at)
-                        : null,
+        completedAt:
+          row.completed_at
+            ? new Date(row.completed_at)
+            : null,
 
-                shipments:
-                    row.shipments ?? [],
-            }),
-        );
+        shipments:
+          row.shipments ?? [],
+      }),
+    );
+  }
+  async findShipmentEvents(
+    tenant: CurrentTenant,
+    shipmentId: string,
+  ): Promise<{
+    id: string;
+    shipmentId: string;
+    eventType: string;
+    previousStatus: string | null;
+    newStatus: string | null;
+    occurredAt: Date;
+    recordedAt: Date;
+  }[]> {
+    const schemaName = this.safeSchemaName(
+      tenant.schemaName,
+    );
+
+    const rows = await this.db.query<{
+      id: string;
+      shipment_id: string;
+      event_type: string;
+      previous_status: string | null;
+      new_status: string | null;
+      occurred_at: Date;
+      recorded_at: Date;
+    }>(
+      `
+        SELECT
+            e.id,
+            e.shipment_id,
+            e.event_type,
+            e.previous_status,
+            e.new_status,
+            e.occurred_at,
+            e.recorded_at
+        FROM "${schemaName}".shipment_events e
+        INNER JOIN "${schemaName}".shipments s
+            ON s.id = e.shipment_id
+        WHERE e.shipment_id = $1
+        ORDER BY e.occurred_at ASC,
+                 e.recorded_at ASC,
+                 e.id ASC
+        `,
+      [shipmentId],
+    );
+
+    return rows.map(row => ({
+      id: row.id,
+      shipmentId: row.shipment_id,
+      eventType: row.event_type,
+      previousStatus: row.previous_status,
+      newStatus: row.new_status,
+      occurredAt: row.occurred_at,
+      recordedAt: row.recorded_at,
+    }));
+  }
+  private safeSchemaName(
+    schemaName: string,
+  ): string {
+    if (
+      !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(
+        schemaName,
+      )
+    ) {
+      throw new Error(
+        `Invalid schema name: ${schemaName}`,
+      );
     }
 
-    private safeSchemaName(
-        schemaName: string,
-    ): string {
-        if (
-            !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(
-                schemaName,
-            )
-        ) {
-            throw new Error(
-                `Invalid schema name: ${schemaName}`,
-            );
-        }
+    return schemaName;
+  }
 
-        return schemaName;
-    }
 }

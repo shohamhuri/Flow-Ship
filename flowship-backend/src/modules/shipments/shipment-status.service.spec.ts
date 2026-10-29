@@ -23,6 +23,7 @@ describe('ShipmentStatusService', () => {
     let markDropoffCompletedMock: jest.Mock;
     let markDeliveredMock: jest.Mock;
     let markFailedMock: jest.Mock;
+    let recordShipmentEventMock: jest.Mock;
     let findCheckoutIdByShipmentIdMock: jest.Mock;
     let getShipmentStatusSummaryMock: jest.Mock;
     let updateCheckoutStatusMock: jest.Mock;
@@ -51,6 +52,8 @@ describe('ShipmentStatusService', () => {
             .mockResolvedValue(undefined);
 
         markFailedMock = jest.fn()
+            .mockResolvedValue(undefined);
+        recordShipmentEventMock = jest.fn()
             .mockResolvedValue(undefined);
 
         findCheckoutIdByShipmentIdMock = jest.fn()
@@ -84,6 +87,8 @@ describe('ShipmentStatusService', () => {
 
             markFailed:
                 markFailedMock,
+            recordShipmentEvent:
+                recordShipmentEventMock,
 
             findCheckoutIdByShipmentId:
                 findCheckoutIdByShipmentIdMock,
@@ -134,6 +139,8 @@ describe('ShipmentStatusService', () => {
             'shipment-1',
             2,
             occurredAt,
+            expect.any(Object),
+
         );
     });
 
@@ -153,6 +160,8 @@ describe('ShipmentStatusService', () => {
             tenant,
             'shipment-1',
             'picked_up',
+            expect.any(Object),
+
         );
     });
 
@@ -183,7 +192,8 @@ describe('ShipmentStatusService', () => {
         ).toHaveBeenCalledWith(
             tenant,
             'shipment-1',
-            undefined,
+            expect.any(Object),
+
 
         );
 
@@ -192,8 +202,7 @@ describe('ShipmentStatusService', () => {
         ).toHaveBeenCalledWith(
             tenant,
             'checkout-1',
-            undefined,
-
+            expect.any(Object),
         );
     });
 
@@ -209,6 +218,8 @@ describe('ShipmentStatusService', () => {
             tenant,
             'shipment-1',
             'in_transit',
+            expect.any(Object),
+
         );
 
         expect(
@@ -216,7 +227,7 @@ describe('ShipmentStatusService', () => {
         ).toHaveBeenCalledWith(
             tenant,
             'shipment-1',
-            undefined,
+            expect.any(Object),
 
         );
     });
@@ -274,6 +285,8 @@ describe('ShipmentStatusService', () => {
             'shipment-1',
             'address not found',
             occurredAt,
+            expect.any(Object),
+
         );
     });
 
@@ -344,6 +357,8 @@ describe('ShipmentStatusService', () => {
             'shipment-1',
             3,
             new Date(occurredAt),
+            expect.any(Object),
+
         );
     });
 
@@ -365,6 +380,8 @@ describe('ShipmentStatusService', () => {
             tenant,
             'shipment-1',
             'in_transit',
+            expect.any(Object),
+
         );
     });
 
@@ -561,7 +578,7 @@ describe('ShipmentStatusService', () => {
             tenant,
             'checkout-1',
             'partially_failed',
-            undefined,
+            expect.any(Object),
         );
     });
 
@@ -615,7 +632,7 @@ describe('ShipmentStatusService', () => {
                 tenant,
                 'checkout-1',
                 expectedStatus,
-                undefined,
+                expect.any(Object),
 
             );
         },

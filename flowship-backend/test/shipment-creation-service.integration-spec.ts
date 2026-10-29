@@ -382,6 +382,7 @@ describe(
                         shipments: [
                             {
                                 sourceId: 'integration-source',
+                                estimatedDeliveryAt: '2026-11-01T14:30:00.000Z',
                                 vehicleIndex: 0,
                                 vehicleType: 'car',
                                 assignedWeightKg: 3,
@@ -450,7 +451,7 @@ describe(
                 metrics: {
                     totalShippingPrice:
                         35,
-
+                    pickupLeadTimeMinutes: 0,
                     estimatedDeliveryDays:
                         1,
 
@@ -542,6 +543,12 @@ describe(
 
                         estimated_delivery_days:
                         number;
+                        preparation_time_minutes: number | null;
+                        estimated_delivery_at: Date | null;
+                        metadata: {
+                            sourceId?: string;
+                            deliveryMethod?: 'carrier' | 'self_delivery';
+                        };
                     }>(
                         `
                         select
@@ -550,8 +557,11 @@ describe(
                             carrier_name,
                             service_name,
                             price,
-                            currency,
-                            estimated_delivery_days
+                           currency,
+estimated_delivery_days,
+estimated_delivery_at,
+metadata,
+preparation_time_minutes
                         from flow_ship_test_a.shipments
                         where id = $1
                         `,
@@ -565,7 +575,9 @@ describe(
                 ).toHaveLength(
                     1,
                 );
-
+                expect(
+                    rows[0].preparation_time_minutes,
+                ).toBe(0);
                 expect(
                     rows[0],
                 ).toMatchObject({
@@ -590,6 +602,17 @@ describe(
                     estimated_delivery_days:
                         1,
                 });
+                expect(
+                    rows[0].estimated_delivery_at?.toISOString(),
+                ).toBe('2026-11-01T14:30:00.000Z');
+
+                expect(
+                    rows[0].metadata.sourceId,
+                ).toBe('integration-source');
+
+                expect(
+                    rows[0].metadata.deliveryMethod,
+                ).toBe('carrier');
             },
         );
 

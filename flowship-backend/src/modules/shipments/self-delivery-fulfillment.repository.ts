@@ -135,23 +135,58 @@ export class SelfDeliveryFulfillmentRepository {
         sourceOrderId: string,
     ): Promise<void> {
         const schema = this.safeSchemaName(tenant.schemaName);
+        const externalId = sourceOrderId.trim();
 
-        const rows = await this.db.query(
-            `
+        if (!externalId) {
+            throw new Error('External shipment ID cannot be empty');
+        }
+
+        await this.db.transaction(async (tx) => {
+            const rows = await tx.query<{ id: string }>(
+                `
             UPDATE "${schema}".self_delivery_fulfillments
             SET status = 'confirmed',
                 source_order_id = $2,
                 error_message = NULL,
                 updated_at = now()
-            WHERE shipment_id = $1 AND status = 'processing'
+            WHERE shipment_id = $1
+              AND status = 'processing'
+              AND (
+                  source_order_id IS NULL
+                  OR source_order_id = $2
+              )
             RETURNING id
             `,
-            [shipmentId, sourceOrderId],
-        );
+                [shipmentId, externalId],
+            );
 
-        if (rows.length !== 1) {
-            throw new Error('Fulfillment confirmation update failed');
-        }
+            if (rows.length !== 1) {
+                throw new Error(
+                    'Fulfillment confirmation update failed',
+                );
+            }
+
+            const shipmentRows = await tx.query<{ id: string }>(
+                `
+            UPDATE "${schema}".shipments
+            SET external_shipment_id = $2,
+                updated_at = now()
+            WHERE id = $1
+              AND (
+                  external_shipment_id IS NULL
+                  OR external_shipment_id = $2
+              )
+            RETURNING id
+            `,
+                [shipmentId, externalId],
+            );
+
+            if (shipmentRows.length !== 1) {
+                throw new Error(
+                    'Shipment external ID update failed',
+                );
+            }
+        });
     }
 
     async markFailed(

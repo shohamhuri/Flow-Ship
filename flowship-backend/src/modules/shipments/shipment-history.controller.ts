@@ -3,6 +3,8 @@ import {
     Get,
     UseGuards,
     Query,
+    Param,
+
 } from '@nestjs/common';
 import {
     ShipmentHistoryQueryDto,
@@ -81,6 +83,28 @@ export class ShipmentHistoryController {
 
             count: items.length,
             items,
+        };
+    }
+    @Get(':shipmentId/events')
+    async getShipmentEvents(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+
+        @Param('shipmentId')
+        shipmentId: string,
+    ) {
+        const events =
+            await this.shipmentHistoryService
+                .getShipmentEvents(
+                    auth.tenant,
+                    shipmentId,
+                );
+
+        return {
+            ok: true,
+            shipmentId,
+            count: events.length,
+            events,
         };
     }
 }

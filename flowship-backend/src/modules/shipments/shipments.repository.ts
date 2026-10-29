@@ -43,10 +43,14 @@ export interface CreateShipmentData {
 
     carrierName: string;
     serviceName: string;
-
     price: number;
     currency: string;
     estimatedDeliveryDays: number;
+
+    // Additional shipment tracking fields
+    preparationTimeMinutes?: number | null;
+    estimatedDeliveryAt?: string | null;
+    externalShipmentId?: string | null;
 
     status: string;
     metadata?: {
@@ -106,10 +110,13 @@ export class ShipmentsRepository {
 
             price,
             currency,
-            estimated_delivery_days,
+          estimated_delivery_days,
+preparation_time_minutes,
+estimated_delivery_at,
+external_shipment_id,
 
-                      status,
-            metadata
+status,
+metadata
         )
         VALUES
         (
@@ -117,8 +124,9 @@ export class ShipmentsRepository {
             $4, $5,
             $6, $7, $8,
             $9, $10,
-            $11, $12, $13,
-            $14, $15::jsonb
+          $11, $12, $13,
+$14, $15, $16,
+$17, $18::jsonb
         )
         RETURNING id
         `,
@@ -140,6 +148,10 @@ export class ShipmentsRepository {
                     shipment.price,
                     shipment.currency,
                     shipment.estimatedDeliveryDays,
+
+                    shipment.preparationTimeMinutes ?? null,
+                    shipment.estimatedDeliveryAt ?? null,
+                    shipment.externalShipmentId ?? null,
 
                     shipment.status,
                     JSON.stringify(shipment.metadata ?? {}),
@@ -241,24 +253,37 @@ export class ShipmentsRepository {
         shipmentId: string,
         deliveredAt: Date = new Date(),
         tx?: DbTransaction,
-    ): Promise<void> {
+    ): Promise<string | null> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await (tx ?? this.db).query(`    update "${schemaName}".shipments
-    set
-      status = 'delivered',
-    delivered_at = coalesce(delivered_at, $1),
-    failed_at = null,
-    failure_reason = null
-where id = $2
-  and status not in ('delivered', 'failed')
+
+        const rows = await (tx ?? this.db).query<{
+            previous_status: string;
+        }>(
+            `
+    WITH previous AS MATERIALIZED (
+        SELECT id, status
+        FROM "${schemaName}".shipments
+        WHERE id = $2
+        FOR UPDATE
+    )
+    UPDATE "${schemaName}".shipments AS s
+    SET status = 'delivered',
+        delivered_at = COALESCE(s.delivered_at, $1),
+        failed_at = NULL,
+        failure_reason = NULL,
+        updated_at = now()
+    FROM previous
+    WHERE s.id = previous.id
+      AND previous.status NOT IN ('delivered', 'failed')
+    RETURNING previous.status AS previous_status
     `,
-            [
-                deliveredAt,
-                shipmentId,
-            ],
+            [deliveredAt, shipmentId],
         );
+
+        return rows[0]?.previous_status ?? null;
+
     }
 
     async markFailed(
@@ -266,27 +291,37 @@ where id = $2
         shipmentId: string,
         failureReason: string,
         failedAt: Date = new Date(),
-    ): Promise<void> {
+        tx?: DbTransaction,
+    ): Promise<string | null> {
+
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
-
-        await this.db.query(
+        const rows = await (tx ?? this.db).query<{
+            previous_status: string;
+        }>(
             `
-    update "${schemaName}".shipments
-    set
-       status = 'failed',
-    failed_at = coalesce(failed_at, $1),
-    failure_reason = coalesce(failure_reason, $2),
-    delivered_at = null
-where id = $3
-  and status not in ('delivered', 'failed')
+    WITH previous AS MATERIALIZED (
+        SELECT id, status
+        FROM "${schemaName}".shipments
+        WHERE id = $3
+        FOR UPDATE
+    )
+    UPDATE "${schemaName}".shipments AS s
+    SET status = 'failed',
+        failed_at = COALESCE(s.failed_at, $1),
+        failure_reason = $2,
+        delivered_at = NULL,
+        updated_at = now()
+    FROM previous
+    WHERE s.id = previous.id
+      AND previous.status NOT IN ('delivered', 'failed')
+    RETURNING previous.status AS previous_status
     `,
-            [
-                failedAt,
-                failureReason,
-                shipmentId,
-            ],
+            [failedAt, failureReason, shipmentId],
         );
+
+        return rows[0]?.previous_status ?? null;
+
     }
 
     async markDropoffCompleted(
@@ -325,12 +360,12 @@ where shipment_id = $2
         shipmentId: string,
         stopOrder: number,
         completedAt: Date = new Date(),
+        tx?: DbTransaction,
     ): Promise<void> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await this.db.query(
-            `
+        await (tx ?? this.db).query(`
         update "${schemaName}".shipment_stops
         set
            status = 'completed',
@@ -350,11 +385,12 @@ where shipment_id = $2
     async areAllPickupsCompleted(
         tenant: CurrentTenant,
         shipmentId: string,
+        tx?: DbTransaction,
     ): Promise<boolean> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        const rows = await this.db.query<{
+        const rows = await (tx ?? this.db).query<{
             remaining_count: string | number;
         }>(
             `
@@ -375,28 +411,42 @@ where shipment_id = $2
         tenant: CurrentTenant,
         shipmentId: string,
         status: string,
-    ): Promise<void> {
+        tx?: DbTransaction,
+    ): Promise<string | null> {
         const schemaName =
             this.safeSchemaName(tenant.schemaName);
 
-        await this.db.query(
+
+        const rows = await (tx ?? this.db).query<{
+            previous_status: string;
+        }>(
             `
-    update "${schemaName}".shipments
-    set
-       status = $1,
+    WITH previous AS (
+        SELECT id, status
+        FROM "${schemaName}".shipments
+        WHERE id = $2
+        FOR UPDATE
+    )
+    UPDATE "${schemaName}".shipments AS s
+    SET
+        status = $1,
         updated_at = now()
-    where id = $2
-  and (
-    (status in ('created', 'pending') and $1 = 'picked_up')
-    or
-    (status in ('created', 'pending', 'picked_up') and $1 = 'in_transit')
-  )
+    FROM previous
+    WHERE s.id = previous.id
+      AND (
+          (previous.status IN ('created', 'pending')
+              AND $1 = 'picked_up')
+          OR
+          (previous.status IN ('created', 'pending', 'picked_up')
+              AND $1 = 'in_transit')
+      )
+    RETURNING previous.status AS previous_status
     `,
-            [
-                status,
-                shipmentId,
-            ],
+            [status, shipmentId],
         );
+
+        return rows[0]?.previous_status ?? null;
+
     }
     async findCheckoutIdByShipmentId(
         tenant: CurrentTenant,
@@ -554,6 +604,59 @@ where shipment_id = $2
         ORDER BY id
         `,
             [checkoutId],
+        );
+    }
+
+    async recordShipmentEvent(
+        tenant: CurrentTenant,
+        event: {
+            shipmentId: string;
+            eventType: string;
+            previousStatus?: string | null;
+            newStatus?: string | null;
+            occurredAt: Date;
+            sourceId?: string | null;
+            externalEventId?: string | null;
+            errorCode?: string | null;
+            errorMessage?: string | null;
+            metadata?: Record<string, unknown>;
+        },
+        tx: DbTransaction,
+    ): Promise<void> {
+        const schema = this.safeSchemaName(tenant.schemaName);
+
+        await tx.query(
+            `
+        INSERT INTO "${schema}".shipment_events (
+            shipment_id,
+            event_type,
+            previous_status,
+            new_status,
+            occurred_at,
+            source_id,
+            external_event_id,
+            error_code,
+            error_message,
+            metadata
+        )
+        VALUES (
+            $1, $2, $3, $4, $5,
+            $6, $7, $8, $9, $10::jsonb
+        )
+        ON CONFLICT DO NOTHING
+        `,
+            [
+                event.shipmentId,
+                event.eventType,
+                event.previousStatus ?? null,
+                event.newStatus ?? null,
+                event.occurredAt,
+                event.sourceId ?? null,
+                event.externalEventId ?? null,
+                event.errorCode ?? null,
+                event.errorMessage ?? null,
+                JSON.stringify(event.metadata ?? {}),
+            ],
         );
     }
 

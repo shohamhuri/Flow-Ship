@@ -517,6 +517,15 @@ describe('ShipmentsRepository Integration', () => {
                     estimatedDeliveryDays:
                         2,
 
+                    preparationTimeMinutes:
+                        45,
+
+                    estimatedDeliveryAt:
+                        '2026-11-01T14:30:00.000Z',
+
+                    externalShipmentId:
+                        'EXT-INTEGRATION-12345',
+
                     status:
                         'created',
                 },
@@ -760,15 +769,21 @@ describe('ShipmentsRepository Integration', () => {
                 carrier_name: string;
                 service_name: string;
                 status: string;
+                preparation_time_minutes: number | null;
+                estimated_delivery_at: Date | null;
+                external_shipment_id: string | null;
             }>(
                 `
                 select
                     id,
                     checkout_id,
                     shipment_group_id,
-                    carrier_name,
-                    service_name,
-                    status
+                carrier_name,
+service_name,
+status,
+preparation_time_minutes,
+estimated_delivery_at,
+external_shipment_id
                 from flow_ship_test_a.shipments
                 where id = $1
                 `,
@@ -796,6 +811,17 @@ describe('ShipmentsRepository Integration', () => {
             status:
                 'created',
         });
+        expect(
+            rows[0].preparation_time_minutes,
+        ).toBe(45);
+
+        expect(
+            rows[0].estimated_delivery_at?.toISOString(),
+        ).toBe('2026-11-01T14:30:00.000Z');
+
+        expect(
+            rows[0].external_shipment_id,
+        ).toBe('EXT-INTEGRATION-12345');
     });
 
     it('should keep Tenant A shipment out of Tenant B schema', async () => {
