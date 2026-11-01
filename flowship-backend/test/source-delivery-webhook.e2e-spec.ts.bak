@@ -1,0 +1,352 @@
+﻿import './integration-safety';
+
+import { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { createHmac, randomUUID } from 'node:crypto';
+import request from 'supertest';
+
+import { AppModule } from '../src/app.module';
+import { DbService } from '../src/infrastructure/database/db.service';
+import {
+    CurrentTenant,
+    TenantsService,
+} from '../src/modules/tenants/tenants.service';
+import { SelfDeliveryFulfillmentRepository } from '../src/modules/shipments/self-delivery-fulfillment.repository';
+
+describe('Source Delivery Webhook HTTP E2E', () => {
+    let app: INestApplication;
+    let db: DbService;
+    let tenant: CurrentTenant;
+    let fulfillmentRepository: SelfDeliveryFulfillmentRepository;
+
+    const shipmentId = randomUUID();
+    const checkoutId = randomUUID();
+    const webhookId = randomUUID();
+    const storeId = `webhook-store-${randomUUID()}`;
+    const sourceId = `webhook-source-${randomUUID()}`;
+    const sourceOrderId = `webhook-order-${randomUUID()}`;
+    const orderId = `webhook-checkout-${randomUUID()}`;
+    const webhookSecret = 'local-e2e-webhook-secret-at-least-32-characters';
+
+    beforeAll(async () => {
+        const moduleRef = await Test.createTestingModule({
+            imports: [AppModule],
+        }).compile();
+
+        app = moduleRef.createNestApplication({
+            rawBody: true,
+        });
+
+        await app.init();
+
+        db = app.get(DbService);
+        const config = app.get(ConfigService);
+        const tenants = app.get(TenantsService);
+
+        const apiKey = config.get<string>('TEST_FLOW_SHIP_A_API_KEY');
+
+        if (!apiKey) {
+            throw new Error('Missing TEST_FLOW_SHIP_A_API_KEY');
+        }
+
+        tenant = await tenants.findByApiKey(apiKey);
+
+        if (tenant.schemaName !== 'flow_ship_test_a') {
+            throw new Error('Test requires flow_ship_test_a');
+        }
+
+        fulfillmentRepository = app.get(
+            SelfDeliveryFulfillmentRepository,
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".checkouts
+             (id, platform, status)
+             VALUES ($1, $2, $3)`,
+            [checkoutId, 'test', 'open'],
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".shipments
+             (id, order_id, checkout_id)
+             VALUES ($1, $2, $3)`,
+            [shipmentId, orderId, checkoutId],
+        );
+
+        await fulfillmentRepository.createPending(tenant, shipmentId, {
+            orderId,
+            storeId,
+            sourceId,
+            recipient: {
+                name: 'Test Customer',
+                phone: '0501234567',
+            },
+            destination: {
+                country: 'IL',
+                city: 'Tel Aviv',
+                street: 'Herzl',
+                houseNumber: '10',
+            },
+            items: [{ sku: 'SKU-1', quantity: 1 }],
+        });
+
+        await fulfillmentRepository.claimPending(tenant, shipmentId);
+
+        await fulfillmentRepository.markConfirmed(
+            tenant,
+            shipmentId,
+            sourceOrderId,
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".source_delivery_integrations
+             (store_id, source_id, webhook_id, webhook_secret, webhook_enabled)
+             VALUES ($1, $2, $3, $4, true)`,
+            [storeId, sourceId, webhookId, webhookSecret],
+        );
+    }, 30000);
+    
+    beforeAll(async () => {
+        const moduleRef = await Test.createTestingModule({
+            imports: [AppModule],
+        }).compile();
+
+        app = moduleRef.createNestApplication({
+            rawBody: true,
+        });
+
+        await app.init();
+
+        db = app.get(DbService);
+        const config = app.get(ConfigService);
+        const tenants = app.get(TenantsService);
+
+        const apiKey = config.get<string>('TEST_FLOW_SHIP_A_API_KEY');
+
+        if (!apiKey) {
+            throw new Error('Missing TEST_FLOW_SHIP_A_API_KEY');
+        }
+
+        tenant = await tenants.findByApiKey(apiKey);
+
+        if (tenant.schemaName !== 'flow_ship_test_a') {
+            throw new Error('Test requires flow_ship_test_a');
+        }
+
+        fulfillmentRepository = app.get(
+            SelfDeliveryFulfillmentRepository,
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".checkouts
+             (id, platform, status)
+             VALUES ($1, $2, $3)`,
+            [checkoutId, 'test', 'open'],
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".shipments
+             (id, order_id, checkout_id)
+             VALUES ($1, $2, $3)`,
+            [shipmentId, orderId, checkoutId],
+        );
+
+        await fulfillmentRepository.createPending(tenant, shipmentId, {
+            orderId,
+            storeId,
+            sourceId,
+            recipient: {
+                name: 'Test Customer',
+                phone: '0501234567',
+            },
+            destination: {
+                country: 'IL',
+                city: 'Tel Aviv',
+                street: 'Herzl',
+                houseNumber: '10',
+            },
+            items: [{ sku: 'SKU-1', quantity: 1 }],
+        });
+
+        await fulfillmentRepository.claimPending(tenant, shipmentId);
+
+        await fulfillmentRepository.markConfirmed(
+            tenant,
+            shipmentId,
+            sourceOrderId,
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".source_delivery_integrations
+             (store_id, source_id, webhook_id, webhook_secret, webhook_enabled)
+             VALUES ($1, $2, $3, $4, true)`,
+            [storeId, sourceId, webhookId, webhookSecret],
+        );
+    }, 30000);
+         beforeAll(async () => {
+        const moduleRef = await Test.createTestingModule({
+            imports: [AppModule],
+        }).compile();
+
+        app = moduleRef.createNestApplication({
+            rawBody: true,
+        });
+
+        await app.init();
+
+        db = app.get(DbService);
+        const config = app.get(ConfigService);
+        const tenants = app.get(TenantsService);
+
+        const apiKey = config.get<string>('TEST_FLOW_SHIP_A_API_KEY');
+
+        if (!apiKey) {
+            throw new Error('Missing TEST_FLOW_SHIP_A_API_KEY');
+        }
+
+        tenant = await tenants.findByApiKey(apiKey);
+
+        if (tenant.schemaName !== 'flow_ship_test_a') {
+            throw new Error('Test requires flow_ship_test_a');
+        }
+
+        fulfillmentRepository = app.get(
+            SelfDeliveryFulfillmentRepository,
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".checkouts
+             (id, platform, status)
+             VALUES ($1, $2, $3)`,
+            [checkoutId, 'test', 'open'],
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".shipments
+             (id, order_id, checkout_id)
+             VALUES ($1, $2, $3)`,
+            [shipmentId, orderId, checkoutId],
+        );
+
+        await fulfillmentRepository.createPending(tenant, shipmentId, {
+            orderId,
+            storeId,
+            sourceId,
+            recipient: {
+                name: 'Test Customer',
+                phone: '0501234567',
+            },
+            destination: {
+                country: 'IL',
+                city: 'Tel Aviv',
+                street: 'Herzl',
+                houseNumber: '10',
+            },
+            items: [{ sku: 'SKU-1', quantity: 1 }],
+        });
+
+        await fulfillmentRepository.claimPending(tenant, shipmentId);
+
+        await fulfillmentRepository.markConfirmed(
+            tenant,
+            shipmentId,
+            sourceOrderId,
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".source_delivery_integrations
+             (store_id, source_id, webhook_id, webhook_secret, webhook_enabled)
+             VALUES ($1, $2, $3, $4, true)`,
+            [storeId, sourceId, webhookId, webhookSecret],
+        );
+    }, 30000);
+         beforeAll(async () => {
+        const moduleRef = await Test.createTestingModule({
+            imports: [AppModule],
+        }).compile();
+
+        app = moduleRef.createNestApplication({
+            rawBody: true,
+        });
+
+        await app.init();
+
+        db = app.get(DbService);
+        const config = app.get(ConfigService);
+        const tenants = app.get(TenantsService);
+
+        const apiKey = config.get<string>('TEST_FLOW_SHIP_A_API_KEY');
+
+        if (!apiKey) {
+            throw new Error('Missing TEST_FLOW_SHIP_A_API_KEY');
+        }
+
+        tenant = await tenants.findByApiKey(apiKey);
+
+        if (tenant.schemaName !== 'flow_ship_test_a') {
+            throw new Error('Test requires flow_ship_test_a');
+        }
+
+        fulfillmentRepository = app.get(
+            SelfDeliveryFulfillmentRepository,
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".checkouts
+             (id, platform, status)
+             VALUES ($1, $2, $3)`,
+            [checkoutId, 'test', 'open'],
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".shipments
+             (id, order_id, checkout_id)
+             VALUES ($1, $2, $3)`,
+            [shipmentId, orderId, checkoutId],
+        );
+
+        await fulfillmentRepository.createPending(tenant, shipmentId, {
+            orderId,
+            storeId,
+            sourceId,
+            recipient: {
+                name: 'Test Customer',
+                phone: '0501234567',
+            },
+            destination: {
+                country: 'IL',
+                city: 'Tel Aviv',
+                street: 'Herzl',
+                houseNumber: '10',
+            },
+            items: [{ sku: 'SKU-1', quantity: 1 }],
+        });
+
+        await fulfillmentRepository.claimPending(tenant, shipmentId);
+
+        await fulfillmentRepository.markConfirmed(
+            tenant,
+            shipmentId,
+            sourceOrderId,
+        );
+
+        await db.query(
+            `INSERT INTO "flow_ship_test_a".source_delivery_integrations
+             (store_id, source_id, webhook_id, webhook_secret, webhook_enabled)
+             VALUES ($1, $2, $3, $4, true)`,
+            [storeId, sourceId, webhookId, webhookSecret],
+        );
+    }, 30000);
+    function sign(body: string, timestamp: string): string {
+        return createHmac('sha256', webhookSecret)
+            .update(timestamp)
+            .update('.')
+            .update(body)
+            .digest('hex');
+    }
+});
+
+
+
+

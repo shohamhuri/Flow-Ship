@@ -6,7 +6,9 @@ import {
     SelfDeliveryQuoteResponse,
     SelfDeliveryCreateRequest,
     SelfDeliveryCreateResponse,
-    SelfDeliveryProviderError
+    SelfDeliveryProviderError,
+    SelfDeliveryStatusRequest,
+    SelfDeliveryTrackingUpdate,
 } from '../interfaces/self-delivery-provider.interface';
 
 @Injectable()
@@ -34,6 +36,7 @@ export class MockSelfDeliveryProvider
         {
             fingerprint: string;
             response: SelfDeliveryCreateResponse;
+            createdAt: string;
         }
     >();
 
@@ -87,8 +90,37 @@ export class MockSelfDeliveryProvider
         this.deliveryOrders.set(request.requestId, {
             fingerprint,
             response,
+            createdAt: new Date().toISOString(),
         });
 
         return response;
     }
+
+    async getDeliveryStatus(
+        request: SelfDeliveryStatusRequest,
+    ): Promise<SelfDeliveryTrackingUpdate> {
+        const order = Array.from(this.deliveryOrders.values())
+            .find(
+                ({ response }) =>
+                    response.sourceId === request.sourceId &&
+                    response.sourceOrderId === request.sourceOrderId,
+            );
+
+        if (!order) {
+            throw new SelfDeliveryProviderError(
+                'INVALID_REQUEST',
+                'Mock self-delivery order not found',
+                false,
+            );
+        }
+
+        return {
+            sourceId: order.response.sourceId,
+            sourceOrderId: order.response.sourceOrderId,
+            status: 'preparing',
+            externalEventId: `MOCK-PREPARING-${order.response.requestId}`,
+            occurredAt: order.createdAt,
+        };
+    }
+
 }

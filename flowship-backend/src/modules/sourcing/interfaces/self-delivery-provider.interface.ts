@@ -54,6 +54,29 @@ export interface SelfDeliveryCreateResponse {
     sourceOrderId: string;
     status: 'confirmed';
 }
+export type SelfDeliveryTrackingStatus =
+    | 'preparing'
+    | 'ready_for_pickup'
+    | 'out_for_delivery'
+    | 'delivered'
+    | 'failed';
+
+export interface SelfDeliveryTrackingUpdate {
+    sourceId: string;
+    sourceOrderId: string;
+    status: SelfDeliveryTrackingStatus;
+
+    externalEventId: string;
+    occurredAt: string;
+
+    reason?: string;
+}
+
+export interface SelfDeliveryStatusRequest {
+    sourceId: string;
+    sourceOrderId: string;
+    signal?: AbortSignal;
+}
 export interface SelfDeliveryProvider {
     /**
      * Requests a self-delivery feasibility quote from a supply source.
@@ -87,6 +110,15 @@ export interface SelfDeliveryProvider {
     createDelivery(
         request: SelfDeliveryCreateRequest,
     ): Promise<SelfDeliveryCreateResponse>;
+    /**
+ * Optional polling capability.
+ *
+ * Providers supporting status polling implement this method.
+ * Providers using webhooks only may omit it.
+ */
+    getDeliveryStatus?(
+        request: SelfDeliveryStatusRequest,
+    ): Promise<SelfDeliveryTrackingUpdate>;
 }
 export type SelfDeliveryErrorCode =
     'INVALID_REQUEST' | 'PROVIDER_UNAVAILABLE' | 'TIMEOUT' | 'INTERNAL_ERROR';

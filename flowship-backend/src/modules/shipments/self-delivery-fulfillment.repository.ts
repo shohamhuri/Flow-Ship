@@ -2,8 +2,10 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
-import { DbService } from '../../infrastructure/database/db.service';
-import { CurrentTenant } from '../tenants/tenants.service';
+import {
+    DbService,
+    DbTransaction,
+} from '../../infrastructure/database/db.service'; import { CurrentTenant } from '../tenants/tenants.service';
 import { SelfDeliveryCreateRequest } from '../sourcing/interfaces/self-delivery-provider.interface';
 
 export interface SelfDeliveryFulfillmentRow {
@@ -111,7 +113,47 @@ export class SelfDeliveryFulfillmentRepository {
             [shipmentId],
         );
     }
+    async findBySourceOrderId(
+        tenant: CurrentTenant,
+        sourceId: string,
+        sourceOrderId: string,
+        tx?: DbTransaction,
+    ): Promise<SelfDeliveryFulfillmentRow | null> {
+        const schema = this.safeSchemaName(tenant.schemaName);
 
+        const normalizedSourceId = sourceId.trim();
+        const normalizedOrderId = sourceOrderId.trim();
+
+        if (!normalizedSourceId || !normalizedOrderId) {
+            throw new Error(
+                'Source ID and source order ID are required',
+            );
+        }
+
+        const query = `
+    SELECT *
+    FROM "${schema}".self_delivery_fulfillments
+    WHERE source_id = $1
+      AND source_order_id = $2
+      AND status = 'confirmed'
+`;
+
+        const params = [normalizedSourceId, normalizedOrderId];
+
+        if (tx) {
+            const rows = await tx.query<SelfDeliveryFulfillmentRow>(
+                query,
+                params,
+            );
+
+            return rows[0] ?? null;
+        }
+
+        return this.db.queryOne<SelfDeliveryFulfillmentRow>(
+            query,
+            params,
+        );
+    }
     async claimPending(
         tenant: CurrentTenant,
         shipmentId: string,

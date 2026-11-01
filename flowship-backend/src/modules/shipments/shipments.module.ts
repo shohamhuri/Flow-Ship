@@ -7,14 +7,23 @@ import { ShipmentStatusService } from './shipment-status.service';
 import { ShipmentsController } from './shipments.controller';
 import { TenantsModule } from '../tenants/tenants.module';
 import { SourcingModule } from '../sourcing/sourcing.module';
+import { SourceDeliveryWebhookController }
+    from './source-delivery-webhook.controller';
+import { SourceDeliveryWebhookResolverService }
+    from './source-delivery-webhook-resolver.service';
 import { SelfDeliveryFulfillmentService }
     from './self-delivery-fulfillment.service';
+import { SourceDeliveryIntegrationsService }
+    from './source-delivery-integrations.service';
 import { SelfDeliveryFulfillmentRepository }
     from './self-delivery-fulfillment.repository';
+import { SourceDeliveryWebhookSignatureService }
+    from './source-delivery-webhook-signature.service';
 import {
     ShipmentHistoryController,
 } from './shipment-history.controller';
-
+import { SelfDeliveryPollingService }
+    from './self-delivery-polling.service';
 import {
     ShipmentHistoryRepository,
 } from './shipment-history.repository';
@@ -37,6 +46,10 @@ import {
         ShipmentHistoryService,
         SelfDeliveryFulfillmentRepository,
         SelfDeliveryFulfillmentService,
+        SourceDeliveryIntegrationsService,
+        SourceDeliveryWebhookSignatureService,
+        SourceDeliveryWebhookResolverService,
+        SelfDeliveryPollingService,
     ],
     exports: [
         ShipmentsRepository,
@@ -48,7 +61,8 @@ import {
     ],
     controllers: [
         ShipmentsController,
-        ShipmentHistoryController
+        ShipmentHistoryController,
+        SourceDeliveryWebhookController,
     ]
 })
 export class ShipmentsModule { }

@@ -407,6 +407,47 @@ where shipment_id = $2
             rows[0]?.remaining_count ?? 0,
         ) === 0;
     }
+    async lockShipmentForUpdate(
+        tenant: CurrentTenant,
+        shipmentId: string,
+        tx: DbTransaction,
+    ): Promise<string | null> {
+        const schema = this.safeSchemaName(tenant.schemaName);
+
+        const rows = await tx.query<{ status: string }>(
+            `
+        SELECT status
+        FROM "${schema}".shipments
+        WHERE id = $1
+        FOR UPDATE
+        `,
+            [shipmentId],
+        );
+
+        return rows[0]?.status ?? null;
+    }
+    async hasExternalShipmentEvent(
+        tenant: CurrentTenant,
+        sourceId: string,
+        externalEventId: string,
+        tx: DbTransaction,
+    ): Promise<boolean> {
+        const schema = this.safeSchemaName(tenant.schemaName);
+
+        const rows = await tx.query<{ exists: boolean }>(
+            `
+        SELECT EXISTS (
+            SELECT 1
+            FROM "${schema}".shipment_events
+            WHERE source_id = $1
+              AND external_event_id = $2
+        ) AS exists
+        `,
+            [sourceId, externalEventId],
+        );
+
+        return rows[0]?.exists === true;
+    }
     async updateStatus(
         tenant: CurrentTenant,
         shipmentId: string,
@@ -433,13 +474,24 @@ where shipment_id = $2
         updated_at = now()
     FROM previous
     WHERE s.id = previous.id
-      AND (
-          (previous.status IN ('created', 'pending')
-              AND $1 = 'picked_up')
-          OR
-          (previous.status IN ('created', 'pending', 'picked_up')
-              AND $1 = 'in_transit')
-      )
+     AND (
+    (previous.status IN ('created', 'pending')
+        AND $1 = 'preparing')
+    OR
+    (previous.status IN ('created', 'pending', 'preparing')
+        AND $1 = 'ready_for_pickup')
+    OR
+    (previous.status IN (
+        'created', 'pending', 'preparing', 'ready_for_pickup'
+    )
+        AND $1 = 'picked_up')
+    OR
+    (previous.status IN (
+        'created', 'pending', 'preparing',
+        'ready_for_pickup', 'picked_up'
+    )
+        AND $1 = 'in_transit')
+)
     RETURNING previous.status AS previous_status
     `,
             [status, shipmentId],
@@ -622,11 +674,10 @@ where shipment_id = $2
             metadata?: Record<string, unknown>;
         },
         tx: DbTransaction,
-    ): Promise<void> {
+    ): Promise<boolean> {
         const schema = this.safeSchemaName(tenant.schemaName);
 
-        await tx.query(
-            `
+        const rows = await tx.query<{ id: string }>(`
         INSERT INTO "${schema}".shipment_events (
             shipment_id,
             event_type,
@@ -643,8 +694,8 @@ where shipment_id = $2
             $1, $2, $3, $4, $5,
             $6, $7, $8, $9, $10::jsonb
         )
-        ON CONFLICT DO NOTHING
-        `,
+ON CONFLICT DO NOTHING
+RETURNING id        `,
             [
                 event.shipmentId,
                 event.eventType,
@@ -658,6 +709,34 @@ where shipment_id = $2
                 JSON.stringify(event.metadata ?? {}),
             ],
         );
+        return rows.length === 1;
+    }
+    async getLatestSupplierEventTime(
+        tenant: CurrentTenant,
+        shipmentId: string,
+        sourceId: string,
+        tx: DbTransaction,
+    ): Promise<Date | null> {
+        const schema = this.safeSchemaName(
+            tenant.schemaName,
+        );
+
+        const rows = await tx.query<{
+            latest_occurred_at: Date | null;
+        }>(
+            `
+        SELECT MAX(occurred_at) AS latest_occurred_at
+        FROM "${schema}".shipment_events
+        WHERE shipment_id = $1
+          AND source_id = $2
+          AND external_event_id IS NOT NULL
+        `,
+            [shipmentId, sourceId],
+        );
+
+        const latest = rows[0]?.latest_occurred_at;
+
+        return latest ? new Date(latest) : null;
     }
 
 }
