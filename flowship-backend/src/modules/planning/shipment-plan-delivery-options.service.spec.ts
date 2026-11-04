@@ -70,7 +70,7 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
         service =
             new ShipmentPlanDeliveryOptionsService();
     });
-    it('should include accepted self-delivery alongside carrier options', () => {
+    it('should offer only self-delivery when the source accepts', () => {
         const groupQuote = createGroupQuote('group-1', [
             createQuote('carrier-a', 40, 2, 0.8),
         ]);
@@ -92,34 +92,33 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
         const result = service.generateForPlans([quotedPlan]);
         const options = result[0].deliveryOptions;
 
-        expect(options).toHaveLength(2);
 
-        const shipments = options.map(
-            (option) => option.selectedGroupQuotes[0].shipments![0],
+        expect(options).toHaveLength(1);
+
+        const shipments =
+            options[0].selectedGroupQuotes[0].shipments!;
+
+        expect(shipments).toHaveLength(1);
+
+        expect(shipments[0]).toEqual(
+            expect.objectContaining({
+                sourceId: 'source-group-1',
+                deliveryMethod: 'self_delivery',
+                estimatedDeliveryAt: eta,
+                quote: expect.objectContaining({
+                    price: 25,
+                    currency: 'ILS',
+                }),
+            }),
         );
 
-        expect(shipments).toEqual(
-            expect.arrayContaining([
-                expect.objectContaining({
-                    sourceId: 'source-group-1',
-                    deliveryMethod: 'carrier',
-                    quote: expect.objectContaining({
-                        price: 40,
-                    }),
-                }),
-                expect.objectContaining({
-                    sourceId: 'source-group-1',
-                    deliveryMethod: 'self_delivery',
-                    estimatedDeliveryAt: eta,
-                    quote: expect.objectContaining({
-                        price: 25,
-                        currency: 'ILS',
-                    }),
-                }),
-            ]),
-        );
+        expect(
+            shipments.some(
+                (shipment) => shipment.deliveryMethod === 'carrier',
+            ),
+        ).toBe(false);
 
-        expect(shipments).toHaveLength(2);
+
         expect(
             options.every(
                 (option) =>
@@ -173,12 +172,7 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
 
         const options = result[0].deliveryOptions;
 
-        expect(options).toHaveLength(1);
-
-        const shipment = options[0].selectedGroupQuotes[0].shipments![0];
-
-        expect(shipment.deliveryMethod).toBe('carrier');
-        expect(shipment.quote.price).toBe(40);
+        expect(options).toHaveLength(0);
     });
     it('should reject self-delivery with an invalid ETA', () => {
         const groupQuote = createGroupQuote('group-1', [
@@ -198,12 +192,7 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
 
         const options = result[0].deliveryOptions;
 
-        expect(options).toHaveLength(1);
-
-        const shipment = options[0].selectedGroupQuotes[0].shipments![0];
-
-        expect(shipment.deliveryMethod).toBe('carrier');
-        expect(shipment.quote.price).toBe(40);
+        expect(options).toHaveLength(0);
     });
     it('should reject self-delivery with an ETA in the past', () => {
         const groupQuote = createGroupQuote('group-1', [
@@ -225,12 +214,7 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
 
         const options = result[0].deliveryOptions;
 
-        expect(options).toHaveLength(1);
-
-        const shipment = options[0].selectedGroupQuotes[0].shipments![0];
-
-        expect(shipment.deliveryMethod).toBe('carrier');
-        expect(shipment.quote.price).toBe(40);
+        expect(options).toHaveLength(0);
     });
     it('should reject self-delivery when ETA is before source readyAt', () => {
         const groupQuote = createGroupQuote('group-1', [
@@ -258,14 +242,7 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
 
         const options = result[0].deliveryOptions;
 
-        // Invalid self-delivery must be excluded.
-        expect(options).toHaveLength(1);
-
-        // Carrier delivery must remain available.
-        const shipment = options[0].selectedGroupQuotes[0].shipments![0];
-
-        expect(shipment.deliveryMethod).toBe('carrier');
-        expect(shipment.quote.price).toBe(40);
+        expect(options).toHaveLength(0);
     });
     it('should generate one delivery option for one group with one quote', () => {
         const quotedPlan = createQuotedPlan(

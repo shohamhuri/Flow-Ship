@@ -92,8 +92,12 @@ export interface SelfDeliveryProvider {
      * Technical failure:
      * - Reject the Promise with an error.
      * - The caller handles provider failures and timeouts.
-     * - Carrier quotes must remain available.
-     *
+* - Retry transient provider failures when appropriate.
+* - If retries fail, mark self-delivery as unavailable.
+* - Never fall back to carrier delivery for a source
+*   that has already accepted self-delivery.
+* - A business rejection (accepted: false) may allow
+*   normal carrier delivery.     *
      * The optional AbortSignal allows cancellation.
      */
     getQuote(

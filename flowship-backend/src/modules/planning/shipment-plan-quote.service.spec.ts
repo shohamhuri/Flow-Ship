@@ -776,7 +776,7 @@ describe('ShipmentPlanQuoteService', () => {
             ]),
         );
     });
-    it('should preserve carrier quotes when self-delivery provider fails', async () => {
+    it('should not fall back to carriers when self-delivery provider fails', async () => {
         const source = {
             ...createSource('WAREHOUSE-SOUTH', 'Ashdod'),
             selfDeliveryEnabled: true,
@@ -816,16 +816,11 @@ describe('ShipmentPlanQuoteService', () => {
 
         expect(selfDeliveryGetQuoteMock).toHaveBeenCalledTimes(1);
 
-        expect(sourceResult?.quotes).toEqual(
-            expect.arrayContaining([
-                expect.objectContaining({
-                    carrierName: 'MockCarrier',
-                    price: 40,
-                }),
-            ]),
-        );
+        expect(sourceResult?.quotes).toEqual([]);
+        expect(carriersServiceMock.getQuotes).not.toHaveBeenCalled();
     });
-    it('should preserve carrier quotes when self-delivery times out', async () => {
+
+    it('should not fall back to carriers when self-delivery times out', async () => {
         jest.useFakeTimers();
 
         try {
@@ -835,17 +830,17 @@ describe('ShipmentPlanQuoteService', () => {
             };
 
             getSettingsForStoreMock.mockResolvedValue(
-                new Map([['WAREHOUSE-SOUTH', { selfDeliveryAllowed: true, selfDeliveryPrice: 40 }]]),
+                new Map([
+                    ['WAREHOUSE-SOUTH', {
+                        selfDeliveryAllowed: true,
+                        selfDeliveryPrice: 40,
+                    }],
+                ]),
             );
 
             selfDeliveryGetQuoteMock.mockImplementation(
                 () => new Promise(() => { }),
             );
-
-            carriersServiceMock.getQuotes.mockResolvedValue({
-                quotes: [createQuote('MockCarrier', 40)],
-                failedProviders: [],
-            });
 
             const plan = createPlan('plan-1', [
                 createGroup({
@@ -863,33 +858,31 @@ describe('ShipmentPlanQuoteService', () => {
                 'store-1',
             );
 
-            await jest.advanceTimersByTimeAsync(5000);
+            // Two attempts, each with a 5-second timeout.
+            await jest.advanceTimersByTimeAsync(10000);
 
             const results = await resultPromise;
 
             const sourceResult =
                 results[0]?.groupQuotes[0]?.sourceDirectQuotes?.[0];
 
-            expect(selfDeliveryGetQuoteMock).toHaveBeenCalledTimes(1);
-            const quoteRequest = selfDeliveryGetQuoteMock.mock.calls[0][0];
+            expect(selfDeliveryGetQuoteMock).toHaveBeenCalledTimes(2);
 
-            expect(quoteRequest.signal).toBeDefined();
-            expect(quoteRequest.signal).toBeInstanceOf(AbortSignal);
-            expect(quoteRequest.signal.aborted).toBe(true);
+            for (const [request] of selfDeliveryGetQuoteMock.mock.calls) {
+                expect(request.signal).toBeInstanceOf(AbortSignal);
+                expect(request.signal.aborted).toBe(true);
+            }
+
             expect(sourceResult?.selfDeliveryQuote).toBeNull();
+            expect(sourceResult?.quotes).toEqual([]);
+            expect(results[0]?.groupQuotes[0]?.vehiclePlans).toEqual([]);
 
-            expect(sourceResult?.quotes).toEqual(
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        carrierName: 'MockCarrier',
-                        price: 40,
-                    }),
-                ]),
-            );
+            expect(carriersServiceMock.getQuotes).not.toHaveBeenCalled();
         } finally {
             jest.useRealTimers();
         }
     });
+
     it('should store carrier quotes in the matching group quote', async () => {
         const group = createGroup({
             groupId: 'group-1',
@@ -1505,6 +1498,7 @@ describe('ShipmentPlanQuoteService', () => {
             expressCutoffTime: null,
             expressAfterCutoffMode: 'extended',
             expressAfterCutoffMaxMinutes: null,
+            statusUpdateTimeoutMinutes: 120,
         });
 
         jest.spyOn(
@@ -1566,6 +1560,7 @@ describe('ShipmentPlanQuoteService', () => {
             expressCutoffTime: null,
             expressAfterCutoffMode: 'extended',
             expressAfterCutoffMaxMinutes: null,
+            statusUpdateTimeoutMinutes: 120,
         });
 
         jest.spyOn(
@@ -1749,6 +1744,7 @@ describe('ShipmentPlanQuoteService', () => {
                 expressCutoffTime: null,
                 expressAfterCutoffMode: 'extended',
                 expressAfterCutoffMaxMinutes: null,
+                statusUpdateTimeoutMinutes: 120,
             });
 
         jest.spyOn(
@@ -2587,6 +2583,7 @@ describe('ShipmentPlanQuoteService', () => {
                     expressAfterCutoffMode: mode,
                     expressAfterCutoffMaxMinutes:
                         mode === 'extended' ? 300 : null,
+                    statusUpdateTimeoutMinutes: 120,
                 });
         };
 

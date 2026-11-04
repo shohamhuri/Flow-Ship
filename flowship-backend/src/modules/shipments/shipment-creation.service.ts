@@ -235,6 +235,7 @@ export class ShipmentCreationService {
                             price: quote.price,
                             currency: quote.currency,
                             estimatedDeliveryDays: quote.estimatedDays,
+                            readyAt: shipment.readyAt ?? null,
                             estimatedDeliveryAt: shipment.estimatedDeliveryAt ?? null,
                             preparationTimeMinutes:
                                 selectedDeliveryOption.metrics.pickupLeadTimeMinutes,

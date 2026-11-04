@@ -382,6 +382,7 @@ describe(
                         shipments: [
                             {
                                 sourceId: 'integration-source',
+                                readyAt: '2026-11-01T13:00:00.000Z',
                                 estimatedDeliveryAt: '2026-11-01T14:30:00.000Z',
                                 vehicleIndex: 0,
                                 vehicleType: 'car',
@@ -544,6 +545,7 @@ describe(
                         estimated_delivery_days:
                         number;
                         preparation_time_minutes: number | null;
+                        ready_at: Date | null;
                         estimated_delivery_at: Date | null;
                         metadata: {
                             sourceId?: string;
@@ -559,6 +561,7 @@ describe(
                             price,
                            currency,
 estimated_delivery_days,
+ready_at,
 estimated_delivery_at,
 metadata,
 preparation_time_minutes
@@ -602,6 +605,10 @@ preparation_time_minutes
                     estimated_delivery_days:
                         1,
                 });
+                expect(
+                    rows[0].ready_at?.toISOString(),
+                ).toBe('2026-11-01T13:00:00.000Z');
+
                 expect(
                     rows[0].estimated_delivery_at?.toISOString(),
                 ).toBe('2026-11-01T14:30:00.000Z');

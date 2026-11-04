@@ -28,6 +28,7 @@ describe('DeliverySettingsService', () => {
             express_max_minutes: 120,
             same_day_max_minutes: 1440,
             pickup_lead_time_minutes: 0,
+            status_update_timeout_minutes: 60,
             express_cutoff_time: null,
             express_after_cutoff_mode: 'extended',
             express_after_cutoff_max_minutes: null,
@@ -42,6 +43,7 @@ describe('DeliverySettingsService', () => {
             expressAfterCutoffMode: 'extended',
             expressAfterCutoffMaxMinutes: null,
             pickupLeadTimeMinutes: 0,
+            statusUpdateTimeoutMinutes: 60,
         });
 
         expect(dbMock.queryOne).toHaveBeenCalledWith(
@@ -61,6 +63,7 @@ describe('DeliverySettingsService', () => {
             express_after_cutoff_mode: 'extended',
             express_after_cutoff_max_minutes: 300,
             pickup_lead_time_minutes: 20,
+            status_update_timeout_minutes: 60,
         });
 
         const result = await service.getSettings(tenant);
@@ -72,6 +75,7 @@ describe('DeliverySettingsService', () => {
             expressAfterCutoffMode: 'extended',
             expressAfterCutoffMaxMinutes: 300,
             pickupLeadTimeMinutes: 20,
+            statusUpdateTimeoutMinutes: 60,
         });
     });
 
@@ -84,6 +88,7 @@ describe('DeliverySettingsService', () => {
             express_after_cutoff_mode: 'disabled',
             express_after_cutoff_max_minutes: null,
             pickup_lead_time_minutes: 0,
+            status_update_timeout_minutes: 60,
         });
 
         const result = await service.getSettings(tenant);
@@ -92,6 +97,73 @@ describe('DeliverySettingsService', () => {
         expect(result.expressAfterCutoffMode).toBe('disabled');
         expect(result.expressAfterCutoffMaxMinutes).toBeNull();
     });
+
+
+    const validSettingsRow = () => ({
+        express_max_minutes: 180,
+        same_day_max_minutes: 1440,
+        express_cutoff_time: null,
+        express_after_cutoff_mode: 'extended',
+        express_after_cutoff_max_minutes: null,
+        pickup_lead_time_minutes: 0,
+        status_update_timeout_minutes: 60,
+    });
+
+    it('should update the status timeout to 90 minutes', async () => {
+        dbMock.queryOne
+            .mockResolvedValueOnce(validSettingsRow())
+            .mockResolvedValueOnce({
+                ...validSettingsRow(),
+                status_update_timeout_minutes: 90,
+            });
+
+        const result = await service.updateSettings(tenant, {
+            expressMaxMinutes: 180,
+            statusUpdateTimeoutMinutes: 90,
+        });
+
+        expect(result.statusUpdateTimeoutMinutes).toBe(90);
+        expect(dbMock.queryOne).toHaveBeenNthCalledWith(
+            2,
+            expect.stringContaining('status_update_timeout_minutes = $7'),
+            [180, 1440, null, 'extended', null, 0, 90, 1],
+        );
+    });
+
+    it('should preserve the status timeout when omitted', async () => {
+        dbMock.queryOne
+            .mockResolvedValueOnce(validSettingsRow())
+            .mockResolvedValueOnce(validSettingsRow());
+
+        const result = await service.updateSettings(tenant, {
+            expressMaxMinutes: 180,
+        });
+
+        expect(result.statusUpdateTimeoutMinutes).toBe(60);
+        expect(dbMock.queryOne).toHaveBeenNthCalledWith(
+            2,
+            expect.any(String),
+            [180, 1440, null, 'extended', null, 0, 60, 1],
+        );
+    });
+
+    it.each([0, -1, 1.5])(
+        'should reject invalid status timeout %s',
+        async (value) => {
+            dbMock.queryOne.mockResolvedValueOnce(validSettingsRow());
+
+            await expect(
+                service.updateSettings(tenant, {
+                    expressMaxMinutes: 180,
+                    statusUpdateTimeoutMinutes: value,
+                }),
+            ).rejects.toThrow(
+                'statusUpdateTimeoutMinutes must be a positive integer',
+            );
+
+            expect(dbMock.queryOne).toHaveBeenCalledTimes(1);
+        },
+    );
 
     it('should reject missing tenant settings', async () => {
         dbMock.queryOne.mockResolvedValue(null);

@@ -23,7 +23,7 @@ import { ShipmentPlanCandidate } from './interfaces/shipment-plan.interface';
 import { SELF_DELIVERY_PROVIDER } from
     '../sourcing/sourcing.tokens';
 
-import type { SelfDeliveryProvider } from
+import * as selfDeliveryProviderInterface from
     '../sourcing/interfaces/self-delivery-provider.interface';
 import {
     QuotedShipmentPlan,
@@ -50,7 +50,7 @@ export class ShipmentPlanQuoteService {
         private readonly sourceDeliveryPermissionsService:
             SourceDeliveryPermissionsService,
         @Inject(SELF_DELIVERY_PROVIDER)
-        private readonly selfDeliveryProvider: SelfDeliveryProvider,
+        private readonly selfDeliveryProvider: selfDeliveryProviderInterface.SelfDeliveryProvider,
     ) { }
 
     private resolveExpressMaxMinutes(
@@ -590,45 +590,32 @@ export class ShipmentPlanQuoteService {
                     travelMinutes <= sameDayRemainingMinutes;
 
                 let selfDeliveryQuote: SelfDeliveryQuoteResponse | null = null;
+                let selfDeliveryProviderFailed = false;
+
                 if (isSelfDeliveryEligible && storeId) {
                     try {
-                        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-                        const abortController = new AbortController();
-                        try {
-                            selfDeliveryQuote = await Promise.race([
-                                this.selfDeliveryProvider.getQuote({
-                                    storeId,
-                                    sourceId: sourceGroup.sourceId,
-                                    destination: {
-                                        city: destination.city,
-                                        street: destination.street,
-                                        houseNumber: destination.houseNumber,
-
-                                    },
-                                    items: sourceGroup.items.map((item) => ({
-                                        sku: item.sku,
-                                        quantity: item.quantity,
-                                    })),
-                                    signal: abortController.signal,
-                                }),
-                                new Promise<never>((_, reject) => {
-                                    timeoutHandle = setTimeout(() => {
-                                        abortController.abort();
-
-                                        reject(new Error('Self-delivery quote timeout'));
-                                    }, 5000);
-                                }),
-                            ]);
-                        } finally {
-                            if (timeoutHandle !== undefined) {
-                                clearTimeout(timeoutHandle);
-                            }
-                        }
+                        selfDeliveryQuote =
+                            await this.getSelfDeliveryQuoteWithRetry({
+                                storeId,
+                                sourceId: sourceGroup.sourceId,
+                                destination: {
+                                    city: destination.city,
+                                    street: destination.street,
+                                    houseNumber: destination.houseNumber,
+                                },
+                                items: sourceGroup.items.map((item) => ({
+                                    sku: item.sku,
+                                    quantity: item.quantity,
+                                })),
+                            });
                     } catch (error) {
-                        // Provider failure must not block carrier quotes.
+                        // Supplier did not respond successfully.
+                        // Do not automatically fall back to external carriers.
+                        selfDeliveryProviderFailed = true;
                         selfDeliveryQuote = null;
                     }
                 }
+
 
                 if (
                     selfDeliveryQuote?.accepted === true &&
@@ -641,7 +628,8 @@ export class ShipmentPlanQuoteService {
                     };
                 }
                 const useSelfDeliveryExclusively =
-                    selfDeliveryQuote?.accepted === true;
+                    selfDeliveryQuote?.accepted === true ||
+                    selfDeliveryProviderFailed;
                 const sourceQuoteRequest: CarrierQuoteRequest = {
                     pickupCities: [sourceGroup.source.location.city],
                     destinationCity: destination.city,
@@ -796,4 +784,52 @@ export class ShipmentPlanQuoteService {
             ];
         });
     }
+
+    private async getSelfDeliveryQuoteWithRetry(
+        request: Parameters<selfDeliveryProviderInterface.SelfDeliveryProvider['getQuote']>[0],
+    ): Promise<SelfDeliveryQuoteResponse> {
+        const maxAttempts = 2;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            const abortController = new AbortController();
+            let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+            try {
+                return await Promise.race([
+                    this.selfDeliveryProvider.getQuote({
+                        ...request,
+                        signal: abortController.signal,
+                    }),
+                    new Promise<never>((_, reject) => {
+                        timeoutHandle = setTimeout(() => {
+                            abortController.abort();
+                            reject(
+                                new selfDeliveryProviderInterface.SelfDeliveryProviderError(
+                                    'TIMEOUT',
+                                    'Self-delivery quote timeout',
+                                    true,
+                                ),
+                            );
+                        }, 5000);
+                    }),
+                ]);
+            } catch (error) {
+                const retryable =
+                    error instanceof selfDeliveryProviderInterface.SelfDeliveryProviderError
+                        ? error.retryable
+                        : false;
+
+                if (!retryable || attempt === maxAttempts) {
+                    throw error;
+                }
+            } finally {
+                if (timeoutHandle !== undefined) {
+                    clearTimeout(timeoutHandle);
+                }
+            }
+        }
+
+        throw new Error('Self-delivery quote attempts exhausted');
+    }
+
 }

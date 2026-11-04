@@ -1314,6 +1314,8 @@ describe('CheckoutService', () => {
                     }),
                 ]),
                 new Date('2026-09-07T12:00:00.000Z'),
+                'store-1',
+
             );
         });
 
@@ -1607,6 +1609,7 @@ describe('CheckoutService', () => {
                     }),
                 ]),
                 new Date('2026-09-07T12:00:00.000Z'),
+                'store-1',
             );
 
             expect(
@@ -1690,6 +1693,7 @@ describe('CheckoutService', () => {
                     }),
                 ]),
                 new Date('2026-09-07T12:00:00.000Z'),
+                'store-1',
             );
         });
 

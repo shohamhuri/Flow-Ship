@@ -1,0 +1,111 @@
+<section class="monitoring-page" dir="rtl">
+    <header class="page-header">
+        <div>
+            <h1>ניטור חריגות משלוחים</h1>
+            <p>מעקב אחר איחורים בהכנה, במסירה ועדכוני סטטוס מספקים</p>
+        </div>
+
+        <button type="button" (click)="loadAnomalies()" [disabled]="loading">
+            רענון נתונים
+        </button>
+    </header>
+
+    <div class="summary">
+        <div class="summary-card">
+            <strong>{{ openCount }}</strong>
+            <span>חריגות פתוחות</span>
+        </div>
+
+        <div class="summary-card">
+            <strong>{{ acknowledgedCount }}</strong>
+            <span>חריגות בטיפול</span>
+        </div>
+
+        <div class="summary-card">
+            <strong>{{ resolvedCount }}</strong>
+            <span>חריגות שנפתרו</span>
+        </div>
+    </div>
+
+    <div class="filters">
+        <button type="button" [class.active]="selectedStatus === 'all'" (click)="changeStatus('all')">הכול</button>
+
+        <button type="button" [class.active]="selectedStatus === 'open'" (click)="changeStatus('open')">פתוחות</button>
+
+        <button type="button" [class.active]="selectedStatus === 'acknowledged'"
+            (click)="changeStatus('acknowledged')">בטיפול</button>
+
+        <button type="button" [class.active]="selectedStatus === 'resolved'"
+            (click)="changeStatus('resolved')">נפתרו</button>
+    </div>
+
+    @if (errorMessage) {
+    <p class="error-message" role="alert">{{ errorMessage }}</p>
+    }
+
+    @if (loading) {
+    <p class="state-message">טוען חריגות...</p>
+    } @else if (anomalies.length === 0) {
+    <p class="state-message">לא נמצאו חריגות בסטטוס שנבחר.</p>
+    } @else {
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>סוג החריגה</th>
+                    <th>מזהה משלוח</th>
+                    <th>זמן זיהוי</th>
+                    <th>סטטוס</th>
+                    <th>פעולה</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @for (anomaly of anomalies; track anomaly.id) {
+                <tr>
+                    <td>
+                        @switch (anomaly.anomaly_type) {
+                        @case ('preparation_delay') {
+                        איחור בהכנת מוצרים
+                        }
+                        @case ('delivery_delay') {
+                        איחור במסירת משלוח
+                        }
+                        @case ('missing_status_update') {
+                        לא התקבל עדכון סטטוס
+                        }
+                        }
+                    </td>
+
+                    <td class="shipment-id">{{ anomaly.shipment_id }}</td>
+
+                    <td>{{ anomaly.detected_at | date:'dd/MM/yyyy HH:mm' }}</td>
+
+                    <td>
+                        <span class="status" [class]="anomaly.status">
+                            @switch (anomaly.status) {
+                            @case ('open') { פתוחה }
+                            @case ('acknowledged') { בטיפול }
+                            @case ('resolved') { נפתרה }
+                            }
+                        </span>
+                    </td>
+
+                    <td>
+                        @if (anomaly.status === 'open') {
+                        <button type="button" (click)="acknowledge(anomaly)" [disabled]="processingAnomalyId !== null">
+                            {{ processingAnomalyId === anomaly.id
+                            ? 'מעדכן...'
+                            : 'סמן כבטיפול' }}
+                        </button>
+                        } @else {
+                        <span>—</span>
+                        }
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+</section>

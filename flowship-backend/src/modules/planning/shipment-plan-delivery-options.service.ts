@@ -65,6 +65,7 @@ export class ShipmentPlanDeliveryOptionsService {
                         plan,
                         sourceTiming?.travelMinutes,
                         sourceTiming?.estimatedDeliveryAt,
+                        sourceTiming?.readyAt,
                     ),
                 );
 
@@ -101,6 +102,7 @@ export class ShipmentPlanDeliveryOptionsService {
                                 items: sourceItems.map((item) => ({ ...item })),
                                 quote,
                                 travelMinutes: entry.travelMinutes,
+                                readyAt: entry.readyAt,
                                 estimatedDeliveryAt: entry.estimatedDeliveryAt,
                             },
                         ]),
@@ -146,6 +148,7 @@ export class ShipmentPlanDeliveryOptionsService {
                                             ),
                                         ),
                                     },
+                                    readyAt: sourceTiming.readyAt,
                                     estimatedDeliveryAt:
                                         sourceTiming.selfDeliveryQuote.estimatedDeliveryAt,
                                 },
@@ -153,7 +156,12 @@ export class ShipmentPlanDeliveryOptionsService {
                         ]
                         : [];
 
-                return [...vehicleChoices, ...directChoices, ...selfDeliveryChoices];
+
+                if (sourceTiming?.selfDeliveryQuote?.accepted === true) {
+                    return selfDeliveryChoices;
+                }
+
+                return [...vehicleChoices, ...directChoices];
             });
 
             if (choicesBySource.some((choices) => choices.length === 0)) {
@@ -301,6 +309,7 @@ export class ShipmentPlanDeliveryOptionsService {
         plan: ProviderVehiclePlanQuoteResult,
         travelMinutes?: number,
         estimatedDeliveryAt?: string,
+        readyAt?: string,
     ): SelectedVehicleShipment[][] {
         const alternatives = plan.alternatives ?? [];
 
@@ -329,6 +338,7 @@ export class ShipmentPlanDeliveryOptionsService {
                     items: vehicle.items.map((item) => ({ ...item })),
                     quote,
                     travelMinutes,
+                    readyAt,
                     estimatedDeliveryAt,
                 });
             }

@@ -1049,6 +1049,26 @@ export interface ShipmentHistoryFilters {
   sortBy?: ShipmentHistorySortBy;
   sortDirection?: ShipmentHistorySortDirection;
 }
+export type ShipmentAnomalyStatus =
+  | 'open'
+  | 'acknowledged'
+  | 'resolved';
+
+export type ShipmentAnomalyType =
+  | 'preparation_delay'
+  | 'delivery_delay'
+  | 'missing_status_update';
+
+export interface ShipmentMonitoringAnomaly {
+  id: string;
+  shipment_id: string;
+  anomaly_type: ShipmentAnomalyType;
+  status: ShipmentAnomalyStatus;
+  detected_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  details: Record<string, unknown> | null;
+}
 @Injectable({
   providedIn: 'root',
 })
@@ -1386,6 +1406,28 @@ export class AdminApiService {
     return this.http.patch<WeightEstimationRuleResponse>(
       `${this.baseUrl}/admin/weight-estimation-rules/${ruleId}`,
       body,
+    );
+  }
+  getShipmentMonitoringAnomalies(
+    status?: ShipmentAnomalyStatus,
+  ) {
+    const params = status
+      ? new HttpParams().set('status', status)
+      : new HttpParams();
+
+    return this.http.get<ShipmentMonitoringAnomaly[]>(
+      `${this.baseUrl}/shipments/monitoring/anomalies`,
+      { params },
+    );
+  }
+
+  acknowledgeShipmentMonitoringAnomaly(anomalyId: string) {
+    return this.http.patch<{
+      ok: boolean;
+      anomalyId: string;
+    }>(
+      `${this.baseUrl}/shipments/monitoring/anomalies/${encodeURIComponent(anomalyId)}/acknowledge`,
+      {},
     );
   }
 }

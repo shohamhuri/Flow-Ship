@@ -13,6 +13,7 @@ import { CheckoutsList } from './pages/checkouts-list/checkouts-list';
 import { CheckoutDetailsComponent } from './pages/checkout-details/checkout-details';
 import { authGuard } from './guards/auth-guard';
 import { StoreSettings } from './pages/store-settings/store-settings';
+import { ShipmentMonitoring } from './pages/shipment-monitoring/shipment-monitoring';
 import { WeightEstimationManagement } from './pages/weight-estimation-management/weight-estimation-management';
 export const routes: Routes = [
     {
@@ -59,6 +60,10 @@ export const routes: Routes = [
             {
                 path: 'shipments-history',
                 component: ShipmentsHistory,
+            },
+            {
+                path: 'shipment-monitoring',
+                component: ShipmentMonitoring,
             },
             {
                 path: 'group-purchases',

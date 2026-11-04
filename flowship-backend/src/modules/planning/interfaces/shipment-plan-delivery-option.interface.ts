@@ -13,6 +13,7 @@ export interface SelectedVehicleShipment {
     quote: CarrierQuoteOption;
 
     travelMinutes?: number;
+    readyAt?: string;
     estimatedDeliveryAt?: string;
 }
 export interface SelectedGroupQuote {

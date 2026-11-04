@@ -49,6 +49,7 @@ export interface CreateShipmentData {
 
     // Additional shipment tracking fields
     preparationTimeMinutes?: number | null;
+    readyAt?: string | null;
     estimatedDeliveryAt?: string | null;
     externalShipmentId?: string | null;
 
@@ -112,6 +113,7 @@ export class ShipmentsRepository {
             currency,
           estimated_delivery_days,
 preparation_time_minutes,
+ready_at,
 estimated_delivery_at,
 external_shipment_id,
 
@@ -125,8 +127,8 @@ metadata
             $6, $7, $8,
             $9, $10,
           $11, $12, $13,
-$14, $15, $16,
-$17, $18::jsonb
+$14, $15, $16, $17,
+$18, $19::jsonb
         )
         RETURNING id
         `,
@@ -150,6 +152,7 @@ $17, $18::jsonb
                     shipment.estimatedDeliveryDays,
 
                     shipment.preparationTimeMinutes ?? null,
+                    shipment.readyAt ?? null,
                     shipment.estimatedDeliveryAt ?? null,
                     shipment.externalShipmentId ?? null,
 

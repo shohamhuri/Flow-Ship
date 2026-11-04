@@ -33,4 +33,9 @@ export class UpdateStoreSettingsDto {
     @IsInt()
     @Min(0)
     pickupLeadTimeMinutes?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    statusUpdateTimeoutMinutes?: number;
 }

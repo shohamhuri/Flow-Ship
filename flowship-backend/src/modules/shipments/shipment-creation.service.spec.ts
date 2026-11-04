@@ -402,6 +402,9 @@ describe('ShipmentCreationService', () => {
                     'ILS',
 
                 estimatedDeliveryDays: 1,
+                readyAt: null,
+                estimatedDeliveryAt: null,
+                preparationTimeMinutes: undefined,
 
                 status:
                     'created',
@@ -409,6 +412,44 @@ describe('ShipmentCreationService', () => {
             expect.objectContaining({
                 query: expect.any(Function),
             }),
+        );
+    });
+
+    it('should forward the supplier readyAt to the shipments repository', async () => {
+        const readyAt = '2026-11-01T14:30:00.000Z';
+        const plan = createPlan();
+        const option = createDeliveryOption(
+            'plan-1',
+            [
+                {
+                    ...createSelectedGroupQuote('group-1', 'source-1'),
+                    shipments: [
+                        {
+                            sourceId: 'source-1',
+                            vehicleIndex: 0,
+                            vehicleType: 'car',
+                            quote: createQuote(),
+                            readyAt,
+                        },
+                    ],
+                },
+            ],
+        );
+
+        await service.createShipments(
+            tenant,
+            'checkout-123',
+            checkout,
+            plan,
+            option,
+        );
+
+        expect(createShipmentMock).toHaveBeenCalledWith(
+            tenant,
+            expect.objectContaining({
+                readyAt,
+            }),
+            expect.anything(),
         );
     });
 

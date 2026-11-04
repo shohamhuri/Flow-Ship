@@ -11,6 +11,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
 import { SourcingModule } from './modules/sourcing/sourcing.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { ScheduleModule } from '@nestjs/schedule';
 import {
   AuthModule,
 } from './modules/auth/auth.module';
@@ -19,6 +20,7 @@ import {
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     TenantsModule,
     CarriersModule,

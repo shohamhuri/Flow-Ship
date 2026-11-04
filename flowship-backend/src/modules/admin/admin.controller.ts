@@ -658,6 +658,7 @@ export class AdminController {
                     sameDayMaxMinutes: dto.sameDayMaxMinutes,
                     expressCutoffTime: dto.expressCutoffTime,
                     pickupLeadTimeMinutes: dto.pickupLeadTimeMinutes,
+                    statusUpdateTimeoutMinutes: dto.statusUpdateTimeoutMinutes,
                     expressAfterCutoffMode:
                         dto.expressAfterCutoffMode,
                     expressAfterCutoffMaxMinutes:
