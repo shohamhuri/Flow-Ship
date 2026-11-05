@@ -105,7 +105,75 @@ export class ShipmentMonitoringRepository {
             [status ?? null],
         );
     }
+    async findActiveShipments(
+        tenant: CurrentTenant,
+    ) {
+        const schema = this.schema(tenant);
 
+        return this.db.query<{
+            id: string;
+            checkoutId: string;
+            orderId: string;
+            deliveryMethod: 'carrier' | 'self_delivery';
+            sourceId: string | null;
+            preparationTimeMinutes: number | null;
+            readyAt: Date | null;
+            estimatedDeliveryAt: Date | null;
+            status: string;
+            carrierName: string | null;
+            serviceName: string | null;
+            createdAt: Date;
+            updatedAt: Date | null;
+        }>(
+            `
+        SELECT
+            s.id,
+            s.checkout_id AS "checkoutId",
+
+            COALESCE(
+                c.external_order_id,
+                c.external_checkout_id,
+                c.id::text
+            ) AS "orderId",
+
+            CASE
+                WHEN s.metadata->>'deliveryMethod' = 'self_delivery'
+                    THEN 'self_delivery'
+                ELSE 'carrier'
+            END AS "deliveryMethod",
+
+            s.metadata->>'sourceId' AS "sourceId",
+
+            s.preparation_time_minutes
+                AS "preparationTimeMinutes",
+
+            s.ready_at AS "readyAt",
+
+            s.estimated_delivery_at
+                AS "estimatedDeliveryAt",
+
+            s.status,
+            s.carrier_name AS "carrierName",
+            s.service_name AS "serviceName",
+            s.created_at AS "createdAt",
+            s.updated_at AS "updatedAt"
+
+        FROM "${schema}".shipments s
+
+        JOIN "${schema}".checkouts c
+            ON c.id = s.checkout_id
+
+        WHERE s.status NOT IN (
+            'delivered',
+            'failed',
+            'cancelled',
+            'canceled'
+        )
+
+        ORDER BY s.created_at DESC
+        `,
+        );
+    }
     async findShipmentsToMonitor(
         tenant: CurrentTenant,
     ) {
@@ -154,8 +222,7 @@ export class ShipmentMonitoringRepository {
            AND f.status = 'confirmed'
 
       
-WHERE s.metadata->>'deliveryMethod' = 'self_delivery'
-  AND (
+WHERE (
       s.status NOT IN ('delivered', 'failed')
 
       OR s.delivered_at > s.estimated_delivery_at

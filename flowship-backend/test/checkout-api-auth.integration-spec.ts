@@ -5,13 +5,19 @@ import {
 } from '@nestjs/common';
 import { SOURCE_CONFIRMATION_PROVIDER } from
     '../src/modules/sourcing/sourcing.tokens';
-
+import { CheckoutConfirmationService } from '../src/modules/checkout/checkout-confirmation.service';
+import { MockSelfDeliveryProvider } from '../src/modules/sourcing/providers/mock-self-delivery.provider';
+import { SELF_DELIVERY_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
 import { MockSourceConfirmationProvider } from
     '../src/modules/sourcing/providers/mock-source-confirmation.provider';
+import { SourceDeliveryPermissionsService } from '../src/modules/sourcing/source-delivery-permissions.service';
 import {
     ConfigModule,
     ConfigService,
 } from '@nestjs/config';
+import { ShipmentHistoryController } from '../src/modules/shipments/shipment-history.controller';
+import { ShipmentHistoryService } from '../src/modules/shipments/shipment-history.service';
+import { ShipmentHistoryRepository } from '../src/modules/shipments/shipment-history.repository';
 
 import {
     Test,
@@ -115,7 +121,9 @@ describe(
 
         let orderId: string;
         let checkoutId: string;
-
+        let selfDeliveryCheckoutId: string | undefined;
+        const selfDeliveryOrderId =
+            `CHECKOUT-SELF-DELIVERY-${randomUUID()}`;
         const adminTokenA =
             'integration-admin-token-a';
 
@@ -163,6 +171,8 @@ describe(
 
                             controllers: [
                                 CheckoutController,
+                                ShipmentHistoryController,
+
                             ],
 
                             providers: [
@@ -189,6 +199,11 @@ describe(
                                     },
                                 },
                                 MockSourceConfirmationProvider,
+                                MockSelfDeliveryProvider,
+                                {
+                                    provide: SELF_DELIVERY_PROVIDER,
+                                    useExisting: MockSelfDeliveryProvider,
+                                },
 
                                 {
                                     provide: SOURCE_CONFIRMATION_PROVIDER,
@@ -220,7 +235,12 @@ describe(
                                 CheckoutRepository,
                                 CheckoutProcessingRepository,
                                 CheckoutService,
-
+                                {
+                                    provide: CheckoutConfirmationService,
+                                    useValue: {
+                                        confirm: jest.fn(),
+                                    },
+                                },
                                 /*
                                  * Audit
                                  */
@@ -251,6 +271,7 @@ describe(
 
                                 SourcingService,
                                 SourcingResultsRepository,
+                                SourceDeliveryPermissionsService,
 
                                 /*
                                  * Grouping
@@ -288,6 +309,8 @@ describe(
                                  */
                                 ShipmentsRepository,
                                 ShipmentCreationService,
+                                ShipmentHistoryService,
+                                ShipmentHistoryRepository,
                             ],
                         })
                         .compile();
@@ -714,14 +737,45 @@ describe(
                     return;
                 }
 
+                /*
+                 * =====================================================
+                 * Cleanup Self-Delivery permission
+                 * =====================================================
+                 */
 
+                await db.query(
+                    `
+    DELETE FROM flow_ship_test_a.source_delivery_permissions
+    WHERE store_id = $1
+      AND source_id = $2
+    `,
+                    ['API-SELF-DELIVERY-STORE', 'WAREHOUSE-SOUTH'],
+                );
+                /*
+ * Recover Self-Delivery checkout ID for cleanup
+ */
+                const selfDeliveryRows = await db.query<{ id: string }>(
+                    `
+    SELECT id
+    FROM flow_ship_test_a.checkouts
+    WHERE external_order_id = $1
+    LIMIT 1
+    `,
+                    [selfDeliveryOrderId],
+                );
+
+                selfDeliveryCheckoutId =
+                    selfDeliveryRows[0]?.id ?? selfDeliveryCheckoutId;
                 /*
                  * =====================================================
                  * Cleanup checkout
                  * =====================================================
                  */
 
-                if (checkoutId) {
+                for (const id of [
+                    checkoutId,
+                    selfDeliveryCheckoutId,
+                ].filter((value): value is string => Boolean(value))) {
                     await db.query(
                         `
                         delete from flow_ship_test_a.shipment_stops
@@ -732,8 +786,7 @@ describe(
                         )
                         `,
                         [
-                            checkoutId,
-                        ],
+                            id,],
                     );
 
 
@@ -743,8 +796,7 @@ describe(
                         where checkout_id = $1
                         `,
                         [
-                            checkoutId,
-                        ],
+                            id,],
                     );
 
 
@@ -758,8 +810,7 @@ describe(
                         )
                         `,
                         [
-                            checkoutId,
-                        ],
+                            id,],
                     );
 
 
@@ -773,8 +824,7 @@ describe(
                         )
                         `,
                         [
-                            checkoutId,
-                        ],
+                            id,],
                     );
 
 
@@ -784,8 +834,7 @@ describe(
                         where checkout_id = $1
                         `,
                         [
-                            checkoutId,
-                        ],
+                            id,],
                     );
 
 
@@ -795,8 +844,7 @@ describe(
                         where checkout_id = $1
                         `,
                         [
-                            checkoutId,
-                        ],
+                            id,],
                     );
 
 
@@ -806,14 +854,13 @@ describe(
                         where checkout_id = $1
                         `,
                         [
-                            checkoutId,
-                        ],
+                            id,],
                     );
 
                     await db.query(
                         `DELETE FROM flow_ship_test_a.checkout_sourcing_results
      WHERE checkout_id = $1`,
-                        [checkoutId],
+                        [id],
                     );
                     await db.query(
                         `
@@ -821,8 +868,7 @@ describe(
                         where checkout_id = $1
                         `,
                         [
-                            checkoutId,
-                        ],
+                            id,],
                     );
 
 
@@ -832,8 +878,7 @@ describe(
                         where id = $1
                         `,
                         [
-                            checkoutId,
-                        ],
+                            id,],
                     );
                 }
 
@@ -1026,8 +1071,9 @@ describe(
         }
 
 
-        async function loadCheckoutId():
-            Promise<string> {
+        async function loadCheckoutId(
+            externalOrderId: string = orderId,
+        ): Promise<string> {
 
             const rows =
                 await db.query<{
@@ -1040,15 +1086,13 @@ describe(
                     order by created_at desc
                     limit 1
                     `,
-                    [
-                        orderId,
-                    ],
+                    [externalOrderId],
                 );
 
 
             if (!rows[0]) {
                 throw new Error(
-                    `Checkout was not found for order ${orderId}`,
+                    `Checkout was not found for order ${externalOrderId}`,
                 );
             }
 
@@ -1539,6 +1583,22 @@ describe(
                 ).toHaveLength(
                     1,
                 );
+                const shipment = response.body.shipments[0];
+
+                expect(shipment).toMatchObject({
+                    deliveryMethod: 'carrier',
+                    sourceId: 'WAREHOUSE-SOUTH',
+                    preparationTimeMinutes: 25,
+                    estimatedDeliveryAt: null,
+                });
+
+                expect(shipment.readyAt).toEqual(
+                    expect.any(String),
+                );
+
+                expect(
+                    Number.isNaN(Date.parse(shipment.readyAt)),
+                ).toBe(false);
             },
         );
 
@@ -1588,6 +1648,147 @@ describe(
                     adminTokenB,
                 );
             },
+        );
+        /*
+ * =============================================================
+ * TEST 11
+ * Self-Delivery checkout lifecycle
+ * =============================================================
+ */
+
+        it(
+            'should create a Self-Delivery checkout and expose its tracking fields',
+            async () => {
+                await db.query(
+                    `
+            INSERT INTO flow_ship_test_a.source_delivery_permissions (
+                store_id,
+                source_id,
+                self_delivery_allowed,
+                self_delivery_price
+            )
+            VALUES ($1, $2, true, $3)
+            `,
+                    ['API-SELF-DELIVERY-STORE', 'WAREHOUSE-SOUTH', 25],
+                );
+                const payload = createCheckoutPayload();
+
+                payload.orderId = selfDeliveryOrderId;
+                payload.storeId = 'API-SELF-DELIVERY-STORE';
+                const response = await request(
+                    app.getHttpServer(),
+                )
+                    .post('/checkout')
+                    .set('x-api-key', tenantAApiKey)
+                    .send(payload)
+                    .expect(201);
+
+                expect(response.body.checkout).toBeDefined();
+
+                expect(response.body.checkout.orderId).toBe(
+                    selfDeliveryOrderId,
+                );
+
+                selfDeliveryCheckoutId = await loadCheckoutId(
+                    selfDeliveryOrderId,
+                );
+
+                expect(selfDeliveryCheckoutId).toBeTruthy();
+                const detailsResponse = await request(
+                    app.getHttpServer(),
+                )
+                    .get(`/checkout/${selfDeliveryCheckoutId}`)
+                    .set('Authorization', `Bearer ${adminTokenA}`)
+                    .expect(200);
+
+                console.dir(
+                    {
+                        selfDeliveryCheckoutId,
+                        shipments: detailsResponse.body.shipments,
+                    },
+                    { depth: null },
+                );
+                const shipments = detailsResponse.body.shipments;
+
+                expect(shipments).toHaveLength(1);
+
+                const shipment = shipments[0];
+
+                expect(shipment).toMatchObject({
+                    deliveryMethod: 'self_delivery',
+                    sourceId: 'WAREHOUSE-SOUTH',
+                    preparationTimeMinutes: 25,
+                    carrierName: 'Source Self Delivery',
+                    serviceName: 'Self Delivery',
+                    status: 'created',
+                });
+
+                expect(shipment.providerId).toBeNull();
+                expect(shipment.providerCode).toBeNull();
+
+                expect(shipment.readyAt).toEqual(expect.any(String));
+                expect(shipment.estimatedDeliveryAt).toEqual(
+                    expect.any(String),
+                );
+
+                const createdAt = Date.parse(shipment.createdAt);
+                const readyAt = Date.parse(shipment.readyAt);
+                const estimatedDeliveryAt = Date.parse(
+                    shipment.estimatedDeliveryAt,
+                );
+
+                expect(Number.isNaN(createdAt)).toBe(false);
+                expect(Number.isNaN(readyAt)).toBe(false);
+                expect(Number.isNaN(estimatedDeliveryAt)).toBe(false);
+
+                // זמן ההכנה: 25 דקות, עם סטייה קטנה של שעון הבדיקה.
+                expect(readyAt - createdAt).toBeGreaterThan(
+                    24 * 60 * 1000,
+                );
+                expect(readyAt - createdAt).toBeLessThan(
+                    26 * 60 * 1000,
+                );
+
+                // הספק מחזיר ETA של שעתיים.
+                // אין להוסיף אליו שוב את 25 דקות ההכנה.
+                expect(estimatedDeliveryAt - createdAt).toBeGreaterThan(
+                    119 * 60 * 1000,
+                );
+                expect(estimatedDeliveryAt - createdAt).toBeLessThan(
+                    121 * 60 * 1000,
+                );
+
+                expect(shipment.stops).toHaveLength(2);
+                expect(shipment.stops[0].stopType).toBe('pickup');
+                expect(shipment.stops[1].stopType).toBe('dropoff');
+                const historyResponse = await request(app.getHttpServer())
+                    .get('/admin/shipment-history')
+                    .set('Authorization', `Bearer ${adminTokenA}`)
+                    .expect(200);
+
+                expect(historyResponse.body.ok).toBe(true);
+                expect(Array.isArray(historyResponse.body.items)).toBe(true);
+
+                expect(historyResponse.body.count).toBe(
+                    historyResponse.body.items.length,
+                );
+
+                const eventsResponse = await request(app.getHttpServer())
+                    .get(`/admin/shipment-history/${shipment.id}/events`)
+                    .set('Authorization', `Bearer ${adminTokenA}`)
+                    .expect(200);
+
+                expect(eventsResponse.body).toMatchObject({
+                    ok: true,
+                    shipmentId: shipment.id,
+                });
+
+                expect(Array.isArray(eventsResponse.body.events)).toBe(true);
+                expect(eventsResponse.body.count).toBe(
+                    eventsResponse.body.events.length,
+                );
+            },
+            30000,
         );
     },
 );

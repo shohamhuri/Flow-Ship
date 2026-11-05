@@ -13,7 +13,12 @@ export interface ShipmentHistoryShipment {
 
   externalShipmentId: string | null;
   shipmentGroupId: string | null;
+  deliveryMethod: 'carrier' | 'self_delivery';
+  sourceId: string | null;
 
+  preparationTimeMinutes: number | null;
+  readyAt: Date | string | null;
+  estimatedDeliveryAt: Date | string | null;
   status: string;
 
   carrierName: string | null;
@@ -229,7 +234,24 @@ export class ShipmentHistoryRepository {
 
               'shipmentGroupId',
               shipment.shipment_group_id,
+'deliveryMethod',
+case
+  when shipment.metadata->>'deliveryMethod' = 'self_delivery'
+    then 'self_delivery'
+  else 'carrier'
+end,
 
+'sourceId',
+shipment.metadata->>'sourceId',
+
+'preparationTimeMinutes',
+shipment.preparation_time_minutes,
+
+'readyAt',
+shipment.ready_at,
+
+'estimatedDeliveryAt',
+shipment.estimated_delivery_at,
               'status',
               shipment.status,
 

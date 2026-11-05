@@ -2,6 +2,7 @@
 import { Cron } from '@nestjs/schedule';
 import { TenantsService } from '../tenants/tenants.service';
 import { ShipmentMonitoringService } from './shipment-monitoring.service';
+import { SelfDeliveryPollingService } from './self-delivery-polling.service';
 
 @Injectable()
 export class ShipmentMonitoringScheduler {
@@ -11,6 +12,8 @@ export class ShipmentMonitoringScheduler {
     constructor(
         private readonly tenantsService: TenantsService,
         private readonly monitoringService: ShipmentMonitoringService,
+        private readonly selfDeliveryPolling: SelfDeliveryPollingService,
+
     ) { }
 
     @Cron('0 */5 * * * *', {
@@ -29,7 +32,16 @@ export class ShipmentMonitoringScheduler {
             const tenants = await this.tenantsService.findAllActive();
 
             for (const tenant of tenants) {
+
                 try {
+                    try {
+                        await this.selfDeliveryPolling.pollActiveShipments(tenant);
+                    } catch (error) {
+                        this.logger.error(
+                            `Self-delivery polling failed for tenant ${tenant.id}`,
+                            error instanceof Error ? error.stack : String(error),
+                        );
+                    }
                     const ready =
                         await this.tenantsService.isShipmentMonitoringReady(tenant);
 

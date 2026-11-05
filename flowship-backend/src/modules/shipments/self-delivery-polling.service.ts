@@ -97,4 +97,28 @@ export class SelfDeliveryPollingService {
             update,
         );
     }
+    async pollActiveShipments(
+        tenant: CurrentTenant,
+    ): Promise<void> {
+        const activeFulfillments =
+            await this.fulfillments.findActiveForPolling(tenant);
+
+        for (const fulfillment of activeFulfillments) {
+            try {
+                const storeId = fulfillment.request_payload.storeId;
+
+                await this.poll(
+                    tenant,
+                    storeId,
+                    fulfillment.source_id,
+                    fulfillment.source_order_id!,
+                );
+            } catch (error) {
+                console.error(
+                    `Self-delivery polling failed for shipment ${fulfillment.shipment_id}`,
+                    error,
+                );
+            }
+        }
+    }
 }

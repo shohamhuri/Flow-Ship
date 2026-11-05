@@ -38,7 +38,15 @@ export class ShipmentMonitoringController {
         private readonly repository:
             ShipmentMonitoringRepository,
     ) { }
-
+    @Get('active')
+    async getActiveShipments(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+    ) {
+        return this.repository.findActiveShipments(
+            auth.tenant,
+        );
+    }
     @Get('anomalies')
     async getAnomalies(
         @CurrentFlowShipAuth()

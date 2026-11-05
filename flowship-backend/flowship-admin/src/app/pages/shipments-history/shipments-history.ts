@@ -12,6 +12,7 @@ import {
   ShipmentHistoryItem,
   ShipmentHistorySortBy,
   ShipmentHistorySortDirection,
+  ShipmentHistoryEvent,
 } from '../../services/admin-api';
 
 @Component({
@@ -31,7 +32,13 @@ export class ShipmentsHistory implements OnInit {
   errorMessage = '';
 
   expandedCheckoutId: string | null = null;
+  expandedShipmentId: string | null = null;
 
+  shipmentEvents: ShipmentHistoryEvent[] = [];
+
+  shipmentEventsLoading = false;
+
+  shipmentEventsError = '';
   search = '';
   resultStatus = '';
   carrierName = '';
@@ -146,7 +153,50 @@ export class ShipmentsHistory implements OnInit {
         item.resultStatus === 'delivered',
     ).length;
   }
+  toggleShipmentEvents(shipmentId: string): void {
+    if (this.expandedShipmentId === shipmentId) {
+      this.expandedShipmentId = null;
+      this.shipmentEvents = [];
+      this.shipmentEventsError = '';
+      return;
+    }
 
+    this.expandedShipmentId = shipmentId;
+    this.shipmentEvents = [];
+    this.shipmentEventsLoading = true;
+    this.shipmentEventsError = '';
+
+    this.adminApiService
+      .getShipmentHistoryEvents(shipmentId)
+      .subscribe({
+        next: (response) => {
+          if (this.expandedShipmentId !== shipmentId) {
+            return;
+          }
+
+          this.shipmentEvents = response.events;
+          this.shipmentEventsLoading = false;
+          this.cdr.detectChanges();
+        },
+
+        error: (error) => {
+          if (this.expandedShipmentId !== shipmentId) {
+            return;
+          }
+
+          console.error(
+            'Failed to load shipment events',
+            error,
+          );
+
+          this.shipmentEventsError =
+            'לא הצלחנו לטעון את היסטוריית העדכונים.';
+
+          this.shipmentEventsLoading = false;
+          this.cdr.detectChanges();
+        },
+      });
+  }
   get failedCount(): number {
     return this.items.filter(
       (item) =>
@@ -237,7 +287,14 @@ export class ShipmentsHistory implements OnInit {
     switch (status) {
       case 'created':
         return 'נוצר';
+      case 'preparing':
+        return 'בהכנה';
 
+      case 'ready_for_pickup':
+        return 'מוכן למשלוח';
+
+      case 'out_for_delivery':
+        return 'יצא למסירה';
       case 'picked_up':
         return 'נאסף';
 

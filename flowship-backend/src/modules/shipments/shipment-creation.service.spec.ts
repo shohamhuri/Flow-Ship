@@ -404,8 +404,7 @@ describe('ShipmentCreationService', () => {
                 estimatedDeliveryDays: 1,
                 readyAt: null,
                 estimatedDeliveryAt: null,
-                preparationTimeMinutes: undefined,
-
+                preparationTimeMinutes: null,
                 status:
                     'created',
             },
@@ -1467,5 +1466,102 @@ describe('ShipmentCreationService', () => {
         expect(stopsCall[2]).toHaveLength(1);
         expect(stopsCall[2][0].sourceId).toBe('source-1');
         expect(stopsCall[3].city).toBe('Tel Aviv');
+    });
+    it('should persist source-specific preparation times and preserve supplier ETA', async () => {
+        const plan = createPlan('plan-1', [
+            createGroup('group-1', [
+                createSource('source-1', 'Netivot'),
+            ]),
+            createGroup('group-2', [
+                createSource('source-2', 'Jerusalem'),
+            ]),
+        ]);
+
+        const eta1 = '2026-11-04T12:00:00.000Z';
+        const eta2 = '2026-11-04T15:00:00.000Z';
+
+        const option = createDeliveryOption('plan-1', [
+            {
+                groupId: 'group-1',
+                shipments: [{
+                    sourceId: 'source-1',
+                    vehicleIndex: 0,
+                    vehicleType: 'car',
+                    deliveryMethod: 'self_delivery',
+                    estimatedDeliveryAt: eta1,
+                    quote: createQuote(),
+                }],
+            },
+            {
+                groupId: 'group-2',
+                shipments: [{
+                    sourceId: 'source-2',
+                    vehicleIndex: 0,
+                    vehicleType: 'car',
+                    deliveryMethod: 'self_delivery',
+                    estimatedDeliveryAt: eta2,
+                    quote: createQuote(),
+                }],
+            },
+        ]);
+
+        // Intentionally different from either source's preparation time.
+        option.metrics.pickupLeadTimeMinutes = 120;
+
+        const winningConfirmation = {
+            plan,
+            confirmed: true,
+            confirmations: [
+                {
+                    sourceId: 'source-1',
+                    preparationMinutes: 20,
+                    confirmedAt: '2026-11-04T09:00:00.000Z',
+                },
+                {
+                    sourceId: 'source-2',
+                    preparationMinutes: 75,
+                    confirmedAt: '2026-11-04T09:00:00.000Z',
+                },
+            ],
+        } as any;
+
+        createShipmentMock
+            .mockResolvedValueOnce('shipment-1')
+            .mockResolvedValueOnce('shipment-2');
+
+        await service.createShipments(
+            tenant,
+            'checkout-1',
+            checkout,
+            plan,
+            option,
+            undefined,
+            winningConfirmation,
+        );
+
+        expect(createShipmentMock).toHaveBeenCalledTimes(2);
+
+        const persistedShipments =
+            createShipmentMock.mock.calls.map((call) => call[1]);
+
+        const first = persistedShipments.find(
+            (shipment) => shipment.metadata.sourceId === 'source-1',
+        );
+
+        const second = persistedShipments.find(
+            (shipment) => shipment.metadata.sourceId === 'source-2',
+        );
+
+        expect(first).toBeDefined();
+        expect(second).toBeDefined();
+
+        expect(first.preparationTimeMinutes).toBe(20);
+        expect(second.preparationTimeMinutes).toBe(75);
+
+        expect(first.estimatedDeliveryAt).toBe(eta1);
+        expect(second.estimatedDeliveryAt).toBe(eta2);
+
+        expect(first.metadata.deliveryMethod).toBe('self_delivery');
+        expect(second.metadata.deliveryMethod).toBe('self_delivery');
     });
 });

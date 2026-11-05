@@ -224,7 +224,10 @@ export class ShipmentPlanQuoteService {
                     sourceQuotes.some(
                         (entry) =>
                             entry.sourceId === sourceId &&
-                            entry.quotes.length > 0,
+                            (
+                                entry.quotes.length > 0 ||
+                                entry.selfDeliveryQuote?.accepted === true
+                            ),
                     ) ||
                     vehiclePlans.some(
                         (entry) =>
@@ -239,7 +242,10 @@ export class ShipmentPlanQuoteService {
 
             return (
                 sourceQuotes.reduce(
-                    (sum, entry) => sum + entry.quotes.length,
+                    (sum, entry) =>
+                        sum +
+                        entry.quotes.length +
+                        (entry.selfDeliveryQuote?.accepted === true ? 1 : 0),
                     0,
                 ) +
                 vehiclePlans.reduce(

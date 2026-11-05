@@ -108,6 +108,11 @@ export interface CheckoutShipment {
     providerCode: string | null;
     adapterKey: string | null;
     deliveryMethod: 'carrier' | 'self_delivery';
+    sourceId: string | null;
+    preparationTimeMinutes: number | null;
+    readyAt: Date | null;
+    estimatedDeliveryAt: Date | null;
+    externalShipmentId: string | null;
     carrierName: string;
     serviceName: string;
     price: number;
@@ -649,6 +654,10 @@ values (
                 currency: string;
                 estimated_delivery_days: number;
                 status: string;
+                preparation_time_minutes: number | null;
+                ready_at: Date | null;
+                estimated_delivery_at: Date | null;
+                external_shipment_id: string | null;
                 metadata: {
                     deliveryMethod?: 'carrier' | 'self_delivery';
                     [key: string]: unknown;
@@ -670,8 +679,12 @@ values (
                     service_name,
                     price,
                     currency,
-                  estimated_delivery_days,
+                 estimated_delivery_days,
 status,
+preparation_time_minutes,
+ready_at,
+estimated_delivery_at,
+external_shipment_id,
 metadata,
 created_at,
 updated_at
@@ -933,7 +946,26 @@ updated_at
                     adapterKey: shipment.adapter_key,
                     deliveryMethod:
                         shipment.metadata?.deliveryMethod ?? 'carrier',
-                    carrierName: shipment.carrier_name,
+
+                    sourceId:
+                        typeof shipment.metadata?.sourceId === 'string'
+                            ? shipment.metadata.sourceId
+                            : null,
+
+                    preparationTimeMinutes:
+                        shipment.preparation_time_minutes,
+
+                    readyAt:
+                        shipment.ready_at,
+
+                    estimatedDeliveryAt:
+                        shipment.estimated_delivery_at,
+
+                    externalShipmentId:
+                        shipment.external_shipment_id,
+
+                    carrierName:
+                        shipment.carrier_name,
                     serviceName: shipment.service_name,
                     price: shipment.price,
                     currency: shipment.currency,

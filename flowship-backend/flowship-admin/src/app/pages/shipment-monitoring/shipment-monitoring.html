@@ -1,15 +1,161 @@
 <section class="monitoring-page" dir="rtl">
     <header class="page-header">
         <div>
-            <h1>ניטור חריגות משלוחים</h1>
-            <p>מעקב אחר איחורים בהכנה, במסירה ועדכוני סטטוס מספקים</p>
+            <h1>מעקב וניטור משלוחים</h1>
+            <p>מעקב אחר משלוחים פעילים, זמני מסירה וחריגות</p>
         </div>
-
-        <button type="button" (click)="loadAnomalies()" [disabled]="loading">
-            רענון נתונים
-        </button>
     </header>
 
+    <div class="monitoring-toolbar">
+        <div class="monitoring-tabs" role="tablist">
+            <button type="button" role="tab" [class.active]="activeTab === 'shipments'"
+                [attr.aria-selected]="activeTab === 'shipments'" (click)="changeTab('shipments')">
+                משלוחים פעילים
+            </button>
+
+            <button type="button" role="tab" [class.active]="activeTab === 'anomalies'"
+                [attr.aria-selected]="activeTab === 'anomalies'" (click)="changeTab('anomalies')">
+                חריגות
+            </button>
+        </div>
+
+        <button type="button" class="refresh-button" (click)="refreshCurrentTab()"
+            [disabled]="activeTab === 'shipments' ? shipmentsLoading : loading">
+            רענון
+        </button>
+    </div>
+    @if (activeTab === 'shipments') {
+    <section class="active-shipments-section">
+        <div class="section-header">
+            <h2>משלוחים פעילים ({{ activeShipments.length }})</h2>
+
+
+        </div>
+
+        @if (shipmentsError) {
+        <p class="error-message" role="alert">
+            {{ shipmentsError }}
+        </p>
+        }
+
+        @if (shipmentsLoading) {
+        <p class="state-message">טוען משלוחים פעילים...</p>
+        } @else if (!shipmentsError && activeShipments.length === 0) {
+        <p class="state-message">אין משלוחים פעילים כרגע.</p>
+        } @else if (!shipmentsError) {
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>הזמנה</th>
+                        <th>סוג משלוח</th>
+                        <th>מקור אחראי</th>
+                        <th>שירות</th>
+                        <th>זמן הכנה</th>
+                        <th>מוכן בשעה</th>
+                        <th>ETA למסירה</th>
+                        <th>סטטוס</th>
+                        <th>מעקב</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (shipment of activeShipments; track shipment.id) {
+                    <tr>
+                        <td>{{ shipment.orderId }}</td>
+
+                        <td>
+                            {{ shipment.deliveryMethod === 'self_delivery'
+                            ? 'משלוח עצמי'
+                            : 'חברת שילוח' }}
+                        </td>
+
+                        <td>{{ shipment.sourceId || '—' }}</td>
+
+                        <td>
+                            {{ shipment.serviceName || shipment.carrierName || '—' }}
+                        </td>
+
+                        <td>
+                            {{ shipment.preparationTimeMinutes !== null
+                            ? shipment.preparationTimeMinutes + ' דקות'
+                            : '—' }}
+                        </td>
+
+                        <td>
+                            {{ shipment.readyAt
+                            ? (shipment.readyAt | date:'dd/MM/yyyy HH:mm')
+                            : '—' }}
+                        </td>
+
+                        <td>
+                            {{ shipment.estimatedDeliveryAt
+                            ? (shipment.estimatedDeliveryAt | date:'dd/MM/yyyy HH:mm')
+                            : '—' }}
+                        </td>
+
+                        <td>
+                            <span class="shipment-status" [ngClass]="shipment.status">
+                                {{ getShipmentStatusLabel(shipment.status) }}
+                            </span>
+                        </td>
+                        <td>
+                            <button type="button" (click)="toggleShipmentEvents(shipment.id)">
+                                {{ expandedShipmentId === shipment.id
+                                ? 'סגור היסטוריה'
+                                : 'היסטוריית עדכונים' }}
+                            </button>
+                        </td>
+                    </tr>
+                    @if (expandedShipmentId === shipment.id) {
+                    <tr class="shipment-events-row">
+                        <td colspan="9">
+                            <div class="shipment-events">
+                                <h3>היסטוריית עדכונים — {{ shipment.orderId }}</h3>
+
+                                @if (shipmentEventsLoading) {
+                                <p>טוען עדכונים...</p>
+                                } @else if (shipmentEventsError) {
+                                <p class="error-message">
+                                    {{ shipmentEventsError }}
+                                </p>
+                                } @else if (shipmentEvents.length === 0) {
+                                <p>לא נמצאו עדכונים למשלוח זה.</p>
+                                } @else {
+                                <div class="events-list">
+                                    @for (event of shipmentEvents; track event.id) {
+                                    <div class="shipment-event">
+                                        <strong>
+                                            {{ getShipmentStatusLabel(event.newStatus) }}
+                                        </strong>
+
+                                        <span>
+                                            {{ event.occurredAt | date:'dd/MM/yyyy HH:mm' }}
+                                        </span>
+
+                                        <span>
+                                            {{ getShipmentStatusLabel(event.previousStatus || '') }}
+                                            ←
+                                            {{ getShipmentStatusLabel(event.newStatus) }}
+                                        </span>
+
+                                        <small>{{ getShipmentStatusLabel(event.eventType.toLowerCase()) }}</small>
+                                    </div>
+                                    }
+                                </div>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                    }
+                    }
+                </tbody>
+            </table>
+        </div>
+        }
+    </section>
+    }
+    @if (activeTab === 'anomalies') {
     <div class="summary">
         <div class="summary-card">
             <strong>{{ openCount }}</strong>
@@ -107,5 +253,6 @@
             </tbody>
         </table>
     </div>
+    }
     }
 </section>

@@ -913,9 +913,29 @@ export interface ReorderGroupingStrategyItem {
   executionOrder: number;
   conflictPriority: number;
 }
+export interface ShipmentHistoryEvent {
+  id: string;
+  shipmentId: string;
+  eventType: string;
+  previousStatus: string | null;
+  newStatus: string | null;
+  occurredAt: string;
+  recordedAt: string;
+}
+
+export interface ShipmentHistoryEventsResponse {
+  ok: boolean;
+  shipmentId: string;
+  count: number;
+  events: ShipmentHistoryEvent[];
+}
 export interface ShipmentHistoryShipment {
   id: string;
-
+  deliveryMethod: 'carrier' | 'self_delivery' | null;
+  sourceId: string | null;
+  preparationTimeMinutes: number | null;
+  readyAt: string | null;
+  estimatedDeliveryAt: string | null;
   externalShipmentId: string | null;
   shipmentGroupId: string | null;
 
@@ -1068,6 +1088,21 @@ export interface ShipmentMonitoringAnomaly {
   acknowledged_at: string | null;
   resolved_at: string | null;
   details: Record<string, unknown> | null;
+}
+export interface ActiveShipment {
+  id: string;
+  checkoutId: string;
+  orderId: string;
+  deliveryMethod: 'carrier' | 'self_delivery';
+  sourceId: string | null;
+  preparationTimeMinutes: number | null;
+  readyAt: string | null;
+  estimatedDeliveryAt: string | null;
+  status: string;
+  carrierName: string | null;
+  serviceName: string | null;
+  createdAt: string;
+  updatedAt: string | null;
 }
 @Injectable({
   providedIn: 'root',
@@ -1293,6 +1328,11 @@ export class AdminApiService {
       },
     );
   }
+  getShipmentHistoryEvents(shipmentId: string) {
+    return this.http.get<ShipmentHistoryEventsResponse>(
+      `${this.baseUrl}/admin/shipment-history/${encodeURIComponent(shipmentId)}/events`,
+    );
+  }
   getShipmentHistory(
     filters: ShipmentHistoryFilters = {},
   ) {
@@ -1406,6 +1446,11 @@ export class AdminApiService {
     return this.http.patch<WeightEstimationRuleResponse>(
       `${this.baseUrl}/admin/weight-estimation-rules/${ruleId}`,
       body,
+    );
+  }
+  getActiveShipments() {
+    return this.http.get<ActiveShipment[]>(
+      `${this.baseUrl}/shipments/monitoring/active`,
     );
   }
   getShipmentMonitoringAnomalies(

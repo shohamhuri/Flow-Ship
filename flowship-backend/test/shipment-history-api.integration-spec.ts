@@ -467,7 +467,22 @@ describe(
                         trackingA,
                     ],
                 );
-
+                await db.query(
+                    `
+    update ${schemaA}.shipments
+    set
+        metadata = coalesce(metadata, '{}'::jsonb)
+            || jsonb_build_object(
+                'deliveryMethod', 'self_delivery',
+                'sourceId', 'api-integration-source-a'
+            ),
+        preparation_time_minutes = 30,
+        ready_at = '2026-09-10T09:30:00Z',
+        estimated_delivery_at = '2026-09-11T10:00:00Z'
+    where id = $1
+    `,
+                    [shipmentADeliveredId],
+                );
 
                 await db.query(
                     `
@@ -1027,8 +1042,41 @@ describe(
                 );
             },
         );
+        it('should expose Self-Delivery fields in shipment history API', async () => {
+            const response = await request(app.getHttpServer())
+                .get('/admin/shipment-history')
+                .query({
+                    search: deliveredOrderA,
+                })
+                .set('Authorization', bearer(tokenA))
+                .expect(200);
 
+            const order = response.body.items.find(
+                (item: any) => item.checkoutId === checkoutADeliveredId,
+            );
 
+            expect(order).toBeDefined();
+
+            const shipment = order.shipments.find(
+                (item: any) => item.id === shipmentADeliveredId,
+            );
+
+            expect(shipment).toBeDefined();
+
+            expect(shipment).toMatchObject({
+                deliveryMethod: 'self_delivery',
+                sourceId: 'api-integration-source-a',
+                preparationTimeMinutes: 30,
+            });
+
+            expect(new Date(shipment.readyAt).toISOString()).toBe(
+                '2026-09-10T09:30:00.000Z',
+            );
+
+            expect(new Date(shipment.estimatedDeliveryAt).toISOString()).toBe(
+                '2026-09-11T10:00:00.000Z',
+            );
+        });
         it(
             'should not expose Tenant A history to Tenant B',
             async () => {

@@ -145,6 +145,14 @@ export class MockInventoryProvider implements InventoryProvider {
                 'WAREHOUSE-CENTER',
                 'BRANCH-BEER-SHEVA',
             ],
+            'API-INTEGRATION-STORE': [
+                'WAREHOUSE-SOUTH',
+                'WAREHOUSE-CENTER',
+                'BRANCH-BEER-SHEVA',
+            ],
+            'API-SELF-DELIVERY-STORE': [
+                'WAREHOUSE-SOUTH',
+            ],
         };
         const allowedSourceIds = sourceIdsByStore[storeId] ?? [];
 

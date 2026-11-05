@@ -273,4 +273,31 @@ LIMIT 1
             [shipmentId, staleAfterMinutes],
         );
     }
+    async findActiveForPolling(
+        tenant: CurrentTenant,
+    ): Promise<SelfDeliveryFulfillmentRow[]> {
+        const schema = this.safeSchemaName(tenant.schemaName);
+
+        return this.db.query<SelfDeliveryFulfillmentRow>(
+            `
+        SELECT f.*
+        FROM "${schema}".self_delivery_fulfillments f
+        INNER JOIN "${schema}".shipments s
+            ON s.id = f.shipment_id
+        INNER JOIN "${schema}".source_delivery_integrations i
+            ON i.store_id = f.request_payload->>'storeId'
+            AND i.source_id = f.source_id
+        WHERE f.status = 'confirmed'
+          AND f.source_order_id IS NOT NULL
+          AND i.polling_enabled = true
+          AND s.status NOT IN (
+              'delivered',
+              'failed',
+              'cancelled',
+              'canceled'
+          )
+        ORDER BY f.created_at ASC
+        `,
+        );
+    }
 }
