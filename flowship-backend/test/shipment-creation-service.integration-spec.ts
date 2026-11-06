@@ -1,3 +1,4 @@
+import { ConfirmedShipmentPlan } from '../src/modules/planning/shipment-plan-confirmation.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'crypto';
@@ -382,6 +383,8 @@ describe(
                         shipments: [
                             {
                                 sourceId: 'integration-source',
+                                readyAt: '2026-11-01T13:00:00.000Z',
+                                estimatedDeliveryAt: '2026-11-01T14:30:00.000Z',
                                 vehicleIndex: 0,
                                 vehicleType: 'car',
                                 assignedWeightKg: 3,
@@ -450,7 +453,7 @@ describe(
                 metrics: {
                     totalShippingPrice:
                         35,
-
+                    pickupLeadTimeMinutes: 0,
                     estimatedDeliveryDays:
                         1,
 
@@ -479,7 +482,27 @@ describe(
                         plan,
                     );
 
-                const result =
+                const winningConfirmation: ConfirmedShipmentPlan = {
+    plan,
+    confirmed: true,
+    confirmations: [
+        {
+            sourceId: 'integration-source',
+            available: true,
+            preparationMinutes: 25,
+            items: [
+                {
+                    sku: 'SKU-INTEGRATION',
+                    requestedQuantity: 2,
+                    availableQuantity: 10,
+                },
+            ],
+            confirmedAt: new Date().toISOString(),
+        },
+    ],
+    confirmedAt: new Date().toISOString(),
+};
+const result =
                     await shipmentCreationService
                         .createShipments(
                             tenantA,
@@ -487,7 +510,9 @@ describe(
                             checkout,
                             plan,
                             deliveryOption,
-                        );
+                            undefined,
+                            winningConfirmation,
+                        );;
 
                 expect(
                     result,
@@ -542,6 +567,13 @@ describe(
 
                         estimated_delivery_days:
                         number;
+                        preparation_time_minutes: number | null;
+                        ready_at: Date | null;
+                        estimated_delivery_at: Date | null;
+                        metadata: {
+                            sourceId?: string;
+                            deliveryMethod?: 'carrier' | 'self_delivery';
+                        };
                     }>(
                         `
                         select
@@ -550,8 +582,12 @@ describe(
                             carrier_name,
                             service_name,
                             price,
-                            currency,
-                            estimated_delivery_days
+                           currency,
+estimated_delivery_days,
+ready_at,
+estimated_delivery_at,
+metadata,
+preparation_time_minutes
                         from flow_ship_test_a.shipments
                         where id = $1
                         `,
@@ -565,7 +601,9 @@ describe(
                 ).toHaveLength(
                     1,
                 );
-
+                expect(
+                    rows[0].preparation_time_minutes,
+                ).toBe(25);
                 expect(
                     rows[0],
                 ).toMatchObject({
@@ -590,6 +628,21 @@ describe(
                     estimated_delivery_days:
                         1,
                 });
+                expect(
+                    rows[0].ready_at?.toISOString(),
+                ).toBe('2026-11-01T13:00:00.000Z');
+
+                expect(
+                    rows[0].estimated_delivery_at?.toISOString(),
+                ).toBe('2026-11-01T14:30:00.000Z');
+
+                expect(
+                    rows[0].metadata.sourceId,
+                ).toBe('integration-source');
+
+                expect(
+                    rows[0].metadata.deliveryMethod,
+                ).toBe('carrier');
             },
         );
 
@@ -848,8 +901,7 @@ describe(
                             checkoutAId,
                             checkout,
                             plan,
-                            deliveryOption,
-                        ),
+                            deliveryOption,),
                 ).rejects.toThrow(
                     'does not belong to plan',
                 );
@@ -919,8 +971,7 @@ describe(
                             checkoutAId,
                             checkout,
                             plan,
-                            deliveryOption,
-                        ),
+                            deliveryOption,),
                 ).rejects.toThrow(
                     'has no supply sources',
                 );

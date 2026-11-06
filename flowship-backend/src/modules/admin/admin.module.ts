@@ -9,6 +9,9 @@ import { TenantsModule } from
 import { PlanningModule } from
   '../planning/planning.module';
 
+import { SourcingModule } from
+  '../sourcing/sourcing.module';
+
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
@@ -17,6 +20,7 @@ import { AdminService } from './admin.service';
     DatabaseModule,
     TenantsModule,
     PlanningModule,
+    SourcingModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

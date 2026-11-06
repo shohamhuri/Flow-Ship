@@ -2,16 +2,17 @@ import {
     Body,
     Controller,
     Delete,
+    ForbiddenException,
     Get,
     NotFoundException,
     Param,
     Patch,
     Query,
     Post,
-    UseGuards
-
+    UseGuards,
 } from '@nestjs/common';
-
+import { UpdateSourceDeliveryPermissionDto } from
+    './dto/update-source-delivery-permission.dto';
 
 import {
     CurrentFlowShipAuth,
@@ -49,7 +50,61 @@ export class AdminController {
         private readonly deliverySettingsService:
             DeliverySettingsService,
     ) { }
+    @Patch('source-delivery-permissions/:sourceId')
+    async updateSourceDeliveryPermission(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
 
+        @Param('sourceId')
+        sourceId: string,
+
+        @Body()
+        dto: UpdateSourceDeliveryPermissionDto,
+    ) {
+        if (auth.user.role !== 'admin') {
+            throw new ForbiddenException(
+                'Admin access required',
+            );
+        }
+        const permission =
+            await this.adminService.updateSourceDeliveryPermission(
+                auth.tenant,
+                dto.storeId,
+                sourceId,
+                dto.selfDeliveryAllowed,
+                dto.selfDeliveryPrice,
+            );
+
+        return {
+            ok: true,
+            permission,
+        };
+    }
+    @Get('source-delivery-permissions')
+    async getSourceDeliveryPermissions(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+
+        @Query('storeId')
+        storeId: string,
+    ) {
+        if (auth.user.role !== 'admin') {
+            throw new ForbiddenException(
+                'Admin access required',
+            );
+        }
+
+        const permissions =
+            await this.adminService.getSourceDeliveryPermissions(
+                auth.tenant,
+                storeId,
+            );
+
+        return {
+            ok: true,
+            permissions,
+        };
+    }
     @Get('providers')
     async getProviders(
         @CurrentFlowShipAuth()
@@ -603,6 +658,7 @@ export class AdminController {
                     sameDayMaxMinutes: dto.sameDayMaxMinutes,
                     expressCutoffTime: dto.expressCutoffTime,
                     pickupLeadTimeMinutes: dto.pickupLeadTimeMinutes,
+                    statusUpdateTimeoutMinutes: dto.statusUpdateTimeoutMinutes,
                     expressAfterCutoffMode:
                         dto.expressAfterCutoffMode,
                     expressAfterCutoffMaxMinutes:
@@ -618,6 +674,20 @@ export class AdminController {
                 schemaName: tenant.schemaName,
             },
             settings,
+        };
+    }
+    @Get('stores')
+    async getStores(
+        @CurrentFlowShipAuth()
+        auth: FlowShipAuthContext,
+    ) {
+        const stores = await this.adminService.getStores(
+            auth.tenant,
+        );
+
+        return {
+            ok: true,
+            stores,
         };
     }
 

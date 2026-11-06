@@ -53,4 +53,14 @@ export class ShipmentHistoryService {
                 },
             );
     }
+    async getShipmentEvents(
+        tenant: CurrentTenant,
+        shipmentId: string,
+    ) {
+        return this.shipmentHistoryRepository
+            .findShipmentEvents(
+                tenant,
+                shipmentId,
+            );
+    }
 }

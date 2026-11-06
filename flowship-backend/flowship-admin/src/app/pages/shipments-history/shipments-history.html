@@ -471,6 +471,57 @@
 
                                                 <div class="shipment-meta">
                                                     <div>
+                                                        <span>סוג משלוח</span>
+                                                        <strong>
+                                                            {{
+                                                            shipment.deliveryMethod === 'self_delivery'
+                                                            ? 'משלוח עצמי'
+                                                            : shipment.deliveryMethod === 'carrier'
+                                                            ? 'חברת שילוח'
+                                                            : 'לא ידוע'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>מקור אחראי</span>
+                                                        <strong>{{ shipment.sourceId || 'לא ידוע' }}</strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>זמן הכנה</span>
+                                                        <strong>
+                                                            {{
+                                                            shipment.preparationTimeMinutes !== null
+                                                            && shipment.preparationTimeMinutes !== undefined
+                                                            ? shipment.preparationTimeMinutes + ' דקות'
+                                                            : 'לא ידוע'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>מועד מוכנות משוער</span>
+                                                        <strong>
+                                                            {{
+                                                            shipment.readyAt
+                                                            ? (shipment.readyAt | date:'dd/MM/yyyy HH:mm')
+                                                            : 'לא ידוע'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        <span>זמן מסירה משוער (ETA)</span>
+                                                        <strong>
+                                                            {{
+                                                            shipment.estimatedDeliveryAt
+                                                            ? (shipment.estimatedDeliveryAt | date:'dd/MM/yyyy HH:mm')
+                                                            : 'לא ידוע'
+                                                            }}
+                                                        </strong>
+                                                    </div>
+                                                    <div>
                                                         <span>חברת שילוח</span>
 
                                                         <strong>
@@ -571,6 +622,57 @@
                           ">
                                                     פתיחת מעקב
                                                 </a>
+                                                <div class="shipment-events-section">
+
+                                                    <button type="button" class="details-button"
+                                                        (click)="toggleShipmentEvents(shipment.id)">
+                                                        {{
+                                                        expandedShipmentId === shipment.id
+                                                        ? 'סגירת היסטוריית עדכונים'
+                                                        : 'היסטוריית עדכונים'
+                                                        }}
+                                                    </button>
+
+                                                    <div *ngIf="expandedShipmentId === shipment.id">
+
+                                                        <p *ngIf="shipmentEventsLoading">
+                                                            טוען היסטוריית עדכונים...
+                                                        </p>
+
+                                                        <p *ngIf="shipmentEventsError">
+                                                            {{ shipmentEventsError }}
+                                                        </p>
+
+                                                        <p *ngIf="
+        !shipmentEventsLoading &&
+        !shipmentEventsError &&
+        shipmentEvents.length === 0
+      ">
+                                                            לא נמצאו עדכונים למשלוח זה.
+                                                        </p>
+
+                                                        <div *ngFor="let event of shipmentEvents"
+                                                            class="shipment-event">
+                                                            <strong>
+                                                                {{ getShipmentStatusLabel(event.newStatus ||
+                                                                event.eventType) }}
+                                                            </strong>
+
+                                                            <div>
+                                                                {{ event.occurredAt | date:'dd/MM/yyyy HH:mm' }}
+                                                            </div>
+
+                                                            <div *ngIf="event.previousStatus">
+                                                                {{ getShipmentStatusLabel(event.previousStatus) }}
+                                                                ←
+                                                                {{ getShipmentStatusLabel(event.newStatus || '') }}
+                                                            </div>
+
+                                                            <small>סוג אירוע: {{ event.eventType }}</small>
+                                                        </div>
+
+                                                    </div>
+                                                </div>
                                                 <div class="tracking-note">
                                                     לחיצה על הכפתור תפתח את אתר חברת השילוח בחלון חדש.
                                                 </div>

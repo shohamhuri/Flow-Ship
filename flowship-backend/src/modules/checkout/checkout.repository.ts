@@ -107,6 +107,12 @@ export interface CheckoutShipment {
     providerId: string | null;
     providerCode: string | null;
     adapterKey: string | null;
+    deliveryMethod: 'carrier' | 'self_delivery';
+    sourceId: string | null;
+    preparationTimeMinutes: number | null;
+    readyAt: Date | null;
+    estimatedDeliveryAt: Date | null;
+    externalShipmentId: string | null;
     carrierName: string;
     serviceName: string;
     price: number;
@@ -648,6 +654,14 @@ values (
                 currency: string;
                 estimated_delivery_days: number;
                 status: string;
+                preparation_time_minutes: number | null;
+                ready_at: Date | null;
+                estimated_delivery_at: Date | null;
+                external_shipment_id: string | null;
+                metadata: {
+                    deliveryMethod?: 'carrier' | 'self_delivery';
+                    [key: string]: unknown;
+                } | null;
                 created_at: Date;
                 updated_at: Date | null;
             }>(
@@ -665,10 +679,15 @@ values (
                     service_name,
                     price,
                     currency,
-                    estimated_delivery_days,
-                    status,
-                    created_at,
-                    updated_at
+                 estimated_delivery_days,
+status,
+preparation_time_minutes,
+ready_at,
+estimated_delivery_at,
+external_shipment_id,
+metadata,
+created_at,
+updated_at
                 from "${schemaName}".shipments
                 where checkout_id = $1
                 order by created_at asc
@@ -925,7 +944,28 @@ values (
                     providerId: shipment.provider_id,
                     providerCode: shipment.provider_code,
                     adapterKey: shipment.adapter_key,
-                    carrierName: shipment.carrier_name,
+                    deliveryMethod:
+                        shipment.metadata?.deliveryMethod ?? 'carrier',
+
+                    sourceId:
+                        typeof shipment.metadata?.sourceId === 'string'
+                            ? shipment.metadata.sourceId
+                            : null,
+
+                    preparationTimeMinutes:
+                        shipment.preparation_time_minutes,
+
+                    readyAt:
+                        shipment.ready_at,
+
+                    estimatedDeliveryAt:
+                        shipment.estimated_delivery_at,
+
+                    externalShipmentId:
+                        shipment.external_shipment_id,
+
+                    carrierName:
+                        shipment.carrier_name,
                     serviceName: shipment.service_name,
                     price: shipment.price,
                     currency: shipment.currency,
@@ -1014,6 +1054,28 @@ values (
                 `Checkout not found: ${checkoutId}`,
             );
         }
+    }
+    async getStorePaymentWebhookSecret(
+        tenant: CurrentTenant,
+        storeId: string,
+    ): Promise<string | null> {
+        const schemaName = this.safeSchemaName(tenant.schemaName);
+
+        const rows = await this.databaseService.query<{
+            payment_webhook_secret: string | null;
+        }>(
+            `
+        SELECT payment_webhook_secret
+        FROM "${schemaName}".stores
+        WHERE external_store_id = $1
+          AND platform = 'manual'
+          AND is_active = true
+        LIMIT 1
+        `,
+            [storeId],
+        );
+
+        return rows[0]?.payment_webhook_secret ?? null;
     }
 
 }

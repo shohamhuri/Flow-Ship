@@ -1,3 +1,5 @@
+﻿import { INVENTORY_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
+import { SourceDeliveryPermissionsService } from '../src/modules/sourcing/source-delivery-permissions.service';
 import {
     ConfigModule,
     ConfigService,
@@ -354,6 +356,11 @@ describe(
                                 ConfigService,
                                 TenantsService,
                                 AdminService,
+                                SourceDeliveryPermissionsService,
+                                {
+                                    provide: INVENTORY_PROVIDER,
+                                    useValue: {},
+                                },
                             ],
                         })
                         .compile();
@@ -1014,3 +1021,4 @@ describe(
         );
     },
 );
+

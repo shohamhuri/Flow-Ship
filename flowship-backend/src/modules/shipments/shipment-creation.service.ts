@@ -3,6 +3,8 @@ import {
     DbService,
     DbTransaction,
 } from '../../infrastructure/database/db.service';
+import { ConfirmedShipmentPlan }
+    from '../planning/shipment-plan-confirmation.service';
 import { CurrentTenant } from '../tenants/tenants.service';
 import { Checkout } from '../checkout/interfaces/checkout.interface';
 
@@ -31,6 +33,7 @@ export class ShipmentCreationService {
         winningPlan: ShipmentPlanCandidate,
         selectedDeliveryOption: ShipmentPlanDeliveryOption,
         externalTx?: DbTransaction,
+        winningConfirmation?: ConfirmedShipmentPlan,
     ): Promise<CreatedShipmentResult[]> {
         if (!winningPlan.grouping) {
             throw new Error(
@@ -218,7 +221,11 @@ export class ShipmentCreationService {
                     }
 
                     const quote = shipment.quote;
-
+                    const sourceConfirmation =
+                        winningConfirmation?.confirmations.find(
+                            (confirmation) =>
+                                confirmation.sourceId === shipment.sourceId,
+                        );
                     const shipmentId = await this.shipmentsRepository.createShipment(
                         tenant,
                         {
@@ -235,9 +242,14 @@ export class ShipmentCreationService {
                             price: quote.price,
                             currency: quote.currency,
                             estimatedDeliveryDays: quote.estimatedDays,
+                            readyAt: shipment.readyAt ?? null,
+                            estimatedDeliveryAt: shipment.estimatedDeliveryAt ?? null,
+                            preparationTimeMinutes:
+                                sourceConfirmation?.preparationMinutes ?? null,
                             status: 'created',
                             metadata: {
                                 sourceId: shipment.sourceId,
+                                deliveryMethod: shipment.deliveryMethod ?? 'carrier',
                                 vehicleIndex: shipment.vehicleIndex,
                                 vehicleType: shipment.vehicleType,
                                 assignedWeightKg: shipment.assignedWeightKg,

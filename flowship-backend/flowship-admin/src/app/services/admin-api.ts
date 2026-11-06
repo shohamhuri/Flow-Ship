@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+﻿import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 export type ProviderLogStatus = 'success' | 'failed';
 import { environment } from '../../environments/environment';
@@ -73,6 +73,42 @@ export interface UpdateStoreSettingsPayload {
   expressAfterCutoffMode?: 'extended' | 'disabled';
   expressAfterCutoffMaxMinutes?: number | null;
   pickupLeadTimeMinutes?: number;
+}
+export interface SourceDeliveryPermission {
+  sourceId: string;
+  selfDeliveryEnabled: boolean;
+  selfDeliveryAllowed: boolean;
+  selfDeliveryPrice: number | null;
+}
+
+export interface SourceDeliveryPermissionsResponse {
+  ok: boolean;
+  permissions: SourceDeliveryPermission[];
+}
+
+export interface UpdateSourceDeliveryPermissionPayload {
+  storeId: string;
+  selfDeliveryAllowed: boolean;
+  selfDeliveryPrice?: number | null;
+}
+
+export interface UpdateSourceDeliveryPermissionResponse {
+  ok: boolean;
+  permission: {
+    storeId: string;
+    sourceId: string;
+    selfDeliveryAllowed: boolean;
+    selfDeliveryPrice: number | null;
+  };
+}
+export interface AdminStore {
+  id: string;
+  external_store_id: string;
+}
+
+export interface AdminStoresResponse {
+  ok: boolean;
+  stores: AdminStore[];
 }
 export type AdminProvider = {
   id: string;
@@ -877,9 +913,29 @@ export interface ReorderGroupingStrategyItem {
   executionOrder: number;
   conflictPriority: number;
 }
+export interface ShipmentHistoryEvent {
+  id: string;
+  shipmentId: string;
+  eventType: string;
+  previousStatus: string | null;
+  newStatus: string | null;
+  occurredAt: string;
+  recordedAt: string;
+}
+
+export interface ShipmentHistoryEventsResponse {
+  ok: boolean;
+  shipmentId: string;
+  count: number;
+  events: ShipmentHistoryEvent[];
+}
 export interface ShipmentHistoryShipment {
   id: string;
-
+  deliveryMethod: 'carrier' | 'self_delivery' | null;
+  sourceId: string | null;
+  preparationTimeMinutes: number | null;
+  readyAt: string | null;
+  estimatedDeliveryAt: string | null;
   externalShipmentId: string | null;
   shipmentGroupId: string | null;
 
@@ -1012,6 +1068,41 @@ export interface ShipmentHistoryFilters {
   toDate?: string;
   sortBy?: ShipmentHistorySortBy;
   sortDirection?: ShipmentHistorySortDirection;
+}
+export type ShipmentAnomalyStatus =
+  | 'open'
+  | 'acknowledged'
+  | 'resolved';
+
+export type ShipmentAnomalyType =
+  | 'preparation_delay'
+  | 'delivery_delay'
+  | 'missing_status_update';
+
+export interface ShipmentMonitoringAnomaly {
+  id: string;
+  shipment_id: string;
+  anomaly_type: ShipmentAnomalyType;
+  status: ShipmentAnomalyStatus;
+  detected_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  details: Record<string, unknown> | null;
+}
+export interface ActiveShipment {
+  id: string;
+  checkoutId: string;
+  orderId: string;
+  deliveryMethod: 'carrier' | 'self_delivery';
+  sourceId: string | null;
+  preparationTimeMinutes: number | null;
+  readyAt: string | null;
+  estimatedDeliveryAt: string | null;
+  status: string;
+  carrierName: string | null;
+  serviceName: string | null;
+  createdAt: string;
+  updatedAt: string | null;
 }
 @Injectable({
   providedIn: 'root',
@@ -1237,6 +1328,11 @@ export class AdminApiService {
       },
     );
   }
+  getShipmentHistoryEvents(shipmentId: string) {
+    return this.http.get<ShipmentHistoryEventsResponse>(
+      `${this.baseUrl}/admin/shipment-history/${encodeURIComponent(shipmentId)}/events`,
+    );
+  }
   getShipmentHistory(
     filters: ShipmentHistoryFilters = {},
   ) {
@@ -1299,10 +1395,32 @@ export class AdminApiService {
       `${this.baseUrl}/admin/store-settings`,
     );
   }
-
+  getStores() {
+    return this.http.get<AdminStoresResponse>(
+      `${this.baseUrl}/admin/stores`,
+    );
+  }
   updateStoreSettings(body: UpdateStoreSettingsPayload) {
     return this.http.patch<StoreSettingsResponse>(
       `${this.baseUrl}/admin/store-settings`,
+      body,
+    );
+  }
+  getSourceDeliveryPermissions(storeId: string) {
+    return this.http.get<SourceDeliveryPermissionsResponse>(
+      `${this.baseUrl}/admin/source-delivery-permissions`,
+      {
+        params: { storeId },
+      },
+    );
+  }
+
+  updateSourceDeliveryPermission(
+    sourceId: string,
+    body: UpdateSourceDeliveryPermissionPayload,
+  ) {
+    return this.http.patch<UpdateSourceDeliveryPermissionResponse>(
+      `${this.baseUrl}/admin/source-delivery-permissions/${encodeURIComponent(sourceId)}`,
       body,
     );
   }
@@ -1330,4 +1448,32 @@ export class AdminApiService {
       body,
     );
   }
+  getActiveShipments() {
+    return this.http.get<ActiveShipment[]>(
+      `${this.baseUrl}/shipments/monitoring/active`,
+    );
+  }
+  getShipmentMonitoringAnomalies(
+    status?: ShipmentAnomalyStatus,
+  ) {
+    const params = status
+      ? new HttpParams().set('status', status)
+      : new HttpParams();
+
+    return this.http.get<ShipmentMonitoringAnomaly[]>(
+      `${this.baseUrl}/shipments/monitoring/anomalies`,
+      { params },
+    );
+  }
+
+  acknowledgeShipmentMonitoringAnomaly(anomalyId: string) {
+    return this.http.patch<{
+      ok: boolean;
+      anomalyId: string;
+    }>(
+      `${this.baseUrl}/shipments/monitoring/anomalies/${encodeURIComponent(anomalyId)}/acknowledge`,
+      {},
+    );
+  }
 }
+

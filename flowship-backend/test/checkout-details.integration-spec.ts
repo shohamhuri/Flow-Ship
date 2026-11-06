@@ -489,7 +489,22 @@ describe(
                     GROUP_2_ID,
                 ],
             );
-
+            await db.query(
+                `
+    update ${schema}.shipments
+    set
+        metadata = coalesce(metadata, '{}'::jsonb)
+            || jsonb_build_object(
+                'deliveryMethod', 'self_delivery',
+                'sourceId', 'checkout-integration-source-2'
+            ),
+        preparation_time_minutes = 45,
+        ready_at = '2026-11-04T11:45:00Z',
+        estimated_delivery_at = '2026-11-04T14:00:00Z'
+    where id = $1
+    `,
+                [SHIPMENT_2_ID],
+            );
             /*
              * 7. Shipment Stops
              *
@@ -1053,7 +1068,53 @@ describe(
             },
         );
 
+        it(
+            '7a. returns Self-Delivery fields alongside carrier shipment',
+            async () => {
+                const details =
+                    await checkoutRepository.getCheckoutById(
+                        tenantA,
+                        checkoutId!,
+                    );
 
+                expect(details).not.toBeNull();
+
+                const carrierShipment = details!.shipments.find(
+                    (item) => item.id === SHIPMENT_1_ID,
+                );
+
+                const selfDeliveryShipment = details!.shipments.find(
+                    (item) => item.id === SHIPMENT_2_ID,
+                );
+
+                expect(carrierShipment).toBeDefined();
+                expect(selfDeliveryShipment).toBeDefined();
+
+                expect(carrierShipment).toMatchObject({
+                    deliveryMethod: 'carrier',
+                    sourceId: null,
+                    preparationTimeMinutes: null,
+                    readyAt: null,
+                    estimatedDeliveryAt: null,
+                });
+
+                expect(selfDeliveryShipment).toMatchObject({
+                    deliveryMethod: 'self_delivery',
+                    sourceId: 'checkout-integration-source-2',
+                    preparationTimeMinutes: 45,
+                });
+
+                expect(
+                    new Date(selfDeliveryShipment!.readyAt!).toISOString(),
+                ).toBe('2026-11-04T11:45:00.000Z');
+
+                expect(
+                    new Date(
+                        selfDeliveryShipment!.estimatedDeliveryAt!,
+                    ).toISOString(),
+                ).toBe('2026-11-04T14:00:00.000Z');
+            },
+        );
         it(
             '8. maps stops to the correct shipment and orders them by stopOrder',
             async () => {

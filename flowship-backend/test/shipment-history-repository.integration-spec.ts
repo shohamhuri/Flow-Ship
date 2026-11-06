@@ -206,7 +206,21 @@ describe('ShipmentHistoryRepository Integration', () => {
                 checkoutAId,
             ],
         );
-
+        await db.query(
+            `
+    update flow_ship_test_a.shipments
+    set
+        metadata = jsonb_build_object(
+            'deliveryMethod', 'self_delivery',
+            'sourceId', 'integration-source-a2'
+        ),
+        preparation_time_minutes = 30,
+        ready_at = '2026-11-04T10:30:00Z',
+        estimated_delivery_at = '2026-11-04T12:00:00Z'
+    where id = $1
+    `,
+            [shipmentA2Id],
+        );
         await db.query(
             `
             insert into flow_ship_test_a.shipment_stops (
@@ -449,7 +463,49 @@ describe('ShipmentHistoryRepository Integration', () => {
                 'ILS',
         });
     });
+    it('should return Self-Delivery fields alongside carrier shipment', async () => {
+        const history = await repository.findFinalOrders(tenantA);
 
+        const order = history.find(
+            (item) => item.checkoutId === checkoutAId,
+        );
+
+        expect(order).toBeDefined();
+        expect(order?.shipments).toHaveLength(2);
+
+        const carrierShipment = order?.shipments.find(
+            (item) => item.id === shipmentA1Id,
+        );
+
+        const selfDeliveryShipment = order?.shipments.find(
+            (item) => item.id === shipmentA2Id,
+        );
+
+        expect(carrierShipment).toBeDefined();
+        expect(selfDeliveryShipment).toBeDefined();
+
+        expect(carrierShipment).toMatchObject({
+            deliveryMethod: 'carrier',
+            sourceId: null,
+            preparationTimeMinutes: null,
+            readyAt: null,
+            estimatedDeliveryAt: null,
+        });
+
+        expect(selfDeliveryShipment).toMatchObject({
+            deliveryMethod: 'self_delivery',
+            sourceId: 'integration-source-a2',
+            preparationTimeMinutes: 30,
+        });
+
+        expect(
+            new Date(selfDeliveryShipment!.readyAt!).toISOString(),
+        ).toBe('2026-11-04T10:30:00.000Z');
+
+        expect(
+            new Date(selfDeliveryShipment!.estimatedDeliveryAt!).toISOString(),
+        ).toBe('2026-11-04T12:00:00.000Z');
+    });
     it('should return failed final order for Tenant B', async () => {
         const history =
             await repository.findFinalOrders(

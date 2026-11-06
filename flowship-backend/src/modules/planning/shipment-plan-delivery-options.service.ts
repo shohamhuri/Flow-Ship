@@ -65,6 +65,7 @@ export class ShipmentPlanDeliveryOptionsService {
                         plan,
                         sourceTiming?.travelMinutes,
                         sourceTiming?.estimatedDeliveryAt,
+                        sourceTiming?.readyAt,
                     ),
                 );
 
@@ -95,15 +96,71 @@ export class ShipmentPlanDeliveryOptionsService {
                         entry.quotes.map((quote) => [
                             {
                                 sourceId,
+                                deliveryMethod: 'carrier' as const,
                                 vehicleIndex: 0,
                                 assignedWeightKg: sourceWeightKg,
                                 items: sourceItems.map((item) => ({ ...item })),
                                 quote,
                                 travelMinutes: entry.travelMinutes,
+                                readyAt: entry.readyAt,
                                 estimatedDeliveryAt: entry.estimatedDeliveryAt,
                             },
                         ]),
                     );
+                const selfDeliveryChoices =
+                    sourceTiming?.selfDeliveryQuote?.accepted === true &&
+                        sourceTiming.selfDeliveryQuote.price !== null &&
+                        sourceTiming.selfDeliveryQuote.price >= 0 &&
+                        sourceTiming.selfDeliveryQuote.estimatedDeliveryAt &&
+                        Number.isFinite(
+                            Date.parse(sourceTiming.selfDeliveryQuote.estimatedDeliveryAt),
+                        ) &&
+                        Date.parse(
+                            sourceTiming.selfDeliveryQuote.estimatedDeliveryAt,
+                        ) > Date.now() &&
+                        (
+                            typeof sourceTiming.readyAt === 'string' &&
+                            Number.isFinite(Date.parse(sourceTiming.readyAt)) &&
+                            Date.parse(sourceTiming.selfDeliveryQuote.estimatedDeliveryAt) >=
+                            Date.parse(sourceTiming.readyAt)
+                        )
+                        ? [
+
+                            [
+                                {
+                                    sourceId,
+                                    deliveryMethod: 'self_delivery' as const,
+                                    vehicleIndex: 0,
+                                    assignedWeightKg: sourceWeightKg,
+                                    items: sourceItems.map((item) => ({ ...item })),
+                                    quote: {
+                                        carrierName: 'Source Self Delivery',
+                                        serviceName: 'Self Delivery',
+                                        price: sourceTiming.selfDeliveryQuote.price,
+                                        currency: 'ILS' as const,
+                                        estimatedDays: Math.max(
+                                            0,
+                                            Math.ceil(
+                                                (new Date(
+                                                    sourceTiming.selfDeliveryQuote.estimatedDeliveryAt,
+                                                ).getTime() - Date.now()) /
+                                                (24 * 60 * 60 * 1000),
+                                            ),
+                                        ),
+                                    },
+                                    readyAt: sourceTiming.readyAt,
+                                    estimatedDeliveryAt:
+                                        sourceTiming.selfDeliveryQuote.estimatedDeliveryAt,
+                                },
+                            ],
+                        ]
+                        : [];
+
+
+                if (sourceTiming?.selfDeliveryQuote?.accepted === true) {
+                    return selfDeliveryChoices;
+                }
+
                 return [...vehicleChoices, ...directChoices];
             });
 
@@ -252,6 +309,7 @@ export class ShipmentPlanDeliveryOptionsService {
         plan: ProviderVehiclePlanQuoteResult,
         travelMinutes?: number,
         estimatedDeliveryAt?: string,
+        readyAt?: string,
     ): SelectedVehicleShipment[][] {
         const alternatives = plan.alternatives ?? [];
 
@@ -272,12 +330,15 @@ export class ShipmentPlanDeliveryOptionsService {
 
                 shipments.push({
                     sourceId,
+                    deliveryMethod: 'carrier',
+
                     vehicleIndex: index,
                     vehicleType: vehicle.vehicleType,
                     assignedWeightKg: vehicle.assignedWeightKg,
                     items: vehicle.items.map((item) => ({ ...item })),
                     quote,
                     travelMinutes,
+                    readyAt,
                     estimatedDeliveryAt,
                 });
             }

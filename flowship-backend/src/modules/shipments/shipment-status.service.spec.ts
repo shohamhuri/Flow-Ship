@@ -5,7 +5,9 @@ import { DbService } from '../../infrastructure/database/db.service';
 import {
     ShipmentStatusService,
 } from './shipment-status.service';
-
+import {
+    SelfDeliveryFulfillmentRepository,
+} from './self-delivery-fulfillment.repository';
 import {
     ShipmentsRepository,
 } from './shipments.repository';
@@ -23,10 +25,14 @@ describe('ShipmentStatusService', () => {
     let markDropoffCompletedMock: jest.Mock;
     let markDeliveredMock: jest.Mock;
     let markFailedMock: jest.Mock;
+    let recordShipmentEventMock: jest.Mock;
     let findCheckoutIdByShipmentIdMock: jest.Mock;
     let getShipmentStatusSummaryMock: jest.Mock;
     let updateCheckoutStatusMock: jest.Mock;
-
+    let findBySourceOrderIdMock: jest.Mock;
+    let lockShipmentForUpdateMock: jest.Mock;
+    let hasExternalShipmentEventMock: jest.Mock;
+    let getLatestSupplierEventTimeMock: jest.Mock;
     const tenant = {
         id: 'tenant-1',
         name: 'QUEEN',
@@ -37,7 +43,8 @@ describe('ShipmentStatusService', () => {
     beforeEach(() => {
         markPickupCompletedMock = jest.fn()
             .mockResolvedValue(undefined);
-
+        getLatestSupplierEventTimeMock = jest.fn()
+            .mockResolvedValue(null);
         areAllPickupsCompletedMock = jest.fn()
             .mockResolvedValue(false);
 
@@ -52,6 +59,8 @@ describe('ShipmentStatusService', () => {
 
         markFailedMock = jest.fn()
             .mockResolvedValue(undefined);
+        recordShipmentEventMock = jest.fn()
+            .mockResolvedValue(undefined);
 
         findCheckoutIdByShipmentIdMock = jest.fn()
             .mockResolvedValue('checkout-1');
@@ -65,11 +74,24 @@ describe('ShipmentStatusService', () => {
 
         updateCheckoutStatusMock = jest.fn()
             .mockResolvedValue(undefined);
+        findBySourceOrderIdMock = jest.fn()
+            .mockResolvedValue({
+                shipment_id: 'shipment-1',
+                source_id: 'source-1',
+                source_order_id: 'order-1',
+                status: 'confirmed',
+            });
 
+        lockShipmentForUpdateMock = jest.fn()
+            .mockResolvedValue('preparing');
+
+        hasExternalShipmentEventMock = jest.fn()
+            .mockResolvedValue(false);
         const repositoryMock = {
             markPickupCompleted:
                 markPickupCompletedMock,
-
+            getLatestSupplierEventTime:
+                getLatestSupplierEventTimeMock,
             areAllPickupsCompleted:
                 areAllPickupsCompletedMock,
 
@@ -84,6 +106,8 @@ describe('ShipmentStatusService', () => {
 
             markFailed:
                 markFailedMock,
+            recordShipmentEvent:
+                recordShipmentEventMock,
 
             findCheckoutIdByShipmentId:
                 findCheckoutIdByShipmentIdMock,
@@ -93,6 +117,11 @@ describe('ShipmentStatusService', () => {
 
             updateCheckoutStatus:
                 updateCheckoutStatusMock,
+            lockShipmentForUpdate:
+                lockShipmentForUpdateMock,
+
+            hasExternalShipmentEvent:
+                hasExternalShipmentEventMock,
         } as unknown as ShipmentsRepository;
 
         const dbMock = {
@@ -108,9 +137,15 @@ describe('ShipmentStatusService', () => {
             ),
         } as unknown as DbService;
 
+        const fulfillmentRepositoryMock = {
+            findBySourceOrderId:
+                findBySourceOrderIdMock,
+        } as unknown as SelfDeliveryFulfillmentRepository;
+
         service = new ShipmentStatusService(
             repositoryMock,
             dbMock,
+            fulfillmentRepositoryMock,
         );
 
         jest.clearAllMocks();
@@ -134,6 +169,8 @@ describe('ShipmentStatusService', () => {
             'shipment-1',
             2,
             occurredAt,
+            expect.any(Object),
+
         );
     });
 
@@ -153,6 +190,8 @@ describe('ShipmentStatusService', () => {
             tenant,
             'shipment-1',
             'picked_up',
+            expect.any(Object),
+
         );
     });
 
@@ -183,7 +222,8 @@ describe('ShipmentStatusService', () => {
         ).toHaveBeenCalledWith(
             tenant,
             'shipment-1',
-            undefined,
+            expect.any(Object),
+
 
         );
 
@@ -192,8 +232,7 @@ describe('ShipmentStatusService', () => {
         ).toHaveBeenCalledWith(
             tenant,
             'checkout-1',
-            undefined,
-
+            expect.any(Object),
         );
     });
 
@@ -209,6 +248,8 @@ describe('ShipmentStatusService', () => {
             tenant,
             'shipment-1',
             'in_transit',
+            expect.any(Object),
+
         );
 
         expect(
@@ -216,7 +257,7 @@ describe('ShipmentStatusService', () => {
         ).toHaveBeenCalledWith(
             tenant,
             'shipment-1',
-            undefined,
+            expect.any(Object),
 
         );
     });
@@ -274,6 +315,8 @@ describe('ShipmentStatusService', () => {
             'shipment-1',
             'address not found',
             occurredAt,
+            expect.any(Object),
+
         );
     });
 
@@ -344,9 +387,50 @@ describe('ShipmentStatusService', () => {
             'shipment-1',
             3,
             new Date(occurredAt),
+            expect.any(Object),
+
         );
     });
+    it.each([
+        [ShipmentEventType.PREPARING, 'preparing', 'PREPARING'],
+        [
+            ShipmentEventType.READY_FOR_PICKUP,
+            'ready_for_pickup',
+            'READY_FOR_PICKUP',
+        ],
+    ])(
+        'should handle %s and persist the shipment event',
+        async (event, status, eventType) => {
+            const occurredAt = '2026-10-29T12:00:00.000Z';
 
+            updateStatusMock.mockResolvedValueOnce('created');
+
+            await service.handleEvent(tenant, {
+                shipmentId: 'shipment-1',
+                event,
+                occurredAt,
+            } as any);
+
+            expect(updateStatusMock).toHaveBeenCalledWith(
+                tenant,
+                'shipment-1',
+                status,
+                expect.any(Object),
+            );
+
+            expect(recordShipmentEventMock).toHaveBeenCalledWith(
+                tenant,
+                expect.objectContaining({
+                    shipmentId: 'shipment-1',
+                    eventType,
+                    previousStatus: 'created',
+                    newStatus: status,
+                    occurredAt: new Date(occurredAt),
+                }),
+                expect.any(Object),
+            );
+        },
+    );
     it('should handle an IN_TRANSIT event', async () => {
         await service.handleEvent(
             tenant,
@@ -365,6 +449,8 @@ describe('ShipmentStatusService', () => {
             tenant,
             'shipment-1',
             'in_transit',
+            expect.any(Object),
+
         );
     });
 
@@ -561,7 +647,7 @@ describe('ShipmentStatusService', () => {
             tenant,
             'checkout-1',
             'partially_failed',
-            undefined,
+            expect.any(Object),
         );
     });
 
@@ -615,9 +701,238 @@ describe('ShipmentStatusService', () => {
                 tenant,
                 'checkout-1',
                 expectedStatus,
-                undefined,
+                expect.any(Object),
 
             );
         },
     );
+    it('should process a valid supplier tracking update', async () => {
+        recordShipmentEventMock.mockResolvedValue(true);
+        updateStatusMock.mockResolvedValue('preparing');
+
+        const result = await service.processSelfDeliveryUpdate(
+            tenant,
+            {
+                sourceId: 'source-1',
+                sourceOrderId: 'order-1',
+                externalEventId: 'event-1',
+                status: 'ready_for_pickup',
+                occurredAt: '2026-10-29T10:00:00Z',
+            },
+        );
+
+        expect(result).toBe('processed');
+
+        expect(findBySourceOrderIdMock).toHaveBeenCalledWith(
+            tenant,
+            'source-1',
+            'order-1',
+            expect.any(Object),
+        );
+
+        expect(lockShipmentForUpdateMock).toHaveBeenCalledWith(
+            tenant,
+            'shipment-1',
+            expect.any(Object),
+        );
+
+        expect(recordShipmentEventMock).toHaveBeenCalledWith(
+            tenant,
+            expect.objectContaining({
+                shipmentId: 'shipment-1',
+                eventType: 'READY_FOR_PICKUP',
+                previousStatus: 'preparing',
+                newStatus: 'ready_for_pickup',
+                sourceId: 'source-1',
+                externalEventId: 'event-1',
+            }),
+            expect.any(Object),
+        );
+
+        expect(updateStatusMock).toHaveBeenCalledWith(
+            tenant,
+            'shipment-1',
+            'ready_for_pickup',
+            expect.any(Object),
+        );
+
+        expect(updateCheckoutStatusMock).toHaveBeenCalledTimes(1);
+    });
+    it('should ignore duplicate supplier tracking events', async () => {
+        hasExternalShipmentEventMock.mockResolvedValue(true);
+
+        const result = await service.processSelfDeliveryUpdate(
+            tenant,
+            {
+                sourceId: 'source-1',
+                sourceOrderId: 'order-1',
+                externalEventId: 'event-1',
+                status: 'ready_for_pickup',
+                occurredAt: '2026-10-29T10:00:00Z',
+            },
+        );
+
+        expect(result).toBe('duplicate');
+
+        expect(lockShipmentForUpdateMock).toHaveBeenCalledWith(
+            tenant,
+            'shipment-1',
+            expect.any(Object),
+        );
+
+        expect(recordShipmentEventMock).not.toHaveBeenCalled();
+
+        expect(updateStatusMock).not.toHaveBeenCalled();
+
+        expect(markDeliveredMock).not.toHaveBeenCalled();
+
+        expect(markFailedMock).not.toHaveBeenCalled();
+
+        expect(updateCheckoutStatusMock).not.toHaveBeenCalled();
+    });
+    it('should ignore invalid supplier status transitions', async () => {
+        lockShipmentForUpdateMock.mockResolvedValue('in_transit');
+
+        const result = await service.processSelfDeliveryUpdate(
+            tenant,
+            {
+                sourceId: 'source-1',
+                sourceOrderId: 'order-1',
+                externalEventId: 'event-invalid-1',
+                status: 'preparing',
+                occurredAt: '2026-10-29T10:00:00Z',
+            },
+        );
+
+        expect(result).toBe('ignored');
+
+        expect(hasExternalShipmentEventMock).toHaveBeenCalledWith(
+            tenant,
+            'source-1',
+            'event-invalid-1',
+            expect.any(Object),
+        );
+
+        expect(recordShipmentEventMock).not.toHaveBeenCalled();
+
+        expect(updateStatusMock).not.toHaveBeenCalled();
+
+        expect(markDeliveredMock).not.toHaveBeenCalled();
+
+        expect(markFailedMock).not.toHaveBeenCalled();
+
+        expect(updateCheckoutStatusMock).not.toHaveBeenCalled();
+    });
+    it.each([
+        ['delivered', 'failed'],
+        ['failed', 'delivered'],
+    ] as const)(
+        'should protect terminal status %s from %s',
+        async (currentStatus, incomingStatus) => {
+            lockShipmentForUpdateMock.mockResolvedValue(
+                currentStatus,
+            );
+
+            const result =
+                await service.processSelfDeliveryUpdate(
+                    tenant,
+                    {
+                        sourceId: 'source-1',
+                        sourceOrderId: 'order-1',
+                        externalEventId:
+                            `terminal-${currentStatus}-${incomingStatus}`,
+                        status: incomingStatus,
+                        occurredAt: '2026-10-29T10:00:00Z',
+                        reason:
+                            incomingStatus === 'failed'
+                                ? 'Supplier delivery failed'
+                                : undefined,
+                    },
+                );
+
+            expect(result).toBe('ignored');
+
+            expect(
+                recordShipmentEventMock,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                updateStatusMock,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                markDeliveredMock,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                markFailedMock,
+            ).not.toHaveBeenCalled();
+
+            expect(
+                updateCheckoutStatusMock,
+            ).not.toHaveBeenCalled();
+        },
+    );
+    it('should ignore an outdated supplier tracking event', async () => {
+        getLatestSupplierEventTimeMock.mockResolvedValue(
+            new Date('2026-10-29T11:00:00Z'),
+        );
+
+        const result = await service.processSelfDeliveryUpdate(
+            tenant,
+            {
+                sourceId: 'source-1',
+                sourceOrderId: 'order-1',
+                externalEventId: 'event-outdated-1',
+                status: 'ready_for_pickup',
+                occurredAt: '2026-10-29T10:00:00Z',
+            },
+        );
+
+        expect(result).toBe('ignored');
+
+        expect(getLatestSupplierEventTimeMock).toHaveBeenCalledWith(
+            tenant,
+            'shipment-1',
+            'source-1',
+            expect.any(Object),
+        );
+
+        expect(recordShipmentEventMock).not.toHaveBeenCalled();
+        expect(updateStatusMock).not.toHaveBeenCalled();
+        expect(markDeliveredMock).not.toHaveBeenCalled();
+        expect(markFailedMock).not.toHaveBeenCalled();
+        expect(updateCheckoutStatusMock).not.toHaveBeenCalled();
+    });
+    it('should ignore supplier events with the same timestamp', async () => {
+        getLatestSupplierEventTimeMock.mockResolvedValue(
+            new Date('2026-10-29T10:00:00Z'),
+        );
+
+        const result = await service.processSelfDeliveryUpdate(
+            tenant,
+            {
+                sourceId: 'source-1',
+                sourceOrderId: 'order-1',
+                externalEventId: 'event-same-time-2',
+                status: 'ready_for_pickup',
+                occurredAt: '2026-10-29T10:00:00Z',
+            },
+        );
+
+        expect(result).toBe('ignored');
+
+        expect(hasExternalShipmentEventMock).toHaveBeenCalledWith(
+            tenant,
+            'source-1',
+            'event-same-time-2',
+            expect.any(Object),
+        );
+
+        expect(recordShipmentEventMock).not.toHaveBeenCalled();
+        expect(updateStatusMock).not.toHaveBeenCalled();
+        expect(markDeliveredMock).not.toHaveBeenCalled();
+        expect(markFailedMock).not.toHaveBeenCalled();
+        expect(updateCheckoutStatusMock).not.toHaveBeenCalled();
+    });
 });

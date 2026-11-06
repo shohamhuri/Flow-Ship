@@ -367,6 +367,7 @@ describe('ShipmentCreationService', () => {
                     vehicleType: 'car',
                     assignedWeightKg: undefined,
                     items: undefined,
+                    deliveryMethod: 'carrier',
                 },
                 orderId:
                     'ORDER-100',
@@ -401,13 +402,53 @@ describe('ShipmentCreationService', () => {
                     'ILS',
 
                 estimatedDeliveryDays: 1,
-
+                readyAt: null,
+                estimatedDeliveryAt: null,
+                preparationTimeMinutes: null,
                 status:
                     'created',
             },
             expect.objectContaining({
                 query: expect.any(Function),
             }),
+        );
+    });
+
+    it('should forward the supplier readyAt to the shipments repository', async () => {
+        const readyAt = '2026-11-01T14:30:00.000Z';
+        const plan = createPlan();
+        const option = createDeliveryOption(
+            'plan-1',
+            [
+                {
+                    ...createSelectedGroupQuote('group-1', 'source-1'),
+                    shipments: [
+                        {
+                            sourceId: 'source-1',
+                            vehicleIndex: 0,
+                            vehicleType: 'car',
+                            quote: createQuote(),
+                            readyAt,
+                        },
+                    ],
+                },
+            ],
+        );
+
+        await service.createShipments(
+            tenant,
+            'checkout-123',
+            checkout,
+            plan,
+            option,
+        );
+
+        expect(createShipmentMock).toHaveBeenCalledWith(
+            tenant,
+            expect.objectContaining({
+                readyAt,
+            }),
+            expect.anything(),
         );
     });
 
@@ -1233,6 +1274,7 @@ describe('ShipmentCreationService', () => {
         const second = createShipmentMock.mock.calls[1][1];
 
         expect(first.metadata).toEqual({
+            deliveryMethod: 'carrier',
             sourceId: 'source-1',
             vehicleIndex: 0,
             vehicleType: 'scooter',
@@ -1258,6 +1300,7 @@ describe('ShipmentCreationService', () => {
                     unitWeightKg: 0.804,
                 },
             ],
+            deliveryMethod: 'carrier',
         });
 
         expect(
@@ -1365,5 +1408,160 @@ describe('ShipmentCreationService', () => {
         );
 
         expect(totalQuantity).toBe(6);
+    });
+    it('should create self-delivery shipment with one pickup and one dropoff', async () => {
+        const plan = createPlan();
+
+        const quote = createQuote({
+            carrierName: 'Source Self Delivery',
+            serviceName: 'Self Delivery',
+            price: 25,
+            providerId: undefined,
+            providerCode: undefined,
+            adapterKey: undefined,
+        });
+
+        const option = createDeliveryOption('plan-1', [
+            {
+                groupId: 'group-1',
+                quote,
+                shipments: [
+                    {
+                        sourceId: 'source-1',
+                        deliveryMethod: 'self_delivery',
+                        vehicleIndex: 0,
+                        quote,
+                    },
+                ],
+            },
+        ]);
+
+        await service.createShipments(
+            tenant,
+            'checkout-1',
+            checkout,
+            plan,
+            option,
+        );
+
+        expect(createShipmentMock).toHaveBeenCalledWith(
+            tenant,
+            expect.objectContaining({
+                providerId: undefined,
+                providerCode: undefined,
+                adapterKey: undefined,
+                price: 25,
+                metadata: expect.objectContaining({
+                    sourceId: 'source-1',
+                    deliveryMethod: 'self_delivery',
+                }),
+            }),
+            expect.anything(),
+        );
+
+        expect(createShipmentStopsMock).toHaveBeenCalledTimes(1);
+
+        const stopsCall = createShipmentStopsMock.mock.calls[0];
+
+        expect(stopsCall[2]).toHaveLength(1);
+        expect(stopsCall[2][0].sourceId).toBe('source-1');
+        expect(stopsCall[3].city).toBe('Tel Aviv');
+    });
+    it('should persist source-specific preparation times and preserve supplier ETA', async () => {
+        const plan = createPlan('plan-1', [
+            createGroup('group-1', [
+                createSource('source-1', 'Netivot'),
+            ]),
+            createGroup('group-2', [
+                createSource('source-2', 'Jerusalem'),
+            ]),
+        ]);
+
+        const eta1 = '2026-11-04T12:00:00.000Z';
+        const eta2 = '2026-11-04T15:00:00.000Z';
+
+        const option = createDeliveryOption('plan-1', [
+            {
+                groupId: 'group-1',
+                shipments: [{
+                    sourceId: 'source-1',
+                    vehicleIndex: 0,
+                    vehicleType: 'car',
+                    deliveryMethod: 'self_delivery',
+                    estimatedDeliveryAt: eta1,
+                    quote: createQuote(),
+                }],
+            },
+            {
+                groupId: 'group-2',
+                shipments: [{
+                    sourceId: 'source-2',
+                    vehicleIndex: 0,
+                    vehicleType: 'car',
+                    deliveryMethod: 'self_delivery',
+                    estimatedDeliveryAt: eta2,
+                    quote: createQuote(),
+                }],
+            },
+        ]);
+
+        // Intentionally different from either source's preparation time.
+        option.metrics.pickupLeadTimeMinutes = 120;
+
+        const winningConfirmation = {
+            plan,
+            confirmed: true,
+            confirmations: [
+                {
+                    sourceId: 'source-1',
+                    preparationMinutes: 20,
+                    confirmedAt: '2026-11-04T09:00:00.000Z',
+                },
+                {
+                    sourceId: 'source-2',
+                    preparationMinutes: 75,
+                    confirmedAt: '2026-11-04T09:00:00.000Z',
+                },
+            ],
+        } as any;
+
+        createShipmentMock
+            .mockResolvedValueOnce('shipment-1')
+            .mockResolvedValueOnce('shipment-2');
+
+        await service.createShipments(
+            tenant,
+            'checkout-1',
+            checkout,
+            plan,
+            option,
+            undefined,
+            winningConfirmation,
+        );
+
+        expect(createShipmentMock).toHaveBeenCalledTimes(2);
+
+        const persistedShipments =
+            createShipmentMock.mock.calls.map((call) => call[1]);
+
+        const first = persistedShipments.find(
+            (shipment) => shipment.metadata.sourceId === 'source-1',
+        );
+
+        const second = persistedShipments.find(
+            (shipment) => shipment.metadata.sourceId === 'source-2',
+        );
+
+        expect(first).toBeDefined();
+        expect(second).toBeDefined();
+
+        expect(first.preparationTimeMinutes).toBe(20);
+        expect(second.preparationTimeMinutes).toBe(75);
+
+        expect(first.estimatedDeliveryAt).toBe(eta1);
+        expect(second.estimatedDeliveryAt).toBe(eta2);
+
+        expect(first.metadata.deliveryMethod).toBe('self_delivery');
+        expect(second.metadata.deliveryMethod).toBe('self_delivery');
     });
 });

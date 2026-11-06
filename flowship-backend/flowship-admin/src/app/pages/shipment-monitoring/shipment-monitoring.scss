@@ -1,0 +1,402 @@
+:host {
+    display: block;
+    width: 100%;
+}
+
+.monitoring-page {
+    padding: 24px;
+    color: #1e293b;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 24px;
+
+    h1 {
+        margin: 0 0 8px;
+        font-size: 26px;
+        font-weight: 700;
+    }
+
+    p {
+        margin: 0;
+        color: #64748b;
+    }
+}
+
+button {
+    padding: 10px 16px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: white;
+    color: #334155;
+    cursor: pointer;
+    font: inherit;
+
+    &:hover:not(:disabled) {
+        background: #f1f5f9;
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.summary-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 22px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: white;
+
+    strong {
+        font-size: 30px;
+    }
+
+    span {
+        color: #64748b;
+        font-size: 14px;
+    }
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+
+    button.active {
+        background: #1e40af;
+        border-color: #1e40af;
+        color: white;
+    }
+}
+
+.table-container {
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: white;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: right;
+
+    th,
+    td {
+        padding: 16px;
+        border-bottom: 1px solid #e2e8f0;
+        vertical-align: middle;
+    }
+
+    th {
+        background: #f8fafc;
+        color: #475569;
+        font-weight: 600;
+    }
+
+    tbody tr:last-child td {
+        border-bottom: none;
+    }
+}
+
+.shipment-id {
+    font-family: monospace;
+    font-size: 12px;
+    direction: ltr;
+    text-align: right;
+}
+
+.status {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+
+    &.open {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    &.acknowledged {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    &.resolved {
+        background: #dcfce7;
+        color: #166534;
+    }
+}
+
+.error-message {
+    color: #b91c1c;
+    margin: 16px 0;
+}
+
+.state-message {
+    padding: 40px;
+    text-align: center;
+    color: #64748b;
+}
+
+@media (max-width: 768px) {
+    .monitoring-page {
+        padding: 12px;
+    }
+
+    .page-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .summary {
+        grid-template-columns: 1fr;
+    }
+}
+
+.active-shipments-section {
+    margin-bottom: 36px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+
+    h2 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        color: #1e293b;
+    }
+}
+
+.active-shipments-section {
+    .table-container {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    table {
+        min-width: 1050px;
+    }
+
+    th,
+    td {
+        padding: 12px 10px;
+    }
+
+    td {
+        font-size: 13px;
+    }
+
+    th:first-child,
+    td:first-child {
+        max-width: 180px;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    td:last-child button {
+        white-space: nowrap;
+    }
+
+    tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .shipment-events-row td {
+        max-width: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .section-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+.shipment-status {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+
+    &.created,
+    &.pending,
+    &.confirmed {
+        background: #f1f5f9;
+        color: #475569;
+    }
+
+    &.preparing {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    &.ready_for_pickup,
+    &.picked_up {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    &.in_transit,
+    &.out_for_delivery {
+        background: #e0e7ff;
+        color: #4338ca;
+    }
+
+    &.delivered {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    &.failed,
+    &.cancelled,
+    &.canceled {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+}
+
+.shipment-events-row {
+    background: #f8fafc;
+
+    td {
+        padding: 20px;
+    }
+}
+
+.shipment-events {
+    padding: 20px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+
+    h3 {
+        margin: 0 0 20px;
+        font-size: 17px;
+        color: #1e293b;
+    }
+}
+
+.events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.shipment-event {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #f8fafc;
+    border-right: 4px solid #3b82f6;
+    border-radius: 8px;
+
+    strong {
+        color: #1e40af;
+    }
+
+    span {
+        color: #475569;
+        font-size: 13px;
+    }
+
+    small {
+        color: #94a3b8;
+        font-size: 12px;
+    }
+}
+
+.monitoring-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.monitoring-tabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    button {
+        padding: 12px 22px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: #64748b;
+        font-size: 15px;
+        font-weight: 600;
+        transition: background 0.2s, color 0.2s;
+
+        &:hover:not(:disabled) {
+            background: #f1f5f9;
+        }
+
+        &.active {
+            background: #1e40af;
+            color: white;
+        }
+    }
+}
+
+.refresh-button {
+    white-space: nowrap;
+    border: 1px solid #cbd5e1;
+    background: white;
+    font-weight: 600;
+
+    &:hover:not(:disabled) {
+        background: #f1f5f9;
+    }
+}
+
+@media (max-width: 768px) {
+    .monitoring-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .monitoring-tabs {
+        width: 100%;
+
+        button {
+            flex: 1;
+            padding: 12px 10px;
+        }
+    }
+
+    .refresh-button {
+        width: 100%;
+    }
+}

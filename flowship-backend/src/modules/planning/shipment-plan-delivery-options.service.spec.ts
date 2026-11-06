@@ -33,6 +33,9 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
                 {
                     sourceId,
                     quotes,
+                    readyAt: new Date(
+                        Date.now() + 25 * 60 * 1000,
+                    ).toISOString(),
                 },
             ],
             vehiclePlans: [],
@@ -67,7 +70,180 @@ describe('ShipmentPlanDeliveryOptionsService', () => {
         service =
             new ShipmentPlanDeliveryOptionsService();
     });
+    it('should offer only self-delivery when the source accepts', () => {
+        const groupQuote = createGroupQuote('group-1', [
+            createQuote('carrier-a', 40, 2, 0.8),
+        ]);
 
+        const eta = new Date(
+            Date.now() + 2 * 60 * 60 * 1000,
+        ).toISOString();
+
+        groupQuote.sourceDirectQuotes[0].selfDeliveryQuote = {
+            sourceId: 'source-group-1',
+            accepted: true,
+            price: 25,
+            currency: 'ILS',
+            estimatedDeliveryAt: eta,
+        };
+
+        const quotedPlan = createQuotedPlan('plan-1', [groupQuote]);
+
+        const result = service.generateForPlans([quotedPlan]);
+        const options = result[0].deliveryOptions;
+
+
+        expect(options).toHaveLength(1);
+
+        const shipments =
+            options[0].selectedGroupQuotes[0].shipments!;
+
+        expect(shipments).toHaveLength(1);
+
+        expect(shipments[0]).toEqual(
+            expect.objectContaining({
+                sourceId: 'source-group-1',
+                deliveryMethod: 'self_delivery',
+                estimatedDeliveryAt: eta,
+                quote: expect.objectContaining({
+                    price: 25,
+                    currency: 'ILS',
+                }),
+            }),
+        );
+
+        expect(
+            shipments.some(
+                (shipment) => shipment.deliveryMethod === 'carrier',
+            ),
+        ).toBe(false);
+
+
+        expect(
+            options.every(
+                (option) =>
+                    option.selectedGroupQuotes[0].shipments?.length === 1,
+            ),
+        ).toBe(true);
+    });
+    it('should preserve carrier options when self-delivery is rejected', () => {
+        const groupQuote = createGroupQuote('group-1', [
+            createQuote('carrier-a', 40, 2, 0.8),
+        ]);
+
+        groupQuote.sourceDirectQuotes[0].selfDeliveryQuote = {
+            sourceId: 'source-group-1',
+            accepted: false,
+            price: null,
+            currency: 'ILS',
+            estimatedDeliveryAt: null,
+        };
+
+        const quotedPlan = createQuotedPlan('plan-1', [groupQuote]);
+        const result = service.generateForPlans([quotedPlan]);
+
+        const options = result[0].deliveryOptions;
+
+        expect(options).toHaveLength(1);
+
+        const shipment = options[0].selectedGroupQuotes[0].shipments![0];
+
+        expect(shipment.deliveryMethod).toBe('carrier');
+        expect(shipment.quote.price).toBe(40);
+        expect(shipment.sourceId).toBe('source-group-1');
+    });
+    it('should reject self-delivery with a negative price', () => {
+        const groupQuote = createGroupQuote('group-1', [
+            createQuote('carrier-a', 40, 2, 0.8),
+        ]);
+
+        groupQuote.sourceDirectQuotes[0].selfDeliveryQuote = {
+            sourceId: 'source-group-1',
+            accepted: true,
+            price: -10,
+            currency: 'ILS',
+            estimatedDeliveryAt: new Date(
+                Date.now() + 2 * 60 * 60 * 1000,
+            ).toISOString(),
+        };
+
+        const quotedPlan = createQuotedPlan('plan-1', [groupQuote]);
+        const result = service.generateForPlans([quotedPlan]);
+
+        const options = result[0].deliveryOptions;
+
+        expect(options).toHaveLength(0);
+    });
+    it('should reject self-delivery with an invalid ETA', () => {
+        const groupQuote = createGroupQuote('group-1', [
+            createQuote('carrier-a', 40, 2, 0.8),
+        ]);
+
+        groupQuote.sourceDirectQuotes[0].selfDeliveryQuote = {
+            sourceId: 'source-group-1',
+            accepted: true,
+            price: 25,
+            currency: 'ILS',
+            estimatedDeliveryAt: 'invalid-date',
+        };
+
+        const quotedPlan = createQuotedPlan('plan-1', [groupQuote]);
+        const result = service.generateForPlans([quotedPlan]);
+
+        const options = result[0].deliveryOptions;
+
+        expect(options).toHaveLength(0);
+    });
+    it('should reject self-delivery with an ETA in the past', () => {
+        const groupQuote = createGroupQuote('group-1', [
+            createQuote('carrier-a', 40, 2, 0.8),
+        ]);
+
+        groupQuote.sourceDirectQuotes[0].selfDeliveryQuote = {
+            sourceId: 'source-group-1',
+            accepted: true,
+            price: 25,
+            currency: 'ILS',
+            estimatedDeliveryAt: new Date(
+                Date.now() - 60 * 60 * 1000,
+            ).toISOString(),
+        };
+
+        const quotedPlan = createQuotedPlan('plan-1', [groupQuote]);
+        const result = service.generateForPlans([quotedPlan]);
+
+        const options = result[0].deliveryOptions;
+
+        expect(options).toHaveLength(0);
+    });
+    it('should reject self-delivery when ETA is before source readyAt', () => {
+        const groupQuote = createGroupQuote('group-1', [
+            createQuote('carrier-a', 40, 2, 0.8),
+        ]);
+
+        const now = Date.now();
+
+        // Products will only be ready in 3 hours.
+        groupQuote.sourceDirectQuotes[0].readyAt =
+            new Date(now + 3 * 60 * 60 * 1000).toISOString();
+
+        // Self-delivery promises arrival in 2 hours.
+        groupQuote.sourceDirectQuotes[0].selfDeliveryQuote = {
+            sourceId: 'source-group-1',
+            accepted: true,
+            price: 25,
+            currency: 'ILS',
+            estimatedDeliveryAt:
+                new Date(now + 2 * 60 * 60 * 1000).toISOString(),
+        };
+
+        const quotedPlan = createQuotedPlan('plan-1', [groupQuote]);
+        const result = service.generateForPlans([quotedPlan]);
+
+        const options = result[0].deliveryOptions;
+
+        expect(options).toHaveLength(0);
+    });
     it('should generate one delivery option for one group with one quote', () => {
         const quotedPlan = createQuotedPlan(
             'plan-1',

@@ -21,6 +21,7 @@ export interface DeliverySettings {
     expressAfterCutoffMode: ExpressAfterCutoffMode;
     expressAfterCutoffMaxMinutes: number | null;
     pickupLeadTimeMinutes: number;
+    statusUpdateTimeoutMinutes: number;
 }
 
 export interface UpdateDeliverySettingsInput {
@@ -30,6 +31,7 @@ export interface UpdateDeliverySettingsInput {
     expressAfterCutoffMode?: ExpressAfterCutoffMode;
     expressAfterCutoffMaxMinutes?: number | null;
     pickupLeadTimeMinutes?: number;
+    statusUpdateTimeoutMinutes?: number;
 }
 
 interface DeliverySettingsRow {
@@ -39,6 +41,7 @@ interface DeliverySettingsRow {
     express_after_cutoff_mode: string;
     express_after_cutoff_max_minutes: number | null;
     pickup_lead_time_minutes: number;
+    status_update_timeout_minutes: number;
 }
 
 @Injectable()
@@ -59,7 +62,8 @@ export class DeliverySettingsService {
                 express_cutoff_time::text AS express_cutoff_time,
                 express_after_cutoff_mode,
            express_after_cutoff_max_minutes,
-pickup_lead_time_minutes
+pickup_lead_time_minutes,
+                status_update_timeout_minutes
              FROM "${schema}".delivery_settings
              WHERE id = $1`,
             [1],
@@ -91,6 +95,8 @@ pickup_lead_time_minutes
                     : input.expressAfterCutoffMaxMinutes,
             pickupLeadTimeMinutes:
                 input.pickupLeadTimeMinutes ?? current.pickupLeadTimeMinutes,
+            statusUpdateTimeoutMinutes:
+                input.statusUpdateTimeoutMinutes ?? current.statusUpdateTimeoutMinutes,
         };
 
         this.validateSettings(updated);
@@ -105,15 +111,17 @@ pickup_lead_time_minutes
          express_after_cutoff_mode = $4,
          express_after_cutoff_max_minutes = $5,
          pickup_lead_time_minutes = $6,
+         status_update_timeout_minutes = $7,
          updated_at = NOW()
-     WHERE id = $7
+     WHERE id = $8
      RETURNING
          express_max_minutes,
          same_day_max_minutes,
          express_cutoff_time::text AS express_cutoff_time,
          express_after_cutoff_mode,
          express_after_cutoff_max_minutes,
-         pickup_lead_time_minutes`,
+         pickup_lead_time_minutes,
+         status_update_timeout_minutes`,
             [
                 updated.expressMaxMinutes,
                 updated.sameDayMaxMinutes,
@@ -121,6 +129,7 @@ pickup_lead_time_minutes
                 updated.expressAfterCutoffMode,
                 updated.expressAfterCutoffMaxMinutes,
                 updated.pickupLeadTimeMinutes,
+                updated.statusUpdateTimeoutMinutes,
                 1,
             ],
         );
@@ -130,6 +139,11 @@ pickup_lead_time_minutes
     private validateSettings(
         settings: DeliverySettings,
     ): void {
+        if (!this.isValidMinutes(settings.statusUpdateTimeoutMinutes)) {
+            throw new BadRequestException(
+                'statusUpdateTimeoutMinutes must be a positive integer',
+            );
+        }
         if (
             !Number.isSafeInteger(settings.pickupLeadTimeMinutes) ||
             settings.pickupLeadTimeMinutes < 0
@@ -214,6 +228,7 @@ pickup_lead_time_minutes
             (row.express_cutoff_time !== null &&
                 row.express_after_cutoff_mode === 'extended' &&
                 row.express_after_cutoff_max_minutes === null) ||
+            !this.isValidMinutes(row.status_update_timeout_minutes) ||
             !Number.isSafeInteger(row.pickup_lead_time_minutes) ||
             row.pickup_lead_time_minutes < 0
         ) {
@@ -231,6 +246,7 @@ pickup_lead_time_minutes
             expressAfterCutoffMaxMinutes:
                 row.express_after_cutoff_max_minutes,
             pickupLeadTimeMinutes: row.pickup_lead_time_minutes,
+            statusUpdateTimeoutMinutes: row.status_update_timeout_minutes,
         };
     }
 

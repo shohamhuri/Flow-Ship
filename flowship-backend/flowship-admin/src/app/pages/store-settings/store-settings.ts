@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+﻿import { CommonModule } from '@angular/common';
 import {
   ChangeDetectorRef,
   Component,
@@ -12,7 +12,9 @@ import {
 } from '@angular/cdk/drag-drop';
 import {
   AdminApiService,
+  AdminStore,
   WeightEstimationRule,
+  SourceDeliveryPermission,
 } from '../../services/admin-api';
 
 @Component({
@@ -36,13 +38,19 @@ export class StoreSettings implements OnInit {
 
   errorMessage = '';
   successMessage = '';
-  activeTab: 'delivery' | 'weight' = 'delivery';
+  activeTab: 'delivery' | 'weight' | 'selfDelivery' = 'delivery';
   weightRules: WeightEstimationRule[] = [];
   isLoadingWeightRules = false;
   weightRulesLoaded = false;
   isCreatingWeightRuleSaving = false;
+  stores: AdminStore[] = [];
+  selectedStoreId = '';
+  isLoadingStores = false;
+  sourcePermissions: SourceDeliveryPermission[] = [];
+  isLoadingSourcePermissions = false;
+  sourcePermissionsError = '';
   setActiveTab(
-    tab: 'delivery' | 'weight',
+    tab: 'delivery' | 'weight' | 'selfDelivery',
   ): void {
     this.activeTab = tab;
     this.errorMessage = '';
@@ -53,6 +61,9 @@ export class StoreSettings implements OnInit {
       !this.weightRulesLoaded
     ) {
       this.loadWeightRules();
+    }
+    if (tab === 'selfDelivery' && this.stores.length === 0) {
+      this.loadStores();
     }
   }
 
@@ -91,7 +102,7 @@ export class StoreSettings implements OnInit {
 
       error: () => {
         this.errorMessage =
-          'לא ניתן לטעון את הגדרות החנות.';
+          '׳׳ ׳ ׳™׳×׳ ׳׳˜׳¢׳•׳ ׳׳× ׳”׳’׳“׳¨׳•׳× ׳”׳—׳ ׳•׳×.';
 
         this.isLoading = false;
         this.cdr.detectChanges();
@@ -111,7 +122,7 @@ export class StoreSettings implements OnInit {
       minutes <= 0
     ) {
       this.errorMessage =
-        'יש להזין מספר דקות שלם וגדול מאפס.';
+        '׳™׳© ׳׳”׳–׳™׳ ׳׳¡׳₪׳¨ ׳“׳§׳•׳× ׳©׳׳ ׳•׳’׳“׳•׳ ׳׳׳₪׳¡.';
       return;
     }
     if (
@@ -120,7 +131,7 @@ export class StoreSettings implements OnInit {
       sameDayMinutes <= 0
     ) {
       this.errorMessage =
-        'יש להזין זמן תקין למשלוח מהיום להיום.';
+        '׳™׳© ׳׳”׳–׳™׳ ׳–׳׳ ׳×׳§׳™׳ ׳׳׳©׳׳•׳— ׳׳”׳™׳•׳ ׳׳”׳™׳•׳.';
       return;
     }
     const cutoffTime = this.expressCutoffTime?.trim() || null;
@@ -129,7 +140,7 @@ export class StoreSettings implements OnInit {
       cutoffTime !== null &&
       !/^([01]\d|2[0-3]):[0-5]\d$/.test(cutoffTime)
     ) {
-      this.errorMessage = 'יש להזין שעת חיתוך תקינה.';
+      this.errorMessage = '׳™׳© ׳׳”׳–׳™׳ ׳©׳¢׳× ׳—׳™׳×׳•׳ ׳×׳§׳™׳ ׳”.';
       return;
     }
 
@@ -143,7 +154,7 @@ export class StoreSettings implements OnInit {
       )
     ) {
       this.errorMessage =
-        'יש להזין מספר דקות תקין לחלון המורחב.';
+        '׳™׳© ׳׳”׳–׳™׳ ׳׳¡׳₪׳¨ ׳“׳§׳•׳× ׳×׳§׳™׳ ׳׳—׳׳•׳ ׳”׳׳•׳¨׳—׳‘.';
       return;
     }
     if (
@@ -152,7 +163,7 @@ export class StoreSettings implements OnInit {
       this.pickupLeadTimeMinutes < 0
     ) {
       this.errorMessage =
-        'זמן ההמתנה לאיסוף חייב להיות מספר שלם שאינו שלילי.';
+        '׳–׳׳ ׳”׳”׳׳×׳ ׳” ׳׳׳™׳¡׳•׳£ ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳׳¡׳₪׳¨ ׳©׳׳ ׳©׳׳™׳ ׳• ׳©׳׳™׳׳™.';
       return;
     }
     this.isSaving = true;
@@ -186,7 +197,7 @@ export class StoreSettings implements OnInit {
           this.expressAfterCutoffMaxMinutes =
             response.settings.expressAfterCutoffMaxMinutes;
           this.successMessage =
-            'הגדרות החנות נשמרו בהצלחה.';
+            '׳”׳’׳“׳¨׳•׳× ׳”׳—׳ ׳•׳× ׳ ׳©׳׳¨׳• ׳‘׳”׳¦׳׳—׳”.';
 
           this.isSaving = false;
           this.cdr.detectChanges();
@@ -194,7 +205,7 @@ export class StoreSettings implements OnInit {
 
         error: () => {
           this.errorMessage =
-            'שמירת הגדרות החנות נכשלה.';
+            '׳©׳׳™׳¨׳× ׳”׳’׳“׳¨׳•׳× ׳”׳—׳ ׳•׳× ׳ ׳›׳©׳׳”.';
 
           this.isSaving = false;
           this.cdr.detectChanges();
@@ -239,7 +250,7 @@ export class StoreSettings implements OnInit {
           );
 
           this.errorMessage =
-            'לא ניתן לטעון את כללי הערכת המשקל.';
+            '׳׳ ׳ ׳™׳×׳ ׳׳˜׳¢׳•׳ ׳׳× ׳›׳׳׳™ ׳”׳¢׳¨׳›׳× ׳”׳׳©׳§׳.';
 
           this.isLoadingWeightRules = false;
           this.cdr.detectChanges();
@@ -267,7 +278,7 @@ export class StoreSettings implements OnInit {
   cancelEditingWeightRule(): void {
     this.editingWeightRuleId = null;
 
-    // מחזירים את הערכים מהשרת
+    // ׳׳—׳–׳™׳¨׳™׳ ׳׳× ׳”׳¢׳¨׳›׳™׳ ׳׳”׳©׳¨׳×
     this.weightRulesLoaded = false;
     this.loadWeightRules();
   }
@@ -283,7 +294,7 @@ export class StoreSettings implements OnInit {
       weight <= 0
     ) {
       this.errorMessage =
-        'המשקל המשוער חייב להיות גדול מאפס.';
+        '׳”׳׳©׳§׳ ׳”׳׳©׳•׳¢׳¨ ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳’׳“׳•׳ ׳׳׳₪׳¡.';
       return;
     }
 
@@ -323,7 +334,7 @@ export class StoreSettings implements OnInit {
           this.isSavingWeightRule = false;
 
           this.successMessage =
-            'כלל הערכת המשקל נשמר בהצלחה.';
+            '׳›׳׳ ׳”׳¢׳¨׳›׳× ׳”׳׳©׳§׳ ׳ ׳©׳׳¨ ׳‘׳”׳¦׳׳—׳”.';
 
           this.cdr.detectChanges();
         },
@@ -335,8 +346,8 @@ export class StoreSettings implements OnInit {
           );
           this.errorMessage =
             error.status === 409
-              ? 'כבר קיים כלל עם אותה קטגוריה, סוג מוצר ומידה.'
-              : 'שמירת כלל הערכת המשקל נכשלה.';
+              ? '׳›׳‘׳¨ ׳§׳™׳™׳ ׳›׳׳ ׳¢׳ ׳׳•׳×׳” ׳§׳˜׳’׳•׳¨׳™׳”, ׳¡׳•׳’ ׳׳•׳¦׳¨ ׳•׳׳™׳“׳”.'
+              : '׳©׳׳™׳¨׳× ׳›׳׳ ׳”׳¢׳¨׳›׳× ׳”׳׳©׳§׳ ׳ ׳›׳©׳׳”.';
           this.isSavingWeightRule = false;
           this.cdr.detectChanges();
         },
@@ -411,7 +422,7 @@ export class StoreSettings implements OnInit {
       weight <= 0
     ) {
       this.errorMessage =
-        'המשקל המשוער חייב להיות גדול מאפס.';
+        '׳”׳׳©׳§׳ ׳”׳׳©׳•׳¢׳¨ ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳’׳“׳•׳ ׳׳׳₪׳¡.';
       return;
     }
 
@@ -435,7 +446,7 @@ export class StoreSettings implements OnInit {
 
         estimatedWeightKg: weight,
 
-        // כלל חדש נכנס כרגע בסוף סדר העדיפות
+        // ׳›׳׳ ׳—׳“׳© ׳ ׳›׳ ׳¡ ׳›׳¨׳’׳¢ ׳‘׳¡׳•׳£ ׳¡׳“׳¨ ׳”׳¢׳“׳™׳₪׳•׳×
         priority:
           (this.weightRules.length + 1) * 10,
 
@@ -460,7 +471,7 @@ export class StoreSettings implements OnInit {
           };
 
           this.successMessage =
-            'כלל הערכת המשקל נוסף בהצלחה.';
+            '׳›׳׳ ׳”׳¢׳¨׳›׳× ׳”׳׳©׳§׳ ׳ ׳•׳¡׳£ ׳‘׳”׳¦׳׳—׳”.';
 
           this.cdr.detectChanges();
         },
@@ -473,12 +484,177 @@ export class StoreSettings implements OnInit {
 
           this.errorMessage =
             error.status === 409
-              ? 'כבר קיים כלל עם אותה קטגוריה, סוג מוצר ומידה.'
-              : 'יצירת כלל הערכת המשקל נכשלה.';
+              ? '׳›׳‘׳¨ ׳§׳™׳™׳ ׳›׳׳ ׳¢׳ ׳׳•׳×׳” ׳§׳˜׳’׳•׳¨׳™׳”, ׳¡׳•׳’ ׳׳•׳¦׳¨ ׳•׳׳™׳“׳”.'
+              : '׳™׳¦׳™׳¨׳× ׳›׳׳ ׳”׳¢׳¨׳›׳× ׳”׳׳©׳§׳ ׳ ׳›׳©׳׳”.';
 
           this.isCreatingWeightRuleSaving = false;
           this.cdr.detectChanges();
         },
       });
   }
+  loadStores(): void {
+    this.isLoadingStores = true;
+
+    this.adminApiService.getStores().subscribe({
+      next: (response) => {
+        this.stores = response.stores;
+        this.isLoadingStores = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.errorMessage = '׳׳ ׳ ׳™׳×׳ ׳׳˜׳¢׳•׳ ׳׳× ׳¨׳©׳™׳׳× ׳”׳—׳ ׳•׳™׳•׳×';
+        this.isLoadingStores = false;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+  loadSourcePermissions(): void {
+    const storeId = this.selectedStoreId;
+
+    this.sourcePermissions = [];
+    this.sourcePriceInputs = {};
+    this.sourcePermissionsError = '';
+
+    if (!storeId) {
+      return;
+    }
+
+    this.isLoadingSourcePermissions = true;
+
+    this.adminApiService.getSourceDeliveryPermissions(storeId).subscribe({
+      next: (response) => {
+        // ׳׳•׳ ׳¢ ׳”׳¦׳’׳× ׳ ׳×׳•׳ ׳™׳ ׳©׳ ׳—׳ ׳•׳× ׳§׳•׳“׳׳×
+        if (this.selectedStoreId !== storeId) {
+          return;
+        }
+
+        this.sourcePermissions = response.permissions;
+
+        this.sourcePriceInputs = Object.fromEntries(
+          response.permissions.map((source) => [
+            source.sourceId,
+            source.selfDeliveryPrice == null
+              ? ''
+              : String(source.selfDeliveryPrice),
+          ]),
+        );
+
+        this.isLoadingSourcePermissions = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        if (this.selectedStoreId !== storeId) {
+          return;
+        }
+
+        this.sourcePermissionsError =
+          '׳׳ ׳ ׳™׳×׳ ׳׳˜׳¢׳•׳ ׳׳× ׳”׳¨׳©׳׳•׳× ׳”׳׳©׳׳•׳— ׳”׳¢׳¦׳׳™';
+
+        this.isLoadingSourcePermissions = false;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+  sourcePriceInputs: Record<string, string> = {};
+
+  saveSourceDeliveryPrice(source: SourceDeliveryPermission): void {
+    const storeId = this.selectedStoreId;
+
+    if (!storeId || this.savingSourceIds.has(source.sourceId)) {
+      return;
+    }
+
+    const rawPrice = this.sourcePriceInputs[source.sourceId]?.trim() ?? '';
+
+    const price = rawPrice === '' ? null : Number(rawPrice);
+
+    if (
+      price !== null &&
+      (!Number.isFinite(price) ||
+        price < 0 ||
+        price > 99999999.99 ||
+        Math.abs(price * 100 - Math.round(price * 100)) > 0.000001)
+    ) {
+      this.errorMessage = 'מחיר משלוח חייב להיות מספר תקין עם עד שתי ספרות אחרי הנקודה.';
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.savingSourceIds.add(source.sourceId);
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.adminApiService.updateSourceDeliveryPermission(
+      source.sourceId,
+      {
+        storeId,
+        selfDeliveryAllowed: source.selfDeliveryAllowed,
+        selfDeliveryPrice: price,
+      },
+    ).subscribe({
+      next: (response) => {
+        if (this.selectedStoreId === storeId) {
+          source.selfDeliveryPrice = response.permission.selfDeliveryPrice;
+          this.successMessage = 'מחיר המשלוח העצמי נשמר בהצלחה';
+        }
+
+        this.savingSourceIds.delete(source.sourceId);
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        if (this.selectedStoreId === storeId) {
+          this.errorMessage = 'שמירת מחיר המשלוח העצמי נכשלה';
+        }
+
+        this.savingSourceIds.delete(source.sourceId);
+        this.cdr.markForCheck();
+      },
+    });
+  }
+  savingSourceIds = new Set<string>();
+
+  saveSourcePermission(
+    source: SourceDeliveryPermission,
+    allowed: boolean,
+  ): void {
+    const storeId = this.selectedStoreId;
+
+    if (!storeId || this.savingSourceIds.has(source.sourceId)) {
+      return;
+    }
+
+    this.savingSourceIds.add(source.sourceId);
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.adminApiService.updateSourceDeliveryPermission(
+      source.sourceId,
+      {
+        storeId,
+        selfDeliveryAllowed: allowed,
+      },
+    ).subscribe({
+      next: (response) => {
+        if (this.selectedStoreId === storeId) {
+          source.selfDeliveryAllowed =
+            response.permission.selfDeliveryAllowed;
+
+          this.successMessage = '׳”׳¨׳©׳׳× ׳”׳׳©׳׳•׳— ׳”׳¢׳¦׳׳™ ׳ ׳©׳׳¨׳” ׳‘׳”׳¦׳׳—׳”';
+        }
+
+        this.savingSourceIds.delete(source.sourceId);
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        if (this.selectedStoreId === storeId) {
+          this.errorMessage = '׳©׳׳™׳¨׳× ׳”׳¨׳©׳׳× ׳”׳׳©׳׳•׳— ׳”׳¢׳¦׳׳™ ׳ ׳›׳©׳׳”';
+        }
+
+        this.savingSourceIds.delete(source.sourceId);
+        this.cdr.markForCheck();
+      },
+    });
+  }
 }
+
+

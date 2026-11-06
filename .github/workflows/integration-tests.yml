@@ -67,7 +67,8 @@ jobs:
             database/flowship-test-schema.sql \
             database/flowship-test-seed.sql \
             database/flowship-test-auth.sql \
-            database/flowship-test-express.sql
+            database/flowship-test-express.sql \
+            database/flowship-test-additions.sql
           do
             echo "Loading $file"
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
@@ -135,7 +136,8 @@ jobs:
             database/flowship-test-schema.sql \
             database/flowship-test-seed.sql \
             database/flowship-test-auth.sql \
-            database/flowship-test-express.sql
+            database/flowship-test-express.sql \
+            database/flowship-test-additions.sql
           do
             echo "Loading $file"
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"

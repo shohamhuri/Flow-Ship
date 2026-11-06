@@ -1,18 +1,28 @@
 import {
-    Injectable
+    Injectable,
+    NotFoundException,
+    ConflictException,
+    BadRequestException
 } from '@nestjs/common';
 import { DbService } from '../../infrastructure/database/db.service';
 import { UpdateDecisionCriterionDto } from './dto/update-decision-criterion.dto';
 import { CreateDecisionPriorityCardDto } from './dto/create-decision-priority-card.dto';
 import { UpdateDecisionPriorityCardDto } from './dto/update-decision-priority-card.dto';
 import { ReorderDecisionPriorityCardsDto } from './dto/reorder-decision-priority-cards.dto';
-import { ConflictException } from '@nestjs/common';
 import {
     UpdateWeightEstimationRuleDto,
 } from './dto/update-weight-estimation-rule.dto';
 import {
     CreateWeightEstimationRuleDto,
 } from './dto/create-weight-estimation-rule.dto';
+import { Inject } from '@nestjs/common';
+
+import { INVENTORY_PROVIDER } from
+    '../sourcing/sourcing.tokens';
+import { SourceDeliveryPermissionsService } from
+    '../sourcing/source-delivery-permissions.service';
+import type { InventoryProvider } from
+    '../sourcing/interfaces/inventory-provider.interface';
 type TenantContext = {
     id: string;
     name: string;
@@ -61,7 +71,196 @@ type ProviderCallLogsCountRow = {
 };
 @Injectable()
 export class AdminService {
-    constructor(private readonly db: DbService) { }
+    constructor(
+        private readonly db: DbService,
+
+        @Inject(INVENTORY_PROVIDER)
+        private readonly inventoryProvider: InventoryProvider,
+
+        private readonly sourceDeliveryPermissionsService:
+            SourceDeliveryPermissionsService,
+    ) { }
+    private async validateStore(
+        tenant: TenantContext,
+        storeId: string,
+    ): Promise<void> {
+        const schemaName = this.safeSchemaName(
+            tenant.schemaName,
+        );
+
+        const rows = await this.db.query<{ id: string }>(
+            `
+        SELECT id
+        FROM ${schemaName}.stores
+        WHERE external_store_id = $1
+          AND platform = 'manual'
+          AND is_active = true
+        LIMIT 1
+        `,
+            [storeId],
+        );
+
+        if (rows.length === 0) {
+            throw new NotFoundException(
+                'Active store not found for this tenant',
+            );
+        }
+    }
+    async getStores(tenant: TenantContext) {
+        const schemaName = this.safeSchemaName(
+            tenant.schemaName,
+        );
+
+        return this.db.query<{
+            id: string;
+            external_store_id: string;
+        }>(
+            `
+        SELECT id, external_store_id
+        FROM ${schemaName}.stores
+        WHERE platform = 'manual'
+          AND is_active = true
+          AND external_store_id IS NOT NULL
+        ORDER BY external_store_id ASC
+        `,
+        );
+    }
+    private async validateSource(
+        storeId: string,
+        sourceId: string,
+    ): Promise<void> {
+        const sources =
+            await this.inventoryProvider.getSources(storeId);
+
+        const sourceExists = sources.some(
+            (source) => source.id === sourceId,
+        );
+
+        if (!sourceExists) {
+            throw new BadRequestException(
+                'Source does not belong to this store',
+            );
+        }
+    }
+
+    async getSourceDeliveryPermissions(
+        tenant: TenantContext,
+        storeId: string,
+    ) {
+        await this.validateStore(tenant, storeId);
+
+        const sources =
+            await this.inventoryProvider.getSources(storeId);
+
+        const settingsBySource =
+            await this.sourceDeliveryPermissionsService
+                .getSettingsForStore(tenant, storeId);
+
+        return sources.map((source) => {
+            const settings = settingsBySource.get(source.id);
+
+            return {
+                sourceId: source.id,
+                selfDeliveryEnabled:
+                    source.selfDeliveryEnabled ?? false,
+                selfDeliveryAllowed:
+                    settings?.selfDeliveryAllowed ?? false,
+                selfDeliveryPrice:
+                    settings?.selfDeliveryPrice ?? null,
+            };
+        });
+    }
+
+
+    async updateSourceDeliveryPermission(
+        tenant: TenantContext,
+        storeId: string,
+        sourceId: string,
+        selfDeliveryAllowed: boolean,
+        selfDeliveryPrice?: number | null,
+    ) {
+        await this.validateStore(tenant, storeId);
+        await this.validateSource(storeId, sourceId);
+
+        if (typeof selfDeliveryAllowed !== 'boolean') {
+            throw new BadRequestException(
+                'selfDeliveryAllowed must be a boolean',
+            );
+        }
+
+        if (
+            selfDeliveryPrice !== undefined &&
+            selfDeliveryPrice !== null &&
+            (
+                typeof selfDeliveryPrice !== 'number' ||
+                !Number.isFinite(selfDeliveryPrice) ||
+                selfDeliveryPrice < 0 ||
+                selfDeliveryPrice > 99999999.99 ||
+                !Number.isInteger(selfDeliveryPrice * 100)
+            )
+        ) {
+            throw new BadRequestException(
+                'selfDeliveryPrice must be a non-negative amount with up to 2 decimal places',
+            );
+        }
+
+        const schemaName = this.safeSchemaName(
+            tenant.schemaName,
+        );
+
+        const rows = await this.db.query<{
+            store_id: string;
+            source_id: string;
+            self_delivery_allowed: boolean;
+            self_delivery_price: string | null;
+        }>(
+            `
+        INSERT INTO ${schemaName}.source_delivery_permissions (
+            store_id,
+            source_id,
+            self_delivery_allowed,
+            self_delivery_price
+        )
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (store_id, source_id)
+        DO UPDATE SET
+            self_delivery_allowed =
+                EXCLUDED.self_delivery_allowed,
+            self_delivery_price =
+                CASE
+                    WHEN $5::boolean THEN
+                        EXCLUDED.self_delivery_price
+                    ELSE
+                        source_delivery_permissions.self_delivery_price
+                END,
+            updated_at = NOW()
+        RETURNING
+            store_id,
+            source_id,
+            self_delivery_allowed,
+            self_delivery_price
+        `,
+            [
+                storeId,
+                sourceId,
+                selfDeliveryAllowed,
+                selfDeliveryPrice ?? null,
+                selfDeliveryPrice !== undefined,
+            ],
+        );
+
+        const row = rows[0];
+
+        return {
+            storeId: row.store_id,
+            sourceId: row.source_id,
+            selfDeliveryAllowed: row.self_delivery_allowed,
+            selfDeliveryPrice:
+                row.self_delivery_price === null
+                    ? null
+                    : Number(row.self_delivery_price),
+        };
+    }
 
     async getProviders(tenant: TenantContext) {
         const schemaName = this.safeSchemaName(tenant.schemaName);

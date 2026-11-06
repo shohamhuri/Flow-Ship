@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { DeliverySettings } from './delivery-settings.service';
 import { splitShipmentGroupBySource } from './utils/split-shipment-group-by-source';
+import { SourceDeliveryPermissionsService } from
+    '../sourcing/source-delivery-permissions.service';
+import type { SelfDeliveryQuoteResponse } from '../sourcing/interfaces/self-delivery-provider.interface';
 import type {
     VehicleQuoteResult, VehiclePlanQuoteAlternative,
 } from './interfaces/shipment-plan-quote.interface';
@@ -17,6 +20,11 @@ import { CapacityPlanningService } from
 import type { DistanceProvider } from
     '../sourcing/interfaces/distance-provider.interface';
 import { ShipmentPlanCandidate } from './interfaces/shipment-plan.interface';
+import { SELF_DELIVERY_PROVIDER } from
+    '../sourcing/sourcing.tokens';
+
+import * as selfDeliveryProviderInterface from
+    '../sourcing/interfaces/self-delivery-provider.interface';
 import {
     QuotedShipmentPlan,
     ShipmentGroupQuoteResult,
@@ -39,6 +47,10 @@ export class ShipmentPlanQuoteService {
             DeliverySettingsService,
         private readonly capacityPlanningService:
             CapacityPlanningService,
+        private readonly sourceDeliveryPermissionsService:
+            SourceDeliveryPermissionsService,
+        @Inject(SELF_DELIVERY_PROVIDER)
+        private readonly selfDeliveryProvider: selfDeliveryProviderInterface.SelfDeliveryProvider,
     ) { }
 
     private resolveExpressMaxMinutes(
@@ -101,6 +113,7 @@ export class ShipmentPlanQuoteService {
         tenant: CurrentTenant,
         confirmations: ConfirmedShipmentPlan[] = [],
         orderCreatedAt?: Date,
+        storeId?: string,
     ): Promise<QuotedShipmentPlan[]> {
         let expressMaxMinutes = 0;
         let sameDayMaxMinutes = 0;
@@ -144,6 +157,8 @@ export class ShipmentPlanQuoteService {
                     pickupLeadTimeMinutes,
                     confirmation,
                     orderCreatedAt,
+                    storeId,
+
                 );
             }),
         );
@@ -157,6 +172,7 @@ export class ShipmentPlanQuoteService {
         pickupLeadTimeMinutes: number,
         confirmation?: ConfirmedShipmentPlan,
         orderCreatedAt?: Date,
+        storeId?: string,
     ): Promise<QuotedShipmentPlan> {
         const shipmentGroups =
             plan.grouping?.shipmentGroups ?? [];
@@ -172,6 +188,7 @@ export class ShipmentPlanQuoteService {
                     pickupLeadTimeMinutes,
                     confirmation,
                     orderCreatedAt,
+                    storeId,
                 )
             ),
         );
@@ -207,7 +224,10 @@ export class ShipmentPlanQuoteService {
                     sourceQuotes.some(
                         (entry) =>
                             entry.sourceId === sourceId &&
-                            entry.quotes.length > 0,
+                            (
+                                entry.quotes.length > 0 ||
+                                entry.selfDeliveryQuote?.accepted === true
+                            ),
                     ) ||
                     vehiclePlans.some(
                         (entry) =>
@@ -222,7 +242,10 @@ export class ShipmentPlanQuoteService {
 
             return (
                 sourceQuotes.reduce(
-                    (sum, entry) => sum + entry.quotes.length,
+                    (sum, entry) =>
+                        sum +
+                        entry.quotes.length +
+                        (entry.selfDeliveryQuote?.accepted === true ? 1 : 0),
                     0,
                 ) +
                 vehiclePlans.reduce(
@@ -333,6 +356,7 @@ export class ShipmentPlanQuoteService {
         pickupLeadTimeMinutes: number,
         confirmation?: ConfirmedShipmentPlan,
         orderCreatedAt?: Date,
+        storeId?: string,
     ): Promise<ShipmentGroupQuoteResult> {
         if (group.sources.length === 0) {
             throw new Error(
@@ -341,10 +365,30 @@ export class ShipmentPlanQuoteService {
         }
         const sourceGroups = splitShipmentGroupBySource(group);
 
+
+        const selfDeliverySettings = storeId
+            ? await this.sourceDeliveryPermissionsService
+                .getSettingsForStore(tenant, storeId)
+            : new Map();
+
+
         const providers =
             await this.carriersService.getActiveProviders(tenant);
-
         const sourceVehiclePlans = sourceGroups.map((sourceGroup) => {
+
+            const deliverySettings =
+                selfDeliverySettings.get(sourceGroup.source.id);
+
+            const selfDeliveryPrice =
+                deliverySettings?.selfDeliveryPrice ?? null;
+
+            const isSelfDeliveryEligible =
+                sourceGroup.source.selfDeliveryEnabled === true &&
+                deliverySettings?.selfDeliveryAllowed === true &&
+                selfDeliveryPrice !== null &&
+                Number.isFinite(selfDeliveryPrice) &&
+                selfDeliveryPrice >= 0;
+
             const vehiclePlanItems = sourceGroup.items.flatMap((item) =>
                 Array.from({ length: item.quantity }, () => ({
                     sku: item.sku,
@@ -405,6 +449,9 @@ export class ShipmentPlanQuoteService {
                 sourceGroup,
                 providerVehiclePlans,
                 traces,
+                isSelfDeliveryEligible,
+                selfDeliveryPrice,
+
             };
         });
 
@@ -463,6 +510,8 @@ export class ShipmentPlanQuoteService {
             sourceVehiclePlans.map(async ({
                 sourceGroup,
                 providerVehiclePlans,
+                isSelfDeliveryEligible,
+                selfDeliveryPrice,
             }) => {
                 const pickupSource = pickupSources.find(
                     (source) => source.sourceId === sourceGroup.sourceId,
@@ -546,7 +595,47 @@ export class ShipmentPlanQuoteService {
                     travelMinutes !== undefined &&
                     travelMinutes <= sameDayRemainingMinutes;
 
+                let selfDeliveryQuote: SelfDeliveryQuoteResponse | null = null;
+                let selfDeliveryProviderFailed = false;
 
+                if (isSelfDeliveryEligible && storeId) {
+                    try {
+                        selfDeliveryQuote =
+                            await this.getSelfDeliveryQuoteWithRetry({
+                                storeId,
+                                sourceId: sourceGroup.sourceId,
+                                destination: {
+                                    city: destination.city,
+                                    street: destination.street,
+                                    houseNumber: destination.houseNumber,
+                                },
+                                items: sourceGroup.items.map((item) => ({
+                                    sku: item.sku,
+                                    quantity: item.quantity,
+                                })),
+                            });
+                    } catch (error) {
+                        // Supplier did not respond successfully.
+                        // Do not automatically fall back to external carriers.
+                        selfDeliveryProviderFailed = true;
+                        selfDeliveryQuote = null;
+                    }
+                }
+
+
+                if (
+                    selfDeliveryQuote?.accepted === true &&
+                    selfDeliveryPrice !== null
+                ) {
+                    selfDeliveryQuote = {
+                        ...selfDeliveryQuote,
+                        price: selfDeliveryPrice,
+                        currency: 'ILS',
+                    };
+                }
+                const useSelfDeliveryExclusively =
+                    selfDeliveryQuote?.accepted === true ||
+                    selfDeliveryProviderFailed;
                 const sourceQuoteRequest: CarrierQuoteRequest = {
                     pickupCities: [sourceGroup.source.location.city],
                     destinationCity: destination.city,
@@ -563,43 +652,51 @@ export class ShipmentPlanQuoteService {
                 };
 
                 const result =
-                    providerVehiclePlans.length === 0
-                        ? await this.carriersService.getQuotes(
-                            sourceQuoteRequest,
-                            tenant,
-                        )
-                        : {
+                    useSelfDeliveryExclusively
+                        ? {
                             quotes: [],
                             failedProviders: [],
-                        };
-
-                const vehiclePlans = await Promise.all(
-                    providerVehiclePlans.map(async (providerVehiclePlan) => {
-                        const vehicleQuotes =
-                            await this.getQuotesForVehiclePlan(
-                                providerVehiclePlan,
+                        }
+                        : providerVehiclePlans.length === 0
+                            ? await this.carriersService.getQuotes(
                                 sourceQuoteRequest,
                                 tenant,
-                            );
+                            )
+                            : {
+                                quotes: [],
+                                failedProviders: [],
+                            };
 
-                        return {
-                            sourceId: sourceGroup.sourceId,
-                            providerId: providerVehiclePlan.providerId,
-                            providerCode: providerVehiclePlan.providerCode,
-                            plan: providerVehiclePlan.plan,
-                            vehicleQuotes,
-                            alternatives:
-                                this.buildVehiclePlanAlternatives(vehicleQuotes),
-                        };
-                    }),
-                );
+                const vehiclePlans = useSelfDeliveryExclusively
+                    ? []
+                    : await Promise.all(
+                        providerVehiclePlans.map(async (providerVehiclePlan) => {
+                            const vehicleQuotes =
+                                await this.getQuotesForVehiclePlan(
+                                    providerVehiclePlan,
+                                    sourceQuoteRequest,
+                                    tenant,
+                                );
 
+                            return {
+                                sourceId: sourceGroup.sourceId,
+                                providerId: providerVehiclePlan.providerId,
+                                providerCode: providerVehiclePlan.providerCode,
+                                plan: providerVehiclePlan.plan,
+                                vehicleQuotes,
+                                alternatives:
+                                    this.buildVehiclePlanAlternatives(vehicleQuotes),
+                            };
+                        }),
+                    );
                 return {
                     sourceId: sourceGroup.sourceId,
                     result,
                     vehiclePlans,
                     travelMinutes,
+                    readyAt: pickupSource.readyAt,
                     estimatedDeliveryAt,
+                    selfDeliveryQuote,
                 };
             }),
         );
@@ -616,7 +713,9 @@ export class ShipmentPlanQuoteService {
                 sourceId: entry.sourceId,
                 quotes: entry.result.quotes,
                 travelMinutes: entry.travelMinutes,
+                readyAt: entry.readyAt,
                 estimatedDeliveryAt: entry.estimatedDeliveryAt,
+                selfDeliveryQuote: entry.selfDeliveryQuote,
             })),
             failedProviders: sourceResults.flatMap(
                 (entry) => entry.result.failedProviders,
@@ -691,4 +790,52 @@ export class ShipmentPlanQuoteService {
             ];
         });
     }
+
+    private async getSelfDeliveryQuoteWithRetry(
+        request: Parameters<selfDeliveryProviderInterface.SelfDeliveryProvider['getQuote']>[0],
+    ): Promise<SelfDeliveryQuoteResponse> {
+        const maxAttempts = 2;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            const abortController = new AbortController();
+            let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+            try {
+                return await Promise.race([
+                    this.selfDeliveryProvider.getQuote({
+                        ...request,
+                        signal: abortController.signal,
+                    }),
+                    new Promise<never>((_, reject) => {
+                        timeoutHandle = setTimeout(() => {
+                            abortController.abort();
+                            reject(
+                                new selfDeliveryProviderInterface.SelfDeliveryProviderError(
+                                    'TIMEOUT',
+                                    'Self-delivery quote timeout',
+                                    true,
+                                ),
+                            );
+                        }, 5000);
+                    }),
+                ]);
+            } catch (error) {
+                const retryable =
+                    error instanceof selfDeliveryProviderInterface.SelfDeliveryProviderError
+                        ? error.retryable
+                        : false;
+
+                if (!retryable || attempt === maxAttempts) {
+                    throw error;
+                }
+            } finally {
+                if (timeoutHandle !== undefined) {
+                    clearTimeout(timeoutHandle);
+                }
+            }
+        }
+
+        throw new Error('Self-delivery quote attempts exhausted');
+    }
+
 }

@@ -1,3 +1,5 @@
+﻿import { SourceDeliveryPermissionsService } from '../src/modules/sourcing/source-delivery-permissions.service';
+import { INVENTORY_PROVIDER } from '../src/modules/sourcing/sourcing.tokens';
 import {
     INestApplication,
     UnauthorizedException,
@@ -391,6 +393,11 @@ describe(
                                 ConfigService,
                                 TenantsService,
                                 AdminService,
+                                SourceDeliveryPermissionsService,
+                                {
+                                    provide: INVENTORY_PROVIDER,
+                                    useValue: {},
+                                },
                                 SupabaseAuthGuard,
 
                                 {

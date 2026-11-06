@@ -5,6 +5,7 @@ import {
 } from '../../checkout/capacity-planning.service'; import { QuotedShipmentPlan } from './shipment-plan-quote.interface';
 export interface SelectedVehicleShipment {
     sourceId: string;
+    deliveryMethod?: 'carrier' | 'self_delivery';
     vehicleIndex: number;
     vehicleType?: 'scooter' | 'car' | 'commercial';
     assignedWeightKg?: number;
@@ -12,6 +13,7 @@ export interface SelectedVehicleShipment {
     quote: CarrierQuoteOption;
 
     travelMinutes?: number;
+    readyAt?: string;
     estimatedDeliveryAt?: string;
 }
 export interface SelectedGroupQuote {

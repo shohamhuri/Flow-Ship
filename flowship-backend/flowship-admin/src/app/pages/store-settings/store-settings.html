@@ -22,6 +22,10 @@
             (click)="setActiveTab('weight')">
             כללי הערכת משקל
         </button>
+        <button type="button" class="settings-tab" [class.active]="activeTab === 'selfDelivery'"
+            (click)="setActiveTab('selfDelivery')">
+            משלוח עצמי
+        </button>
     </div>
 
     <div *ngIf="errorMessage" class="error-card" role="alert">
@@ -31,7 +35,133 @@
     <div *ngIf="successMessage" class="success-card" role="status">
         {{ successMessage }}
     </div>
+    <!-- Self Delivery Settings -->
+    <ng-container *ngIf="activeTab === 'selfDelivery'">
+        <section class="settings-section">
 
+            <div class="section-header">
+                <div>
+                    <span class="section-label">SELF DELIVERY</span>
+                    <h2>הרשאות משלוח עצמי</h2>
+                    <p>
+                        בחירת חנות לניהול הרשאות משלוח עצמי
+                        עבור מקורות המוצרים שלה.
+                    </p>
+                </div>
+            </div>
+
+            <div *ngIf="isLoadingStores" class="state-card">
+                טוען את רשימת החנויות...
+            </div>
+
+            <div *ngIf="!isLoadingStores" class="setting-row">
+                <div class="setting-info">
+                    <h3>בחירת חנות</h3>
+                    <p>בחר חנות כדי להציג את מקורות המוצרים שלה.</p>
+                </div>
+
+                <div class="setting-control">
+                    <label for="selfDeliveryStore">חנות</label>
+
+                    <select id="selfDeliveryStore" name="selfDeliveryStore" [(ngModel)]="selectedStoreId"
+                        (ngModelChange)="loadSourcePermissions()">
+                        <option value="">בחר חנות</option>
+
+                        <option *ngFor="let store of stores" [value]="store.external_store_id">
+                            {{ store.external_store_id }}
+                        </option>
+                    </select>
+                </div>
+            </div>
+
+            <div *ngIf="!isLoadingStores && stores.length === 0" class="state-card">
+                לא נמצאו חנויות פעילות.
+            </div>
+
+        </section>
+        <!-- Source Delivery Permissions -->
+        <div *ngIf="selectedStoreId">
+
+            <div *ngIf="isLoadingSourcePermissions" class="state-card">
+                טוען מקורות מוצרים והרשאות משלוח עצמי...
+            </div>
+
+            <div *ngIf="sourcePermissionsError" class="error-card" role="alert">
+                {{ sourcePermissionsError }}
+            </div>
+
+            <ng-container *ngIf="!isLoadingSourcePermissions && !sourcePermissionsError">
+
+                <div *ngIf="sourcePermissions.length === 0" class="state-card">
+                    לא נמצאו מקורות מוצרים עבור החנות שנבחרה.
+                </div>
+
+                <div *ngFor="let source of sourcePermissions" class="setting-row setting-row-separated">
+
+                    <div class="setting-info">
+                        <h3>{{ source.sourceId }}</h3>
+                        <p>
+                            יכולת משלוח עצמי אצל הספק:
+                            <strong>
+                                {{ source.selfDeliveryEnabled ? 'נתמכת' : 'לא נתמכת' }}
+                            </strong>
+                        </p>
+                    </div>
+
+                    <div class="setting-control">
+                        <span>
+                            הרשאת FlowShip:
+                            <strong>
+                                {{ source.selfDeliveryAllowed ? 'מאושרת' : 'לא מאושרת' }}
+                            </strong>
+                        </span>
+
+                        <button type="button" class="settings-tab" [disabled]="savingSourceIds.has(source.sourceId)"
+                            (click)="saveSourcePermission(source, !source.selfDeliveryAllowed)">
+
+                            <ng-container *ngIf="savingSourceIds.has(source.sourceId)">
+                                שומר...
+                            </ng-container>
+
+                            <ng-container *ngIf="!savingSourceIds.has(source.sourceId)">
+                                {{ source.selfDeliveryAllowed
+                                ? 'בטל הרשאת משלוח עצמי'
+                                : 'אשר משלוח עצמי' }}
+                            </ng-container>
+                        </button>
+                    </div>
+
+                    <div class="setting-control">
+                        <label [for]="'self-delivery-price-' + source.sourceId">
+                            מחיר משלוח עצמי (₪)
+                        </label>
+
+                        <input
+                            type="number"
+                            [id]="'self-delivery-price-' + source.sourceId"
+                            min="0"
+                            max="99999999.99"
+                            step="0.01"
+                            placeholder="לא הוגדר מחיר"
+                            [value]="sourcePriceInputs[source.sourceId]"
+                            (input)="sourcePriceInputs[source.sourceId] = $any($event.target).value"
+                            [disabled]="savingSourceIds.has(source.sourceId)"
+                        />
+
+                        <button
+                            type="button"
+                            class="settings-tab"
+                            [disabled]="savingSourceIds.has(source.sourceId)"
+                            (click)="saveSourceDeliveryPrice(source)">
+                            שמור מחיר
+                        </button>
+                    </div>
+
+                </div>
+
+            </ng-container>
+        </div>
+    </ng-container>
     <!-- Delivery Settings -->
     <ng-container *ngIf="activeTab === 'delivery'">
 
@@ -553,3 +683,4 @@
     </ng-container>
 
 </div>
+

@@ -3,24 +3,25 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
-  app.useGlobalPipes(
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true,
+  }); app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
     }),
   );
- const allowedOrigins = Array.from(
-  new Set([
-    'http://localhost:4200',
-    'https://flowship-admin.web.app',
-    ...(process.env.FRONTEND_URL ?? '')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean),
-  ]),
-);
+  const allowedOrigins = Array.from(
+    new Set([
+      'http://localhost:4200',
+      'https://flowship-admin.web.app',
+      ...(process.env.FRONTEND_URL ?? '')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ]),
+  );
 
   app.enableCors({
     origin: allowedOrigins,

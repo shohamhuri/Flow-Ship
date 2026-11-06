@@ -10,6 +10,7 @@ import {
 
 import { ShipmentsRepository } from '../src/modules/shipments/shipments.repository';
 import { ShipmentStatusService } from '../src/modules/shipments/shipment-status.service';
+import { SelfDeliveryFulfillmentRepository } from '../src/modules/shipments/self-delivery-fulfillment.repository';
 
 describe(
     'Shipment Event Idempotency / Out-of-Order Events Integration',
@@ -58,7 +59,13 @@ describe(
 
         async function cleanup(): Promise<void> {
             const schema = qSchema(tenant.schemaName);
-
+            await db.query(
+                `
+    delete from ${schema}.shipment_events
+    where shipment_id = $1
+    `,
+                [SHIPMENT_ID],
+            );
             await db.query(
                 `
                 delete from ${schema}.shipment_stops
@@ -83,17 +90,21 @@ describe(
                 [GROUP_ID],
             );
 
-            if (checkoutId) {
-                await db.query(
-                    `
-        delete from ${schema}.checkouts
-        where id = $1
-        `,
-                    [checkoutId],
-                );
+            await db.query(
+                `
+    delete from ${schema}.checkouts
+    where platform = $1
+      and store_id = $2
+      and external_checkout_id = $3
+    `,
+                [
+                    'integration-test',
+                    'integration-test-store',
+                    'integration-idempotency-order',
+                ],
+            );
 
-                checkoutId = null;
-            }
+            checkoutId = null;
         }
 
         async function seed(): Promise<void> {
@@ -358,6 +369,7 @@ describe(
                         CheckoutRepository,
                         ShipmentsRepository,
                         ShipmentStatusService,
+                        SelfDeliveryFulfillmentRepository,
                     ],
                 }).compile();
 

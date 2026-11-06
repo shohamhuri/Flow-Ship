@@ -364,7 +364,7 @@ export class CheckoutService {
                         tenant,
                         planConfirmations,
                         checkout.createdAt,
-
+                        checkout.storeId,
                     );
 
             const deliveryOptions =
@@ -414,7 +414,16 @@ export class CheckoutService {
                     `Winning shipment plan has no grouping result: ${winningPlan.id}`,
                 );
             }
+            const winningConfirmation = planConfirmations.find(
+                (confirmation) =>
+                    confirmation.plan.id === winningPlan.id,
+            );
 
+            if (!winningConfirmation?.confirmed) {
+                throw new Error(
+                    `Source confirmations not found for winning plan ${winningPlan.id}`,
+                );
+            }
             const grouping = winningPlan.grouping;
 
             await this.decisionService.saveShipmentDecision(
@@ -731,7 +740,7 @@ export class CheckoutService {
                         winningPlan,
                         selectedDeliveryOption,
                         tx,
-
+                        winningConfirmation,
                     );
 
 

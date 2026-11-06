@@ -1,9 +1,11 @@
-import { ConflictException } from '@nestjs/common';
+﻿import { ConflictException } from '@nestjs/common';
 
 import { AdminService } from './admin.service';
-
+import type { InventoryProvider } from
+    '../sourcing/interfaces/inventory-provider.interface';
 import { DbService } from '../../infrastructure/database/db.service';
-
+import { SourceDeliveryPermissionsService } from
+    '../sourcing/source-delivery-permissions.service';
 describe('AdminService', () => {
     let service: AdminService;
 
@@ -92,7 +94,10 @@ describe('AdminService', () => {
         created_at: new Date('2026-09-01T10:00:00.000Z'),
         updated_at: new Date('2026-09-02T10:00:00.000Z'),
     };
-
+    const permissionsServiceMock = {
+        isSelfDeliveryAllowed: jest.fn(),
+        getSettingsForStore: jest.fn(),
+    } as unknown as SourceDeliveryPermissionsService;
     beforeEach(() => {
         dbMock = {
             query: jest.fn(),
@@ -107,13 +112,463 @@ describe('AdminService', () => {
 
         service = new AdminService(
             dbMock as unknown as DbService,
+            {
+                getSources: jest.fn(),
+                getInventory: jest.fn(),
+            } as unknown as InventoryProvider,
+            permissionsServiceMock,
         );
     });
 
     afterEach(() => {
         jest.clearAllMocks();
     });
+    describe('getSourceDeliveryPermissions', () => {
+        it('should default missing permissions to false', async () => {
+            dbMock.query
+                .mockResolvedValueOnce([
+                    { id: 'store-uuid-1' },
+                ])
+                .mockResolvedValueOnce([]);
 
+            const inventoryProvider = {
+                getSources: jest.fn().mockResolvedValue([
+                    {
+                        id: 'WAREHOUSE-SOUTH',
+                        selfDeliveryEnabled: true,
+                    },
+                    {
+                        id: 'WAREHOUSE-CENTER',
+                        selfDeliveryEnabled: false,
+                    },
+                ]),
+                getInventory: jest.fn(),
+            };
+
+            const testService = new AdminService(
+                dbMock as unknown as DbService,
+                inventoryProvider as unknown as InventoryProvider,
+                permissionsServiceMock,
+            );
+            jest.spyOn(
+                permissionsServiceMock,
+                'getSettingsForStore',
+            ).mockResolvedValue(new Map());
+            const result =
+                await testService.getSourceDeliveryPermissions(
+                    tenant,
+                    'store-1',
+                );
+
+            expect(result).toEqual([
+                {
+                    sourceId: 'WAREHOUSE-SOUTH',
+                    selfDeliveryEnabled: true,
+                    selfDeliveryAllowed: false,
+                selfDeliveryPrice: null,
+                },
+                {
+                    sourceId: 'WAREHOUSE-CENTER',
+                    selfDeliveryEnabled: false,
+                    selfDeliveryAllowed: false,
+                selfDeliveryPrice: null,
+                },
+            ]);
+
+            expect(inventoryProvider.getSources)
+                .toHaveBeenCalledWith('store-1');
+
+            expect(dbMock.query).toHaveBeenCalledTimes(1);
+
+            expect(
+                permissionsServiceMock.getSettingsForStore,
+            ).toHaveBeenCalledWith(tenant, 'store-1');
+        });
+        it('should merge saved permissions with supplier capabilities', async () => {
+            dbMock.query
+                .mockResolvedValueOnce([
+                    { id: 'store-uuid-1' },
+                ])
+                .mockResolvedValueOnce([
+                    {
+                        source_id: 'WAREHOUSE-SOUTH',
+                        self_delivery_allowed: true,
+                    self_delivery_price: null,
+                    },
+                    {
+                        source_id: 'WAREHOUSE-CENTER',
+                        self_delivery_allowed: true,
+                    self_delivery_price: null,
+                    },
+                ]);
+
+            const inventoryProvider = {
+                getSources: jest.fn().mockResolvedValue([
+                    {
+                        id: 'WAREHOUSE-SOUTH',
+                        selfDeliveryEnabled: true,
+                    },
+                    {
+                        id: 'WAREHOUSE-CENTER',
+                        selfDeliveryEnabled: false,
+                    },
+                    {
+                        id: 'BRANCH-BEER-SHEVA',
+                        selfDeliveryEnabled: true,
+                    },
+                ]),
+                getInventory: jest.fn(),
+            };
+
+            const testService = new AdminService(
+                dbMock as unknown as DbService,
+                inventoryProvider as unknown as InventoryProvider,
+                permissionsServiceMock,
+            );
+            jest.spyOn(
+                permissionsServiceMock,
+                'getSettingsForStore',
+            ).mockResolvedValue(
+                new Map([
+                    ['WAREHOUSE-SOUTH', { selfDeliveryAllowed: true, selfDeliveryPrice: 40 }],
+                    ['WAREHOUSE-CENTER', { selfDeliveryAllowed: true, selfDeliveryPrice: 20 }],
+                ]),
+            );
+            const result =
+                await testService.getSourceDeliveryPermissions(
+                    tenant,
+                    'store-1',
+                );
+
+            expect(result).toEqual([
+                {
+                    sourceId: 'WAREHOUSE-SOUTH',
+                    selfDeliveryEnabled: true,
+                    selfDeliveryAllowed: true,
+                selfDeliveryPrice: 40,
+                },
+                {
+                    sourceId: 'WAREHOUSE-CENTER',
+                    selfDeliveryEnabled: false,
+                    selfDeliveryAllowed: true,
+                selfDeliveryPrice: 20,
+                },
+                {
+                    sourceId: 'BRANCH-BEER-SHEVA',
+                    selfDeliveryEnabled: true,
+                    selfDeliveryAllowed: false,
+                selfDeliveryPrice: null,
+                },
+            ]);
+
+            expect(
+                permissionsServiceMock.getSettingsForStore,
+            ).toHaveBeenCalledWith(tenant, 'store-1');
+        });
+    });
+    describe('updateSourceDeliveryPermission', () => {
+        it('should save permission in the tenant schema', async () => {
+            dbMock.query
+                .mockResolvedValueOnce([
+                    { id: 'store-uuid-1' },
+                ])
+                .mockResolvedValueOnce([
+                    {
+                        store_id: 'store-1',
+                        source_id: 'WAREHOUSE-SOUTH',
+                        self_delivery_allowed: true,
+                    self_delivery_price: null,
+                    },
+                ]);
+
+            const inventoryProvider = {
+                getSources: jest.fn().mockResolvedValue([
+                    { id: 'WAREHOUSE-SOUTH' },
+                ]),
+                getInventory: jest.fn(),
+            };
+
+            const testService = new AdminService(
+                dbMock as unknown as DbService,
+                inventoryProvider as unknown as InventoryProvider,
+                permissionsServiceMock,
+            );
+
+            const result =
+                await testService.updateSourceDeliveryPermission(
+                    tenant,
+                    'store-1',
+                    'WAREHOUSE-SOUTH',
+                    true,
+                );
+
+            expect(inventoryProvider.getSources)
+                .toHaveBeenCalledWith('store-1');
+
+            expect(dbMock.query).toHaveBeenCalledTimes(2);
+
+            const sql = dbMock.query.mock.calls[1][0];
+            const params = dbMock.query.mock.calls[1][1];
+
+            expect(sql).toContain(
+                '"queen".source_delivery_permissions',
+            );
+
+            expect(sql).toContain('ON CONFLICT');
+
+            expect(params).toEqual([
+                'store-1',
+                'WAREHOUSE-SOUTH',
+                true,
+                null,
+                false,
+            ]);
+
+            expect(result).toEqual({
+                storeId: 'store-1',
+                sourceId: 'WAREHOUSE-SOUTH',
+                selfDeliveryAllowed: true,
+            selfDeliveryPrice: null,
+            });
+        });
+        it('should save configured self-delivery price', async () => {
+            dbMock.query
+                .mockResolvedValueOnce([{ id: 'store-uuid-1' }])
+                .mockResolvedValueOnce([{
+                    store_id: 'store-1',
+                    source_id: 'WAREHOUSE-SOUTH',
+                    self_delivery_allowed: true,
+                    self_delivery_price: '40.00',
+                }]);
+
+            const inventoryProvider = {
+                getSources: jest.fn().mockResolvedValue([
+                    { id: 'WAREHOUSE-SOUTH' },
+                ]),
+                getInventory: jest.fn(),
+            };
+
+            const testService = new AdminService(
+                dbMock as unknown as DbService,
+                inventoryProvider as unknown as InventoryProvider,
+                permissionsServiceMock,
+            );
+
+            const result = await testService.updateSourceDeliveryPermission(
+                tenant,
+                'store-1',
+                'WAREHOUSE-SOUTH',
+                true,
+                40,
+            );
+
+            expect(dbMock.query.mock.calls[1][1]).toEqual([
+                'store-1',
+                'WAREHOUSE-SOUTH',
+                true,
+                40,
+                true,
+            ]);
+
+            expect(result).toEqual({
+                storeId: 'store-1',
+                sourceId: 'WAREHOUSE-SOUTH',
+                selfDeliveryAllowed: true,
+                selfDeliveryPrice: 40,
+            });
+        });
+        it('should save zero self-delivery price', async () => {
+            dbMock.query
+                .mockResolvedValueOnce([{ id: 'store-uuid-1' }])
+                .mockResolvedValueOnce([{
+                    store_id: 'store-1',
+                    source_id: 'WAREHOUSE-SOUTH',
+                    self_delivery_allowed: true,
+                    self_delivery_price: '0.00',
+                }]);
+
+            const inventoryProvider = {
+                getSources: jest.fn().mockResolvedValue([
+                    { id: 'WAREHOUSE-SOUTH' },
+                ]),
+                getInventory: jest.fn(),
+            };
+
+            const testService = new AdminService(
+                dbMock as unknown as DbService,
+                inventoryProvider as unknown as InventoryProvider,
+                permissionsServiceMock,
+            );
+
+            const result = await testService.updateSourceDeliveryPermission(
+                tenant, 'store-1', 'WAREHOUSE-SOUTH', true, 0,
+            );
+
+            expect(dbMock.query.mock.calls[1][1]).toEqual([
+                'store-1', 'WAREHOUSE-SOUTH', true, 0, true,
+            ]);
+            expect(result.selfDeliveryPrice).toBe(0);
+        });
+
+        it('should preserve existing price when only permission changes', async () => {
+            dbMock.query
+                .mockResolvedValueOnce([{ id: 'store-uuid-1' }])
+                .mockResolvedValueOnce([{
+                    store_id: 'store-1',
+                    source_id: 'WAREHOUSE-SOUTH',
+                    self_delivery_allowed: false,
+                    self_delivery_price: '40.00',
+                }]);
+
+            const inventoryProvider = {
+                getSources: jest.fn().mockResolvedValue([
+                    { id: 'WAREHOUSE-SOUTH' },
+                ]),
+                getInventory: jest.fn(),
+            };
+
+            const testService = new AdminService(
+                dbMock as unknown as DbService,
+                inventoryProvider as unknown as InventoryProvider,
+                permissionsServiceMock,
+            );
+
+            const result = await testService.updateSourceDeliveryPermission(
+                tenant, 'store-1', 'WAREHOUSE-SOUTH', false,
+            );
+
+            expect(dbMock.query.mock.calls[1][1]).toEqual([
+                'store-1', 'WAREHOUSE-SOUTH', false, null, false,
+            ]);
+
+            const sql = dbMock.query.mock.calls[1][0];
+            expect(sql).toMatch(/CASE\s+WHEN\s+[$]5::boolean/);
+            expect(sql).toContain('source_delivery_permissions.self_delivery_price');
+            expect(result.selfDeliveryPrice).toBe(40);
+        });
+        it('should reject a store that does not exist', async () => {
+            dbMock.query.mockResolvedValueOnce([]);
+
+            await expect(
+                service.updateSourceDeliveryPermission(
+                    tenant,
+                    'unknown-store',
+                    'WAREHOUSE-SOUTH',
+                    true,
+                ),
+            ).rejects.toThrow(
+                'Active store not found for this tenant',
+            );
+
+            expect(dbMock.query).toHaveBeenCalledTimes(1);
+
+            const sql = dbMock.query.mock.calls[0][0];
+
+            expect(sql).toContain('"queen".stores');
+            expect(sql).toContain('is_active = true');
+
+            expect(dbMock.query.mock.calls[0][1]).toEqual([
+                'unknown-store',
+            ]);
+        });
+        it('should reject a source that does not belong to the store', async () => {
+            dbMock.query.mockResolvedValueOnce([
+                { id: 'store-uuid-1' },
+            ]);
+
+            const inventoryProvider = {
+                getSources: jest.fn().mockResolvedValue([
+                    { id: 'WAREHOUSE-CENTER' },
+                ]),
+                getInventory: jest.fn(),
+            };
+
+            const testService = new AdminService(
+                dbMock as unknown as DbService,
+                inventoryProvider as unknown as InventoryProvider,
+                permissionsServiceMock,
+            );
+
+            await expect(
+                testService.updateSourceDeliveryPermission(
+                    tenant,
+                    'store-1',
+                    'WAREHOUSE-SOUTH',
+                    true,
+                ),
+            ).rejects.toThrow(
+                'Source does not belong to this store',
+            );
+
+            expect(inventoryProvider.getSources)
+                .toHaveBeenCalledWith('store-1');
+
+            expect(dbMock.query).toHaveBeenCalledTimes(1);
+        });
+        it('should update an existing permission to false', async () => {
+            dbMock.query
+                .mockResolvedValueOnce([
+                    { id: 'store-uuid-1' },
+                ])
+                .mockResolvedValueOnce([
+                    {
+                        store_id: 'store-1',
+                        source_id: 'WAREHOUSE-SOUTH',
+                        self_delivery_allowed: false,
+                    self_delivery_price: null,
+                    },
+                ]);
+
+            const inventoryProvider = {
+                getSources: jest.fn().mockResolvedValue([
+                    { id: 'WAREHOUSE-SOUTH' },
+                ]),
+                getInventory: jest.fn(),
+            };
+
+            const testService = new AdminService(
+                dbMock as unknown as DbService,
+                inventoryProvider as unknown as InventoryProvider,
+                permissionsServiceMock,
+            );
+
+            const result =
+                await testService.updateSourceDeliveryPermission(
+                    tenant,
+                    'store-1',
+                    'WAREHOUSE-SOUTH',
+                    false,
+                );
+
+            expect(dbMock.query).toHaveBeenCalledTimes(2);
+
+            const sql = dbMock.query.mock.calls[1][0];
+            const params = dbMock.query.mock.calls[1][1];
+
+            expect(sql).toContain(
+                'ON CONFLICT (store_id, source_id)',
+            );
+
+            expect(sql).toContain(
+                'EXCLUDED.self_delivery_allowed',
+            );
+
+            expect(params).toEqual([
+                'store-1',
+                'WAREHOUSE-SOUTH',
+                false,
+                null,
+                false,
+            ]);
+
+            expect(result).toEqual({
+                storeId: 'store-1',
+                sourceId: 'WAREHOUSE-SOUTH',
+                selfDeliveryAllowed: false,
+            selfDeliveryPrice: null,
+            });
+        });
+    });
     // =========================================================
     // getProviders
     // =========================================================
@@ -1630,3 +2085,8 @@ describe('AdminService', () => {
         });
     });
 });
+
+
+
+
+

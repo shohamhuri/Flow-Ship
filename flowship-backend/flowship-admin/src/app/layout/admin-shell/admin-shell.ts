@@ -22,6 +22,7 @@ import {
   Users,
   LucideIconData,
   Settings,
+  TriangleAlert,
 } from 'lucide-angular';
 import { AuthService } from '../../services/auth';
 import { AdminApiService } from '../../services/admin-api';
@@ -97,11 +98,19 @@ export class AdminShellComponent implements OnInit {
       icon: Package,
     },
     {
+      label: 'ניטור חריגות משלוחים',
+      subtitle: 'איחורים ועדכוני סטטוס',
+      route: '/admin/shipment-monitoring',
+      icon: TriangleAlert,
+    },
+    {
       label: 'רכישות קבוצתיות',
       subtitle: 'Shared / Group Buying',
       route: '/admin/group-purchases',
       icon: Users,
     },
+
+
     {
       label: 'הגדרות חנות',
       subtitle: 'הגדרות כלליות ומשלוחים',
