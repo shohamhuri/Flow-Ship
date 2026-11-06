@@ -49,6 +49,7 @@ describe('Express Cutoff Integration', () => {
 
         expect(settings).toEqual({
             expressMaxMinutes: 120,
+            statusUpdateTimeoutMinutes: 60,
             sameDayMaxMinutes: 1440,
             expressCutoffTime: '12:00:00',
             expressAfterCutoffMode: 'extended',

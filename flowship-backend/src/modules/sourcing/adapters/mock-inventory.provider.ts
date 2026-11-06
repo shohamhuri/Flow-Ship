@@ -130,6 +130,7 @@ export class MockInventoryProvider implements InventoryProvider {
         storeId: string,
     ): Promise<SupplySource[]> {
         const sourceIdsByStore: Record<string, string[]> = {
+            'PIPELINE-STORE': ['WAREHOUSE-SOUTH', 'WAREHOUSE-CENTER', 'BRANCH-BEER-SHEVA'],
             'store-1': [
                 'WAREHOUSE-SOUTH',
                 'WAREHOUSE-CENTER',

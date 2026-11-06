@@ -1,3 +1,5 @@
+﻿import { MockSelfDeliveryProvider } from '../src/modules/sourcing/providers/mock-self-delivery.provider';
+import { SourceDeliveryPermissionsService } from '../src/modules/sourcing/source-delivery-permissions.service';
 import {
     ConfigModule,
     ConfigService,
@@ -35,6 +37,7 @@ import {
     INVENTORY_PROVIDER,
     DISTANCE_PROVIDER,
     SOURCE_CONFIRMATION_PROVIDER,
+    SELF_DELIVERY_PROVIDER,
 } from '../src/modules/sourcing/sourcing.tokens';
 import { MockSourceConfirmationProvider } from
     '../src/modules/sourcing/providers/mock-source-confirmation.provider';
@@ -187,6 +190,11 @@ describe(
                                  */
                                 MockInventoryProvider,
                                 MockSourceConfirmationProvider,
+                                MockSelfDeliveryProvider,
+                                {
+                                    provide: SELF_DELIVERY_PROVIDER,
+                                    useExisting: MockSelfDeliveryProvider,
+                                },
 
                                 {
                                     provide:
@@ -208,6 +216,7 @@ describe(
                                     },
                                 },
 
+                                SourceDeliveryPermissionsService,
                                 SourcingService,
 
                                 /*
@@ -2597,3 +2606,4 @@ describe(
     },
 
 );
+

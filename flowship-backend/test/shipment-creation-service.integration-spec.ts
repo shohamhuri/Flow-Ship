@@ -1,3 +1,4 @@
+import { ConfirmedShipmentPlan } from '../src/modules/planning/shipment-plan-confirmation.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'crypto';
@@ -481,7 +482,27 @@ describe(
                         plan,
                     );
 
-                const result =
+                const winningConfirmation: ConfirmedShipmentPlan = {
+    plan,
+    confirmed: true,
+    confirmations: [
+        {
+            sourceId: 'integration-source',
+            available: true,
+            preparationMinutes: 25,
+            items: [
+                {
+                    sku: 'SKU-INTEGRATION',
+                    requestedQuantity: 2,
+                    availableQuantity: 10,
+                },
+            ],
+            confirmedAt: new Date().toISOString(),
+        },
+    ],
+    confirmedAt: new Date().toISOString(),
+};
+const result =
                     await shipmentCreationService
                         .createShipments(
                             tenantA,
@@ -489,7 +510,9 @@ describe(
                             checkout,
                             plan,
                             deliveryOption,
-                        );
+                            undefined,
+                            winningConfirmation,
+                        );;
 
                 expect(
                     result,
@@ -580,7 +603,7 @@ preparation_time_minutes
                 );
                 expect(
                     rows[0].preparation_time_minutes,
-                ).toBe(0);
+                ).toBe(25);
                 expect(
                     rows[0],
                 ).toMatchObject({
@@ -878,8 +901,7 @@ preparation_time_minutes
                             checkoutAId,
                             checkout,
                             plan,
-                            deliveryOption,
-                        ),
+                            deliveryOption,),
                 ).rejects.toThrow(
                     'does not belong to plan',
                 );
@@ -949,8 +971,7 @@ preparation_time_minutes
                             checkoutAId,
                             checkout,
                             plan,
-                            deliveryOption,
-                        ),
+                            deliveryOption,),
                 ).rejects.toThrow(
                     'has no supply sources',
                 );

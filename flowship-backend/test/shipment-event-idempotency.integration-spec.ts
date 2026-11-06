@@ -10,6 +10,7 @@ import {
 
 import { ShipmentsRepository } from '../src/modules/shipments/shipments.repository';
 import { ShipmentStatusService } from '../src/modules/shipments/shipment-status.service';
+import { SelfDeliveryFulfillmentRepository } from '../src/modules/shipments/self-delivery-fulfillment.repository';
 
 describe(
     'Shipment Event Idempotency / Out-of-Order Events Integration',
@@ -368,6 +369,7 @@ describe(
                         CheckoutRepository,
                         ShipmentsRepository,
                         ShipmentStatusService,
+                        SelfDeliveryFulfillmentRepository,
                     ],
                 }).compile();
 

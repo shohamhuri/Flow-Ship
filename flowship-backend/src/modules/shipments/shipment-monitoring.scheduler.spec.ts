@@ -1,5 +1,6 @@
 
 import type { ShipmentMonitoringService } from './shipment-monitoring.service';
+import type { SelfDeliveryPollingService } from './self-delivery-polling.service';
 import type { TenantsService } from '../tenants/tenants.service';
 import type { ShipmentMonitoringScheduler as SchedulerType } from './shipment-monitoring.scheduler';
 
@@ -29,6 +30,9 @@ describe('ShipmentMonitoringScheduler', () => {
     let monitoringService: {
         monitorTenant: jest.Mock;
     };
+    let pollingService: {
+        pollActiveShipments: jest.Mock;
+    };
 
     beforeEach(() => {
         tenantsService = {
@@ -44,9 +48,14 @@ describe('ShipmentMonitoringScheduler', () => {
             monitorTenant: jest.fn().mockResolvedValue(undefined),
         };
 
+        pollingService = {
+            pollActiveShipments: jest.fn().mockResolvedValue(undefined),
+        };
+
         scheduler = new ShipmentMonitoringScheduler(
             tenantsService as unknown as TenantsService,
             monitoringService as unknown as ShipmentMonitoringService,
+            pollingService as unknown as SelfDeliveryPollingService,
         );
     });
 
@@ -60,6 +69,15 @@ describe('ShipmentMonitoringScheduler', () => {
             .toHaveBeenCalledWith(tenantA);
 
         expect(monitoringService.monitorTenant)
+            .toHaveBeenCalledWith(tenantB);
+
+        expect(pollingService.pollActiveShipments)
+            .toHaveBeenCalledTimes(2);
+
+        expect(pollingService.pollActiveShipments)
+            .toHaveBeenCalledWith(tenantA);
+
+        expect(pollingService.pollActiveShipments)
             .toHaveBeenCalledWith(tenantB);
     });
 

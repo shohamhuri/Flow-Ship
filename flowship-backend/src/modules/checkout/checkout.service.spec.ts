@@ -1,4 +1,4 @@
-import {
+﻿import {
     CheckoutService,
 } from './checkout.service';
 import {
@@ -1827,7 +1827,11 @@ describe('CheckoutService', () => {
                 expect.objectContaining({
                     query: expect.any(Function),
                     queryOne: expect.any(Function),
+                }),                expect.objectContaining({
+                    confirmed: true,
+                    confirmations: expect.any(Array),
                 }),
+
             );
 
             const saveGroupingOrder =
@@ -2096,3 +2100,4 @@ describe('CheckoutService', () => {
         });
     });
 });
+

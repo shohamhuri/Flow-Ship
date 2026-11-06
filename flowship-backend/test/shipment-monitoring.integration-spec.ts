@@ -1,7 +1,8 @@
-﻿import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'crypto';
 import { ShipmentMonitoringService } from '../src/modules/shipments/shipment-monitoring.service';
+import { SelfDeliveryPollingService } from '../src/modules/shipments/self-delivery-polling.service';
 import { DbService } from '../src/infrastructure/database/db.service';
 import {
     TenantsService,
@@ -35,6 +36,12 @@ describe('ShipmentMonitoringRepository Integration', () => {
                 ShipmentMonitoringRepository,
                 ShipmentMonitoringService,
                 ShipmentMonitoringScheduler,
+                {
+                    provide: SelfDeliveryPollingService,
+                    useValue: {
+                        pollActiveShipments: jest.fn().mockResolvedValue(undefined),
+                    },
+                },
             ],
         }).compile();
 

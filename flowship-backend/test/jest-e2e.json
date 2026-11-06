@@ -1,22 +1,25 @@
 {
-  "moduleFileExtensions": [
-    "js",
-    "json",
-    "ts"
-  ],
-  "rootDir": "..",
-  "testEnvironment": "node",
-  "testRegex": ".*\\.e2e-spec\\.ts$",
-  "transform": {
-    "^.+\\.(t|j)s$": [
-      "ts-jest",
-      {
-        "tsconfig": "test/tsconfig.integration.json"
-      }
-    ]
-  },
-  "testTimeout": 60000,
-  "setupFiles": [
-    "<rootDir>/test/integration-safety.ts"
-  ]
+  "moduleFileExtensions":  [
+                               "js",
+                               "json",
+                               "ts"
+                           ],
+  "rootDir":  "..",
+  "testEnvironment":  "node",
+  "testRegex":  ".*\\.e2e-spec\\.ts$",
+  "transform":  {
+                    "^.+\\.(t|j)s$":  [
+                                          "ts-jest",
+                                          {
+                                              "tsconfig":  "test/tsconfig.integration.json"
+                                          }
+                                      ]
+                },
+  "testTimeout":  60000,
+  "setupFiles":  [
+                     "<rootDir>/test/integration-safety.ts"
+                 ],
+  "transformIgnorePatterns":  [
+                                  "node_modules/(?!@nestjs/schedule/)"
+                              ]
 }

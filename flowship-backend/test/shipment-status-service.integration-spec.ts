@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+﻿import { BadRequestException } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'crypto';
@@ -12,6 +12,7 @@ import {
 
 import { ShipmentsRepository } from '../src/modules/shipments/shipments.repository';
 
+import { SelfDeliveryFulfillmentRepository } from '../src/modules/shipments/self-delivery-fulfillment.repository';
 import { ShipmentStatusService } from '../src/modules/shipments/shipment-status.service';
 
 describe('ShipmentStatusService Integration', () => {
@@ -48,6 +49,7 @@ describe('ShipmentStatusService Integration', () => {
                     DbService,
                     TenantsService,
                     ShipmentsRepository,
+                    SelfDeliveryFulfillmentRepository,
                     ShipmentStatusService,
                 ],
             }).compile();
@@ -369,6 +371,21 @@ describe('ShipmentStatusService Integration', () => {
     }, 30000);
 
     afterAll(async () => {
+        await db.query(
+            `
+            delete from flow_ship_test_a.shipment_events
+            where shipment_id = any($1::uuid[])
+            `,
+            [[shipmentA1Id, shipmentA2Id]],
+        );
+
+        await db.query(
+            `
+            delete from flow_ship_test_b.shipment_events
+            where shipment_id = $1
+            `,
+            [shipmentBId],
+        );
         await db.query(
             `
             delete from flow_ship_test_a.shipment_stops
@@ -802,3 +819,4 @@ describe('ShipmentStatusService Integration', () => {
         ).toHaveLength(0);
     });
 });
+

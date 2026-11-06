@@ -1,3 +1,4 @@
+﻿import { SelfDeliveryFulfillmentRepository } from '../src/modules/shipments/self-delivery-fulfillment.repository';
 import {
     INestApplication,
     ValidationPipe,
@@ -306,6 +307,7 @@ describe(
                                 ConfigService,
                                 TenantsService,
                                 ShipmentsRepository,
+                                SelfDeliveryFulfillmentRepository,
                                 ShipmentStatusService,
                             ],
                         })
@@ -425,6 +427,17 @@ describe(
                     ) {
                         await db.query(
                             `
+                            delete from ${schemaA}.shipment_events
+                            where shipment_id =
+                                any($1::uuid[])
+                            `,
+                            [
+                                createdShipmentsA,
+                            ],
+                        );
+
+                        await db.query(
+                            `
                             delete from ${schemaA}.shipment_stops
                             where shipment_id =
                                 any($1::uuid[])
@@ -450,6 +463,17 @@ describe(
                     if (
                         createdShipmentsB.length
                     ) {
+                        await db.query(
+                            `
+                            delete from ${schemaB}.shipment_events
+                            where shipment_id =
+                                any($1::uuid[])
+                            `,
+                            [
+                                createdShipmentsB,
+                            ],
+                        );
+
                         await db.query(
                             `
                             delete from ${schemaB}.shipment_stops
@@ -1185,3 +1209,5 @@ describe(
         );
     },
 );
+
+

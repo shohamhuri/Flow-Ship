@@ -18,5 +18,8 @@
     "testTimeout":  30000,
     "setupFiles":  [
                        "\u003crootDir\u003e/test/integration-safety.ts"
-                   ]
+                   ],
+    "transformIgnorePatterns":  [
+                                    "node_modules/(?!@nestjs/schedule/)"
+                                ]
 }
